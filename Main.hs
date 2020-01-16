@@ -7,4 +7,5 @@ main :: IO ()
 main = do
   args <- getProgramOptions
   let n = iterations args
-  test n
+  let infile = inFile args
+  test infile n

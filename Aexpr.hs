@@ -6,6 +6,8 @@ import Debug.Trace
 import qualified Data.Map as M
 import qualified Data.Set as S
 
+import ErrorMsg
+
 -- we want to parse complex expressions and transform them to Expr afterwards
 -- TODO try to add more AConst types
 data AExpr a
@@ -21,18 +23,18 @@ data AExpr a
   | AAnds [AExpr a]
   | AOrs  [AExpr a]
   | AXors [AExpr a]
-  deriving (Show,Eq)
+  deriving (Ord,Eq,Show)
 
 data AUnOp
   = ANeg | ANot
-  deriving (Show,Eq)
+  deriving (Ord,Eq,Show)
 
 data ABinOp
   = ADiv | AMult | AAdd | ASub
   | AMin | AMax
   | AAnd | AOr | AXor
   | ALT | ALE | AEQ | AGE | AGT
-  deriving (Show,Eq)
+  deriving (Ord,Eq,Show)
 
 -- this has been stolen from Data.Logic.Propositional.NormalForms and adjusted to our data types
 neg :: AExpr a -> AExpr a
@@ -207,10 +209,10 @@ getAllAExprVarData f aexpr =
 
 --------------------------
 -- evaluate an aexpr
-evalAexpr :: (a -> Int) -> AExpr a -> AExpr Int
-evalAexpr evalBase aexpr =
+evalAexpr :: (Show a) => AExpr a -> AExpr Int
+evalAexpr aexpr =
     case aexpr of
-        AVar x      -> AConstNum $ evalBase x
+        AVar x      -> error $ error_nonGroundTerm x
         AConstNum c -> AConstNum c
         AConstStr c -> AConstNum $ hash c
 
@@ -239,18 +241,18 @@ evalAexpr evalBase aexpr =
         ABinary AEQ x1 x2  -> AConstNum $ if (processRec x1) == (processRec x2) then 1 else 0
         ABinary AGE x1 x2  -> AConstNum $ if (processRec x1) >= (processRec x2) then 1 else 0
         ABinary AGT x1 x2  -> AConstNum $ if (processRec x1) >  (processRec x2) then 1 else 0
-    where processRec x = let y = evalAexpr evalBase x in
+    where processRec x = let y = evalAexpr x in
                                   case y of
                                       (AConstNum c) -> c
 
 ------------------------------------------------------------------------------------
-updateAexprVars :: Ord a => (M.Map a b) -> (a -> b) -> AExpr a -> AExpr b
+updateAexprVars :: Ord a => (M.Map a (AExpr b)) -> (a -> AExpr b) -> AExpr a -> AExpr b
 updateAexprVars dataMap f aexpr =
     case aexpr of
 
-        AVar x   -> AVar $ if M.member x dataMap then dataMap M.! x else f x
+        AVar x      -> if M.member x dataMap then dataMap M.! x else f x
         AConstNum c -> AConstNum c
-        AConstStr c  -> AConstStr c
+        AConstStr c -> AConstStr c
 
         ASum  xs -> ASum  $ map processRec xs
         AProd xs -> AProd $ map processRec xs
