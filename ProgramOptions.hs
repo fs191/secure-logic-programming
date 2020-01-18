@@ -14,7 +14,7 @@ data ProgramOptions
 programArgs :: Parser ProgramOptions
 programArgs = ProgramOptions
   <$> strArgument (metavar "DATALOG PROGRAM" <> help "input file containing datalog program")
-  <*> option auto (short 'n' <> long "iterations" <> value 100 <> help "specify the maximum number of iterations")
+  <*> option auto (short 'n' <> long "iterations" <> value 10 <> help "specify the maximum number of iterations")
 
 getProgramOptions :: IO ProgramOptions
 getProgramOptions = execParser opts

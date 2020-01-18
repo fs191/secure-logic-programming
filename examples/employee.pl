@@ -1,5 +1,5 @@
-eds(public string employee,public string department,private int salary).
-dm(public string department, public string manager).
+data eds(public string employee,public string department,private int salary).
+data dm(public string department, public string manager).
 
 secureEDS(E,D,0) :-
     eds(E,D,S),

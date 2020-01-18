@@ -34,7 +34,8 @@ warningTag = "WARNING:"
 error_parseProgram s t = errorTag ++ " Could not parse the datalog program from file " ++ show s ++ "\nError details: " ++ t
 
 -- TODO we could probably track the error location better...
-error_nonGroundTerm x  = errorTag ++ "ERROR! a free variable " ++ show x ++ " in a term used in ABB operation."
+error_nonGroundTerm x  = errorTag ++ "A non-ground term " ++ show x ++ " used in ABB operation."
+error_nonConstantTerm x  = errorTag ++ "A non-ground term " ++ show x ++ " was tried to be evaluated."
 
 -- internall errors that may come due to bugs
 error_mapElem x xs     = inErrTag ++ " Element " ++ show x ++ " is not in the map " ++ show xs

@@ -33,7 +33,7 @@ type Parser = Parsec Void String
 ---------------------------------------------------------------------------------------------
 -- keywords
 allKeyWordList :: [String]
-allKeyWordList = []
+allKeyWordList = ["data","int","string","private","public"]
 
 allKeyWords :: S.Set String -- set of reserved "words"
 allKeyWords = S.fromList allKeyWordList
@@ -73,7 +73,7 @@ bExpr = makeExprParser bTerm bOperators
 
 notAExpr :: Parser (AExpr a -> AExpr a)
 notAExpr = do
-  caseInsensKeyWord "not"
+  caseInsensKeyWord "\\+"
   return $ AUnary ANot
 
 bOperators :: [[Operator Parser Arg]]
@@ -90,9 +90,9 @@ bOperators =
     , InfixL (ABinary AGE <$ symbol ">=")
     , InfixL (ABinary AGT <$ symbol ">") ]
 
+  --TODO we will need to use LP notation here
   , [ InfixL (ABinary AAnd <$ caseInsensKeyWord "and")]
-  , [ InfixL (ABinary AOr  <$ caseInsensKeyWord "or")
-    , InfixL (ABinary AXor  <$ caseInsensKeyWord "xor")]
+  , [ InfixL (ABinary AOr  <$ caseInsensKeyWord "or")]
 
   ]
 
@@ -108,22 +108,25 @@ datalogProgram = manyRules <|> oneRule
 
 manyRules :: Parser (M.Map PName PMap, M.Map PName [Rule])
 manyRules = do
-    xs <- many ruleOrFactClause
+    xs <- many clause
     let xs1 = lefts xs  --database facts
     let xs2 = rights xs --rules
     return (M.fromListWith (M.union) xs1, M.fromListWith (++) xs2)
 
 oneRule :: Parser (M.Map PName PMap, M.Map PName [Rule])
 oneRule = do
-    x <- ruleOrFactClause
+    x <- clause
     let xs1 = case x of {Left  z -> [z]; _ -> []}  --database facts
     let xs2 = case x of {Right z -> [z]; _ -> []}  --rule
     return (M.fromList xs1, M.fromList xs2)
 
-ruleOrFactClause :: Parser (Either (PName, PMap) (PName, [Rule]))
+clause :: Parser (Either (PName, PMap) (PName, [Rule]))
+clause = do
+    dbClause <|> ruleOrFactClause
+
 ruleOrFactClause = do
     (pname,args) <- ruleHead
-    factClause pname args <|> ruleClause pname args
+    ruleClause pname args <|> factClause pname args
 
 ruleClause pname args = do
     void (impliedBy)
@@ -133,6 +136,12 @@ ruleClause pname args = do
 factClause pname args = do
   void(delimRules)
   return $ Left (pname, M.singleton args (AConstNum 1))
+
+dbClause = do
+  keyWord ("data")
+  (pname,args) <- ruleHead
+  void(delimRules)
+  return $ Left (pname, M.singleton args (ANary (AMember pname) args))
 
 ruleHead :: Parser (PName, [Arg])
 ruleHead = do
