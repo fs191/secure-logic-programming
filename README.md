@@ -12,8 +12,8 @@ Building for the first time:
 
 `cabal build`
 
-The executable is created in the subdirectory dist/build/lesca, thus to execute it:
-    dist/build/lesca/lesca
+The executable is created in the subdirectory dist/build/lpsec, thus to execute it:
+    dist/build/lpsec/lpsec
 
 Later, only 
 `cabal build`

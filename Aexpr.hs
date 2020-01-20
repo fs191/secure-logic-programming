@@ -12,6 +12,7 @@ import ErrorMsg
 -- TODO try to add more AConst types
 data AExpr a
   = AVar a
+  | AConstBool Bool
   | AConstNum Int
   | AConstStr String
   | AUnary  AUnOp   (AExpr a)
@@ -31,7 +32,7 @@ data ABinOp
   deriving (Ord,Eq,Show)
 
 data AListOp
-  = ASum  | AProd | AMins | AMaxs | AAnds | AOrs | AMember String
+  = ASum  | AProd | AAnds | AOrs | AMember String
   deriving (Ord,Eq,Show)
 
 -- this has been stolen from Data.Logic.Propositional.NormalForms and adjusted to our data types
@@ -103,36 +104,36 @@ foldBool expr =
     res
 
 unfoldBool :: (Eq a) => AExpr a -> AExpr a
-unfoldBool (ANary AAnds []) = AConstNum 1
+unfoldBool (ANary AAnds []) = AConstBool True
 unfoldBool (ANary AAnds (x:xs)) =
     foldl (ABinary AAnd) (unfoldBool x) $ map unfoldBool xs
 
-unfoldBool (ANary AOrs []) = AConstNum 0
+unfoldBool (ANary AOrs []) = AConstBool False
 unfoldBool (ANary AOrs (x:xs)) =
     foldl (ABinary AOr) (unfoldBool x) $ map unfoldBool xs
 
 unfoldBool x = x
 
 simplifyFoldedBool :: (Eq a) => AExpr a -> AExpr a
-simplifyFoldedBool (ANary AOrs []) = AConstNum 0
+simplifyFoldedBool (ANary AOrs []) = AConstBool False
 simplifyFoldedBool (ANary AOrs xs) =
     let ys = map simplifyFoldedBool xs in
-    if elem (AConstNum 1) ys then (AConstNum 1)
+    if elem (AConstBool True) ys then (AConstBool True)
     else
-         let zs = filter ((AConstNum 0) /=) ys in
+         let zs = filter ((AConstBool False) /=) ys in
          case zs of
-             []  -> AConstNum 0
+             []  -> AConstBool False
              [z] -> z
              _   -> ANary AOrs $ nub zs
 
-simplifyFoldedBool (ANary AAnds []) = AConstNum 1
+simplifyFoldedBool (ANary AAnds []) = AConstBool True
 simplifyFoldedBool (ANary AAnds xs) =
     let ys = map simplifyFoldedBool xs in
-    if elem (AConstNum 0) ys then (AConstNum 0)
+    if elem (AConstBool False) ys then (AConstBool False)
     else
-         let zs = filter ((AConstNum 1) /=) ys in
+         let zs = filter ((AConstBool True) /=) ys in
          case zs of
-             []  -> AConstNum 1
+             []  -> AConstBool True
              [z] -> z
              _   -> ANary AAnds $ nub zs
 
@@ -149,11 +150,11 @@ simplifyBool expr =
     x3
 
 ------------------------------------------------------------------------------------
--- TODO adjust this to SecreC syntax
 aexprToString :: Show a => AExpr a -> String
 aexprToString aexpr =
     case aexpr of
         AVar x -> show x
+        AConstBool b -> case b of {True -> "true"; False -> "false"}
         AConstNum c -> show c
         AConstStr s -> s
 
@@ -161,8 +162,6 @@ aexprToString aexpr =
 
         ANary ASum xs -> "(" ++ intercalate " + " (map aexprToString xs) ++ ")"
         ANary AProd xs -> "(" ++ intercalate " * " (map aexprToString xs) ++ ")"
-        ANary AMins xs -> "min(" ++ intercalate "," (map aexprToString xs) ++ ")"
-        ANary AMaxs xs -> "max(" ++ intercalate "," (map aexprToString xs) ++ ")"
         ANary AAnds xs -> "(" ++ intercalate " AND " (map aexprToString xs) ++ ")"
         ANary AOrs  xs -> "(" ++ intercalate " OR " (map aexprToString xs) ++ ")"
 
@@ -173,8 +172,6 @@ aexprToString aexpr =
         ABinary AMult x1 x2 -> "(" ++ aexprToString x1 ++ " * " ++ aexprToString x2 ++ ")"
         ABinary AAdd x1 x2 -> "(" ++ aexprToString x1 ++ " + " ++ aexprToString x2 ++ ")"
         ABinary ASub x1 x2 -> "(" ++ aexprToString x1 ++ " - " ++ aexprToString x2 ++ ")"
-        ABinary AMin x1 x2 -> "min(" ++ aexprToString x1 ++ ", " ++ aexprToString x2 ++ ")"
-        ABinary AMax x1 x2 -> "max(" ++ aexprToString x1 ++ ", " ++ aexprToString x2 ++ ")"
         ABinary AAnd x1 x2 -> "(" ++ aexprToString x1 ++ " AND " ++ aexprToString x2 ++ ")"
         ABinary AOr  x1 x2 -> "(" ++ aexprToString x1 ++ " OR " ++ aexprToString x2 ++ ")"
         ABinary ALT x1 x2  -> "(" ++ aexprToString x1 ++ " < " ++ aexprToString x2 ++ ")"
@@ -188,9 +185,10 @@ aexprToString aexpr =
 getAllAExprVarData :: Ord b => (a -> b) -> AExpr a -> S.Set b
 getAllAExprVarData f aexpr =
     case aexpr of
-        AVar x      -> S.singleton $ f x
-        AConstNum c -> S.empty
-        AConstStr c -> S.empty
+        AVar x       -> S.singleton $ f x
+        AConstBool b -> S.empty
+        AConstNum  c -> S.empty
+        AConstStr  c -> S.empty
 
         ANary _ xs      -> foldr S.union S.empty $ map processRec xs
         AUnary _ x      -> processRec x
@@ -200,41 +198,53 @@ getAllAExprVarData f aexpr =
 
 --------------------------
 -- evaluate an aexpr
-evalAexpr :: (Show a) => AExpr a -> AExpr Int
+evalAexpr :: (Show a) => AExpr a -> AExpr a
 evalAexpr aexpr =
     case aexpr of
         AVar x      -> error $ error_nonConstantTerm (aexprToString aexpr)
-        AConstNum c -> AConstNum c
-        AConstStr c -> AConstNum $ hash c
+        AConstBool b -> AConstBool b
+        AConstNum c  -> AConstNum c
+        AConstStr c  -> AConstStr c
 
         ANary (AMember p) xs -> error $ error_nonConstantTerm (aexprToString aexpr)
 
-        ANary ASum  xs -> AConstNum $ sum $ map processRec xs
-        ANary AProd xs -> AConstNum $ product $ map processRec xs
-        ANary AMins xs -> AConstNum $ foldr min ( 999999) $ map processRec xs
-        ANary AMaxs xs -> AConstNum $ foldr max (-999999) $ map processRec xs
-        ANary AAnds xs -> AConstNum $ product $ map processRec xs
-        ANary AOrs  xs -> AConstNum $ (\x -> if x > 0 then 1 else 0) . sum $ map processRec xs
+        ANary ASum  xs -> AConstNum $ sum $ map processRecNum xs
+        ANary AProd xs -> AConstNum $ product $ map processRecNum xs
 
-        AUnary ANeg x -> AConstNum $ 0 - (processRec x)
-        AUnary ANot x -> AConstNum $ 1 - (processRec x)
+        ANary AAnds xs -> AConstBool $ foldl (&&) True  $ map processRecBool xs
+        ANary AOrs  xs -> AConstBool $ foldl (||) False $ map processRecBool xs
 
-        ABinary ADiv x1 x2  -> AConstNum $ div (processRec x1) (processRec x2)
-        ABinary AMult x1 x2 -> AConstNum $ (processRec x1) * (processRec x2)
-        ABinary AAdd x1 x2 -> AConstNum $ (processRec x1) + (processRec x2)
-        ABinary ASub x1 x2 -> AConstNum $ (processRec x1) - (processRec x2)
-        ABinary AMin x1 x2 -> AConstNum $ min (processRec x1) (processRec x2)
-        ABinary AMax x1 x2 -> AConstNum $ max (processRec x1) (processRec x2)
-        ABinary AAnd x1 x2 -> AConstNum $ (processRec x1) * (processRec x2)
-        ABinary AOr  x1 x2 -> AConstNum $ if (processRec x1) + (processRec x2) > 0 then 1 else 0
-        ABinary ALT x1 x2  -> AConstNum $ if (processRec x1) <  (processRec x2) then 1 else 0
-        ABinary ALE x1 x2  -> AConstNum $ if (processRec x1) <= (processRec x2) then 1 else 0
-        ABinary AEQ x1 x2  -> AConstNum $ if (processRec x1) == (processRec x2) then 1 else 0
-        ABinary AGE x1 x2  -> AConstNum $ if (processRec x1) >= (processRec x2) then 1 else 0
-        ABinary AGT x1 x2  -> AConstNum $ if (processRec x1) >  (processRec x2) then 1 else 0
-    where processRec x = let y = evalAexpr x in
-                                  case y of
-                                      (AConstNum c) -> c
+        AUnary ANeg x -> AConstNum  $ 0 - (processRecNum x)
+        AUnary ANot x -> AConstBool $ (not (processRecBool x))
+
+        ABinary ADiv x1 x2  -> AConstNum $ div (processRecNum x1) (processRecNum x2)
+        ABinary AMult x1 x2 -> AConstNum $ (processRecNum x1) * (processRecNum x2)
+        ABinary AAdd x1 x2  -> AConstNum $ (processRecNum x1) + (processRecNum x2)
+        ABinary ASub x1 x2  -> AConstNum $ (processRecNum x1) - (processRecNum x2)
+        ABinary AMin x1 x2  -> AConstNum $ min (processRecNum x1) (processRecNum x2)
+        ABinary AMax x1 x2  -> AConstNum $ max (processRecNum x1) (processRecNum x2)
+
+        ABinary AAnd x1 x2 -> AConstBool $ (processRecBool x1) && (processRecBool x2)
+        ABinary AOr  x1 x2 -> AConstBool $ (processRecBool x1) || (processRecBool x2)
+
+        ABinary ALT x1 x2  -> AConstBool $ (processRecNum x1) < (processRecNum x2)
+        ABinary ALE x1 x2  -> AConstBool $ (processRecNum x1) <= (processRecNum x2)
+        ABinary AEQ x1 x2  -> AConstBool $ (processRecAny x1) == (processRecAny x2)
+        ABinary AGE x1 x2  -> AConstBool $ (processRecNum x1) >= (processRecNum x2)
+        ABinary AGT x1 x2  -> AConstBool $ (processRecNum x1) > (processRecNum x2)
+    where processRecAny x  = let y = evalAexpr x in
+                                    case y of
+                                        (AConstBool c) -> show c
+                                        (AConstNum c)  -> show c
+                                        (AConstStr c)  -> c
+          processRecNum x  = let y = evalAexpr x in
+                                    case y of
+                                        (AConstNum c)  -> c
+                                        _              -> error $ error_typeNum y
+          processRecBool x = let y = evalAexpr x in
+                                    case y of
+                                        (AConstBool c) -> c
+                                        _              -> error $ error_typeBool y
 
 ------------------------------------------------------------------------------------
 updateAexprVars :: Ord a => (M.Map a (AExpr b)) -> (a -> AExpr b) -> AExpr a -> AExpr b
@@ -242,8 +252,9 @@ updateAexprVars dataMap f aexpr =
     case aexpr of
 
         AVar x      -> if M.member x dataMap then dataMap M.! x else f x
-        AConstNum c -> AConstNum c
-        AConstStr c -> AConstStr c
+        AConstBool c -> AConstBool c
+        AConstNum  c -> AConstNum c
+        AConstStr  c -> AConstStr c
 
         ANary op xs       -> ANary   op (map processRec xs)
         AUnary  op x      -> AUnary  op (processRec x)
@@ -260,10 +271,11 @@ updateAexprVarsFold f c theta aexpr =
                        else
                            let freshVar = f x c in
                            (c+1, M.insert x freshVar theta, freshVar)
-        AConstNum x -> (c, theta, AConstNum x)
-        AConstStr x -> (c, theta, AConstStr x)
+        AConstBool x -> (c, theta, AConstBool x)
+        AConstNum  x -> (c, theta, AConstNum x)
+        AConstStr  x -> (c, theta, AConstStr x)
 
-        ANary   op xs    -> let (c',theta',ys) = foldr (\y0 (c0, theta0, ys0) -> let (c1, theta1, y1) = processRec c0 theta0 y0 in (c1, theta1, (y1:ys0))) (c, theta, []) xs in
+        ANary   op xs    -> let (c',theta',ys) = foldl (\(c0, theta0, ys0) y0 -> let (c1, theta1, y1) = processRec c0 theta0 y0 in (c1, theta1, ys0 ++ [y1])) (c, theta, []) xs in
                             (c', theta', ANary op ys)
         AUnary  op x     -> let (c',  theta',  y)  = processRec c  theta  x  in
                             (c', theta', AUnary op y)

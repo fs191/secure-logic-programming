@@ -4,8 +4,10 @@ module Rule where
 ---- Data structures for LP facts and rules
 ---------------------------------------------------------
 
-import Aexpr
+import Data.List
 import qualified Data.Map as M
+
+import Aexpr
 
 -- names of attributes, free variables, and predicates are strings
 type AName = String
@@ -30,3 +32,7 @@ data RHS = Fact PName [Arg] | ABB Arg deriving Show
 -- to a boolean expresion desrribing the condtions on with those arguments satisfy the predicate
 -- e.g. 'p(0). p(x) :- x < 1000.' would be expressed as a map {[0] -> True, [x] -> {x < 1000}}
 type PMap = M.Map [Arg] Arg
+
+predToString :: String -> PName -> [Arg] -> Arg -> String
+predToString prefix pname args bexpr =
+    prefix ++ pname ++ "(" ++ intercalate "," (map aexprToString args) ++ ") :-\n" ++ prefix ++ aexprToString bexpr ++ "."

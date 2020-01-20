@@ -15,7 +15,9 @@ import Aexpr
 import ErrorMsg
 import Parser
 import Rule
+import SecreC
 
+-- a prefix of all fresh variables
 nv = "_X"
 
 -- this is for debugging only
@@ -38,7 +40,7 @@ processRule :: PName -> (M.Map PName PMap) -> Rule -> [([Arg], Arg)]
 processRule pname factMap (Rule as bs) =
 
     -- in the end, we get a list of possible thetas from which we can construct the new facts p
-    let initialThetas = [(M.empty, AConstNum 1, 0)] in
+    let initialThetas = [(M.empty, AConstBool True, 0)] in
     let finalThetas   = foldl (\thetas b -> processRulePremise factMap thetas b) initialThetas bs in
 
     --apply obtained substitutions to args
@@ -74,9 +76,9 @@ processABBPremise aexpr' (theta,constr,cnt) =
 
     if isConst then
         --if all arguments are constants, we can evaluate them immediately
-        let AConstNum val = evalAexpr aexpr in
+        let AConstBool val = evalAexpr aexpr in
         --TODO we can do better type check here, e.g. give an error if the answer is non-boolean
-        if val > 0 then [(theta,constr,cnt)] else []
+        if val == True then [(theta,constr,cnt)] else []
     else
         --otherwise, we delegate computation to SecreC
         [(theta, ABinary AAnd constr aexpr,cnt)]
@@ -160,8 +162,9 @@ test fileName iterations = do
 
   let res = map (\p ->
                      "==== [[ " ++ show p ++ "]] ==== \n"
-                     ++ intercalate "\n\n" (map (\key -> p ++ "(" ++ intercalate "," (map aexprToString key) ++ ") :-\n" ++ aexprToString ((facts M.! p) M.! key)) (M.keys (facts M.! p)))
-                     ++ ".\n"
+                     ++ intercalate "\n\n" (map (\key -> predToString "" p key ((facts M.! p) M.! key) ++ "\n") (M.keys (facts M.! p)))
                 ) (M.keys facts)
   putStrLn $ intercalate "\n" res
+
+  putStrLn $ intercalate "\n" (createSecreCNoGoal facts)
 

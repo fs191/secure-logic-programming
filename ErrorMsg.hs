@@ -33,9 +33,21 @@ warningTag = "WARNING:"
 -- the term t contains the error message generated inside megaparsec
 error_parseProgram s t = errorTag ++ " Could not parse the datalog program from file " ++ show s ++ "\nError details: " ++ t
 
+-- type errors
+error_typeNum  x = errorTag ++ "Expected num in expr evaluation, but got " ++ show x ++ "."
+error_typeBool x = errorTag ++ "Expected bool in expr evaluation, but got " ++ show x ++ "."
+
+-- csv import errors
+error_unknownColumn x y        = errorTag ++ "Could not find column " ++ show x ++ " of table " ++ show y ++ "."
+error_unsupportedColumnType x  = errorTag ++ "Column type " ++ show x ++ " is not supported."
+
+-- transformation errors
 -- TODO we could probably track the error location better...
 error_nonGroundTerm x  = errorTag ++ "A non-ground term " ++ show x ++ " used in ABB operation."
 error_nonConstantTerm x  = errorTag ++ "A non-ground term " ++ show x ++ " was tried to be evaluated."
+
+-- secrec code generation errors
+error_complexExpression x  = errorTag ++ "Could not process " ++ show x ++ ", olny variables are supported as predicate arguments."
 
 -- internall errors that may come due to bugs
 error_mapElem x xs     = inErrTag ++ " Element " ++ show x ++ " is not in the map " ++ show xs
