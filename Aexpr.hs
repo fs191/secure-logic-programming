@@ -285,3 +285,17 @@ updateAexprVarsFold f c theta aexpr =
 
     where processRec c theta x = updateAexprVarsFold f c theta x
 
+------------------------------------------------------------------------------------
+extractAllPredicates :: AExpr a -> [(String, [AExpr a])]
+extractAllPredicates aexpr =
+    case aexpr of
+
+        AUnary  _ x      -> processRec x
+        ABinary _ x1 x2  -> (processRec x1) ++ (processRec x2)
+
+        ANary (AMember f) xs -> [(f,xs)]
+        ANary _ xs           -> concat $ map processRec xs
+
+        _                    -> []
+    where processRec x = extractAllPredicates x
+

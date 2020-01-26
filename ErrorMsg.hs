@@ -34,17 +34,22 @@ warningTag = "WARNING:"
 error_parseProgram s t = errorTag ++ " Could not parse the datalog program from file " ++ show s ++ "\nError details: " ++ t
 
 -- type errors
-error_typeNum  x = errorTag ++ "Expected num in expr evaluation, but got " ++ show x ++ "."
-error_typeBool x = errorTag ++ "Expected bool in expr evaluation, but got " ++ show x ++ "."
+error_typeNum  x    = errorTag ++ "Expected num in expr evaluation, but got " ++ show x ++ "."
+error_typeBool x    = errorTag ++ "Expected bool in expr evaluation, but got " ++ show x ++ "."
+error_typeOp op x y = errorTag ++ "Cannot apply op " ++ show op ++ " to types " ++ show x ++ " and " ++ show y ++ "."
 
 -- csv import errors
 error_unknownColumn x y        = errorTag ++ "Could not find column " ++ show x ++ " of table " ++ show y ++ "."
 error_unsupportedColumnType x  = errorTag ++ "Column type " ++ show x ++ " is not supported."
 
+error_dbFileLengthsTooMany x ys = errorTag ++ "Excessive row records " ++ show ys ++ " in the table " ++ show x ++ "."
+error_dbFileLengthsTooFew x ys = errorTag ++ "Insufficient row records for attributes " ++ show ys ++ " in the table " ++ show x ++ "."
+
 -- transformation errors
 -- TODO we could probably track the error location better...
 error_nonGroundTerm x  = errorTag ++ "A non-ground term " ++ show x ++ " used in ABB operation."
 error_nonConstantTerm x  = errorTag ++ "A non-ground term " ++ show x ++ " was tried to be evaluated."
+error_nonGroundTableVar t x i  = inErrTag ++ "Table " ++ show t ++ " is called with a free variable " ++ show x ++ " on argument " ++ show i ++ " after unfolding."
 
 -- secrec code generation errors
 error_complexExpression x  = errorTag ++ "Could not process " ++ show x ++ ", olny variables are supported as predicate arguments."

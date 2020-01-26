@@ -5,6 +5,7 @@ module Transform where
 ----  to intermediate representation
 ---------------------------------------------------------
 
+import Control.Monad
 import Data.Hashable
 import Data.List
 import Debug.Trace
@@ -12,8 +13,10 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 
 import Aexpr
+import CSVImport
 import ErrorMsg
 import Parser
+import ProgramOptions
 import Rule
 import SecreC
 
@@ -152,13 +155,17 @@ applyRule facts rules (p:ps) =
     let facts' = M.insert p factsp facts in
     applyRule facts' rules ps
 
-test fileName iterations = do
+test args = do
+
+  let n = iterations args
+  let fileName = inFile args
 
   (database,rules) <- parseDatalogFromFile fileName
   putStrLn (show database)
   putStrLn (show rules)
   putStrLn "--------------------------------------------------------"
-  let facts = runIteration database rules 0 iterations
+  when (dbCreateTables args) $ writeDataToDB database
+  let facts = runIteration database rules 0 n
 
   let res = map (\p ->
                      "==== [[ " ++ show p ++ "]] ==== \n"
