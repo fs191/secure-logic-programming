@@ -53,6 +53,8 @@ error_nonGroundTableVar t x i  = inErrTag ++ "Table " ++ show t ++ " is called w
 
 -- secrec code generation errors
 error_complexExpression x  = errorTag ++ "Could not process " ++ show x ++ ", olny variables are supported as predicate arguments."
+error_tableArgNotFound t x i = inErrTag ++ show i ++ "-th arg of " ++ show t ++ ", " ++ show x ++ " has not been included into cross product table."
+error_argNotFound x          = inErrTag ++ " var " ++ show x ++ " has no matching in the argument list."
 
 -- internall errors that may come due to bugs
 error_mapElem x xs     = inErrTag ++ " Element " ++ show x ++ " is not in the map " ++ show xs

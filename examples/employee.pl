@@ -3,11 +3,11 @@ data dm(public string department, public string manager).
 
 secureEDS(E,D,0) :-
     eds(E,D,S),
-    100000 =< S.
+    2500 =< S.
 
 secureEDS(E,D,S) :-
     eds(E,D,S),
-    S < 100000.
+    S < 2500.
 
 viewESM(E,S,M) :-
     secureEDS(E,D,S),

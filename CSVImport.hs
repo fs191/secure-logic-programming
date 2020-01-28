@@ -50,10 +50,11 @@ createHeader = [
     indent ++ "string _ds = \"DS1\";",
     indent ++ "uint _params;",
 
-    indent ++ "int32 _temp_int32;",
-    indent ++ "uint32 _temp_uint32;",
-    indent ++ "bool _temp_bool;",
-    indent ++ "uint8 _temp_string;",
+    -- TODO we do not have public columns in tdbhf5, so public becomes secret-shared as well
+    indent ++ "pd_shared3p int32 _temp_int32;",
+    indent ++ "pd_shared3p uint32 _temp_uint32;",
+    indent ++ "pd_shared3p bool _temp_bool;",
+    indent ++ "pd_shared3p xor_uint8 _temp_string;",
 
     indent ++ "pd_shared3p int32 _temp_D_int32;",
     indent ++ "pd_shared3p xor_uint32 _temp_D_xor_uint32;",
@@ -141,13 +142,14 @@ createRow pname _ [] ys  = error $ error_dbFileLengthsTooMany pname ys
 createRow pname _ xs  [] = error $ error_dbFileLengthsTooFew pname xs
 createRow pname typeMap (x:xs) (y:ys) =
     let dtype = (if M.member x typeMap then typeMap ! x else error $ error_unknownColumn x pname) in
+    -- TODO we do not have public columns in tdbhf5, so public becomes secret-shared as well
     let s = case dtype of
-                Public  VarNum  z -> ["{int32 " ++ z ++ " = " ++ y ++ ";",
+                Public  VarNum  z -> ["{pd_shared3p int32 " ++ z ++ " = " ++ y ++ ";",
                                       " tdbVmapAddValue(_params, \"values\", " ++ z ++ ");}"]
                 Private VarNum  z -> ["{pd_shared3p int32 " ++ z ++ " = " ++ y ++ ";",
                                       " tdbVmapAddValue(_params, \"values\", " ++ z ++ ");}"]
 
-                Public  VarText z -> ["{uint8 [[1]] " ++ z ++ " = __bytes_from_string(\"" ++ y ++ "\");",
+                Public  VarText z -> ["{pd_shared3p xor_uint8 [[1]] " ++ z ++ " = __bytes_from_string(\"" ++ y ++ "\");",
                                       " tdbVmapAddVlenValue(_params, \"values\", " ++ z ++ ");}"]
                 Private VarText z -> ["{pd_shared3p xor_uint8 [[1]] " ++ z ++ " = __bytes_from_string(\"" ++ y ++ "\");",
                                       " tdbVmapAddVlenValue(_params, \"values\", " ++ z ++ ");}"]

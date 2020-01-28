@@ -27,7 +27,7 @@ createHeader = [
     "import shared3p_string;",
     "import shared3p_table_database;",
     "import table_database;\n",
-    "import aux;\n",
+    "import lp_essentials;\n",
     "domain pd_shared3p shared3p;\n"]
 
 -- a SecreC program is a list of code lines
@@ -39,53 +39,53 @@ createSecreCNoGoal predMap =
     header ++ body
 
 createSecreCFuns :: PName -> PMap -> [String]
-createSecreCFuns pname pmap = concat $ M.mapWithKey (createSecreCFun pname) pmap
+createSecreCFuns pname pmap =
+    let (keys,values) = unzip (M.toList pmap) in
+    let is = [0..length keys - 1] in
+    concat $ zipWith3 (createSecreCFun pname) is keys values
 
--- TODO add fresh indices to the function names
-createSecreCFun :: PName -> [Arg] -> Arg -> [String]
-createSecreCFun pname as bexpr =
+createSecreCFun :: PName -> Int -> [Arg] -> Arg -> [String]
+createSecreCFun pname index as bexpr =
     --if not(isGround bexpr) then [] else
+    let is = [0..length as - 1] in
     let declaration = [predToString "//" pname as bexpr,
-                       "template <domain D, type T>",
-                       "D bool _goal_" ++ pname ++ "(D T [[1]] args){",
-                       indent ++ "uint rv;",
-
-                       indent ++ "int32 [[1]] temp_int32;",
-                       indent ++ "uint32 [[1]] temp_uint32;",
-                       indent ++ "bool [[1]] temp_bool;",
-
-                       indent ++ "D int32 [[1]] temp_D_int32;",
-                       indent ++ "D xor_uint32 [[1]] temp_D_xor_uint32;",
-                       indent ++ "D bool [[1]] temp_D_bool;",
-
-                       indent ++ "string ds = \"DS1\";",
-                       indent ++ "tdbOpenConnection(ds);"] in
+                       "template <domain D, " ++ intercalate ", " (map (\i -> "type T" ++ show i) is) ++ ">",
+                       "D bool goal_" ++ pname ++ "_" ++ show index ++ "(" ++ intercalate ", " (map (\i -> "D T" ++ show i ++ " arg" ++ show i) is) ++ "){"] in
 
     let aexpr = foldBool bexpr in
     let (varMap,crossProductTable) = createCrossProducTable aexpr in
-    let argMap = M.fromList $ zip as [0..] in
+    let openDbConn = if length crossProductTable > 0 then
+                         [indent ++ "uint m = 0;",
+                          indent ++ "uint rv;",
+                          indent ++ "string ds = \"DS1\";",
+                          indent ++ "tdbOpenConnection(ds);"]
+                     else []
+    in
+    let closeDbConn = if length crossProductTable > 0 then
+                         [indent ++ "tdbCloseConnection(ds);"]
+                     else []
+    in
+    let argMap = M.fromList $ zip as is in
 
     let (_,b,_,_,_,body) = aexprToSecreC S.empty argMap varMap 0 aexpr in
-    let footer = [indent ++ "tdbCloseConnection(ds);",
-                  indent ++ "return any(" ++ b ++ ");",
+    let footer = [indent ++ "return any(" ++ b ++ ");",
                   "}\n\n"] in
-    declaration ++ (map (indent ++) crossProductTable) ++ (map (indent ++) body) ++ footer
+    declaration ++ openDbConn ++ (map (indent ++) crossProductTable) ++ (map (indent ++) body) ++ closeDbConn ++ footer
 
 -- create a big cross product table with a map from 
 -- TODO can be much more efficient if we take into account Primary / Foreign keys
 createCrossProducTable :: AExpr Var -> (M.Map Arg [String], [String])
 createCrossProducTable aexpr =
     let zs = extractAllPredicates aexpr in
-    if length zs == 0 then (M.empty, ["uint m = 0;"]) else
+    if length zs == 0 then (M.empty, []) else
     let fs = zipWith (\(f,_) i -> f ++ "_" ++ show i) zs [0..length zs - 1] in
 
-    let s1 = ["uint m = " ++ intercalate " * " (map (\f -> f ++ "_m") fs) ++ ";"] in
+    let s1 = ["m = " ++ intercalate " * " (map (\f -> f ++ "_m") fs) ++ ";"] in
     let (colMapData, s0, s2) = processTables 0 [] fs zs in
 
     let colMap = map (\(x,j) -> (x,[colPrefix ++ show j])) colMapData in
     (M.fromListWith (++) colMap, s0 ++ s1 ++ s2)
 
--- TODO some indices still are mismatching here
 processTables :: Int -> [String] -> [String] -> [(String,[Arg])] -> ([(Arg,Int)],[String],[String])
 processTables _ _ _ [] = ([],[],[])
 processTables c ms (f:fs) ((tableName,xs):rest) =
@@ -149,24 +149,11 @@ join2 _ "T" x = x
 join2 op x y  = if (x == y) then x else error $ error_typeOp op x y
 
 -- this assumes that the expression is "folded", i.e. is in DNF form with grouped AND / OR
--- TODO point to particular argument name in argMap, not to an index, as they may have different types
 aexprToSecreC :: S.Set VName -> (M.Map Arg Int) -> (M.Map Arg [String]) -> Int -> AExpr Var -> (Int,String,String,String,S.Set VName,[String])
 aexprToSecreC declaredVars argMap varMap c' aexpr =
     let b = nv0 ++ show c' in
     let c = c' + 1 in
     case aexpr of
-
-        AVar z ->
-            case z of
-                  Private VarNum x  -> (c',x,"D", "int32", declaredVars,[])
-                  Private VarText x -> (c',x,"D","uint32", declaredVars,[])
-                  Public  VarNum x  -> (c',x,"",  "int32", declaredVars,[])
-                  Public  VarText x -> (c',x,"", "uint32", declaredVars,[])
-                  Free x            -> (c',"args[" ++ show (argMap ! aexpr) ++ "]", "D", "T", declaredVars,[])
-
-        AConstBool x -> (c, case x of {True -> "true"; False -> "false"},"","bool",  declaredVars,[])
-        AConstNum x  -> (c, show x,                                      "","int32", declaredVars,[])
-        AConstStr x  -> (c, "CRC32(" ++ show x ++ ")",                   "","uint32",declaredVars,[])
 
         ANary (AMember pred) as -> let c'' = c + length as in
                                    let bs = map (\z -> nv0 ++ show z) [c..c''-1] in
@@ -178,44 +165,43 @@ aexprToSecreC declaredVars argMap varMap c' aexpr =
                                    let s3 = ["D bool [[1]] " ++ b ++ " = (" ++ intercalate " & " bs ++ ");"] in
                                    (c'',b, dt,"bool",dv, s2 ++ s3)
 
-        ANary AAnds xs -> processRecNary "&" c b xs
-        ANary AOrs  xs -> processRecNary "|" c b xs
-        ANary ASum xs  -> processRecNary "+" c b xs
-        ANary AProd xs -> processRecNary "*" c b xs
+        ANary AAnds xs -> processRecNary " & " c b xs
+        ANary AOrs  xs -> processRecNary " | " c b xs
+        ANary ASum xs  -> processRecNary " + " c b xs
+        ANary AProd xs -> processRecNary " * " c b xs
 
         AUnary ANot x -> processRecUnary "!" c b x
         AUnary ANeg x -> processRecUnary "-" c b x
 
-        ABinary ADiv x1 x2  -> processRecBinary "" "/" c b x1 x2
-        ABinary AMult x1 x2 -> processRecBinary "" "*" c b x1 x2
-        ABinary AAdd x1 x2  -> processRecBinary "" "+" c b x1 x2
-        ABinary ASub x1 x2  -> processRecBinary "" "-" c b x1 x2
-        ABinary AMin x1 x2  -> processRecBinary "" "min" c b x1 x2
-        ABinary AMax x1 x2  -> processRecBinary "" "max" c b x1 x2
+        ABinary ADiv x1 x2  -> processRecBinary False "" " / " c b x1 x2
+        ABinary AMult x1 x2 -> processRecBinary False "" " * " c b x1 x2
+        ABinary AAdd x1 x2  -> processRecBinary False "" " + " c b x1 x2
+        ABinary ASub x1 x2  -> processRecBinary False "" " - " c b x1 x2
+        ABinary AMin x1 x2  -> processRecBinary True  "" "min" c b x1 x2
+        ABinary AMax x1 x2  -> processRecBinary True  "" "max" c b x1 x2
 
-        ABinary AAnd x1 x2 -> processRecBinary "" "&" c b x1 x2
-        ABinary AOr  x1 x2 -> processRecBinary "" "|" c b x1 x2
-        ABinary ALT x1 x2  -> processRecBinary "bool" "<" c b x1 x2
-        ABinary ALE x1 x2  -> processRecBinary "bool" "<=" c b x1 x2
-        ABinary AEQ x1 x2  -> processRecBinary "bool" "==" c b x1 x2
-        ABinary AGE x1 x2  -> processRecBinary "bool" ">=" c b x1 x2
-        ABinary AGT x1 x2  -> processRecBinary "bool" ">" c b x1 x2
+        ABinary AAnd x1 x2 -> processRecBinary False "" " & " c b x1 x2
+        ABinary AOr  x1 x2 -> processRecBinary False "" " | " c b x1 x2
+        ABinary ALT x1 x2  -> processRecBinary False "bool" " < " c b x1 x2
+        ABinary ALE x1 x2  -> processRecBinary False "bool" " <= " c b x1 x2
+        ABinary AEQ x1 x2  -> processRecBinary False "bool" " == " c b x1 x2
+        ABinary AGE x1 x2  -> processRecBinary False "bool" " >= " c b x1 x2
+        ABinary AGT x1 x2  -> processRecBinary False "bool" " > " c b x1 x2
+
+        _                  -> let (_, domain, dtype, x) = getTypeVar argMap aexpr in
+                              (c', x, domain, dtype, declaredVars,[])
+
 
     where
           processRecUnary op c b x      = let (c'',b', ptype, dtype, declaredVars', ys) = aexprToSecreC declaredVars argMap varMap c x in
                                               (c'',b,  ptype, dtype, declaredVars', ys ++ [ptype ++ " " ++ dtype ++ " [[1]] " ++ b ++ " = " ++ op ++ "(" ++ b' ++ ");"])
 
-          processRecBinary dtype0 op c b x1 x2 = let (c1,b1,ptype1,dtype1,dv1,ys1) = aexprToSecreC declaredVars argMap varMap c x1 in
+          processRecBinary isPrefixOp dtype0 op c b x1 x2 = let (c1,b1,ptype1,dtype1,dv1,ys1) = aexprToSecreC declaredVars argMap varMap c x1 in
                                           let (c2,b2,ptype2,dtype2,dv2,ys2) = aexprToSecreC dv1 argMap varMap c1 x2 in
                                           let ptype = join ptype1 ptype2 in
                                           let dtype = if dtype0 /= "" then dtype0 else join2 op dtype1 dtype2 in
-                                          (c2, b, ptype, dtype, dv2, ys1 ++ ys2 ++ [ptype ++ " " ++ dtype ++ " [[1]] " ++ b ++ " = " ++ b1 ++ " " ++ op ++ " " ++ b2 ++ ";"])
-
-          processRecBinaryPrefix op c b x1 x2 = let (c1,b1,ptype1,dtype1,dv1,ys1) = aexprToSecreC declaredVars argMap varMap c x1 in
-                                                let (c2,b2,ptype2,dtype2,dv2,ys2) = aexprToSecreC dv1 argMap varMap c1 x2 in
-                                                let ptype = join ptype1 ptype2 in
-                                                let dtype = if (dtype1 == dtype2) then dtype1 else error $ error_typeOp op dtype1 dtype2 in
-                                                (c2, b, ptype, dtype, dv2, ys1 ++ ys2 ++ [ptype ++ " " ++ dtype ++ " [[1]] " ++ b ++ " = " ++ op ++ "(" ++ b1 ++ "," ++ b2 ++ ");"])
+                                          let rhs = if isPrefixOp then op ++ "(" ++ b1 ++ "," ++ b2 ++ ")" else b1 ++ op ++ b2 in
+                                          (c2, b, ptype, dtype, dv2, ys1 ++ ys2 ++ [ptype ++ " " ++ dtype ++ " [[1]] " ++ b ++ " = " ++ rhs ++ ";"])
 
           processRecNary op c b xs  = let (c'',bs, ptype, dtype, dv, ys) = foldl (\(c0, bs0, ptype0, dtype0, dv0, ys0) x ->
                                                                                  let (c1, b1, ptype1, dtype1, dv1, ys1) = aexprToSecreC dv0 argMap varMap c0 x in
@@ -227,59 +213,40 @@ aexprToSecreC declaredVars argMap varMap c' aexpr =
 
                                       (c'',b, ptype, dtype, dv, ys ++ [ptype ++ " " ++ dtype ++ " [[1]] " ++ b ++ " = (" ++ intercalate op bs ++ ");"])
 
-          -- TODO we need to take into account _all_ matchings of varMap, not only the head
           processArg pred dv arg b' i =
-              case arg of
+              let (isConst, domain,varType,x) = getTypeVar argMap arg in
 
-                      AVar (Private VarNum x)  -> let (dv', decl) = if S.member x dv then
-                                                                        (dv, "temp_D_bool = (temp_D_int32 == " ++ x ++ ");")
-                                                                    else
-                                                                        (S.insert x dv, "D int32 [[1]] " ++ x ++ " = temp_D_int32; temp_D_bool = reshape(true,m);")
-                                                  in ("D",dv', ["temp_D_int32 = " ++ head (varMap ! arg) ++ ";", decl,
-                                                               "D bool [[1]] " ++ b' ++ " = temp_D_bool & " ++
-                                                               if M.member arg argMap then "(args[" ++ show (argMap ! arg) ++ "] == " ++ x ++ ");"
-                                                               else "true;"])
+              let (z:zs) = if M.member arg varMap then varMap ! arg
+                           else error $ error_tableArgNotFound pred arg i
+              in
+              let (dv', comp0, decl) = if S.member x dv || isConst then
+                                           (dv,            ["(" ++ z ++ " == " ++ x ++ ")"], [])
+                                       else
+                                           (S.insert x dv, [], [domain ++ " " ++ varType ++ " [[1]] " ++ x ++ " = " ++ z ++ ";"])
+              in
+              let comp1 = map (\z' -> "(" ++ z' ++ " == " ++ x ++ ")") zs in
+              let comp2 = if M.member arg argMap then ["(arg" ++ show (argMap ! arg) ++ " == " ++ x ++ ")"] else [] in
+              let comp = comp0 ++ comp1 ++ comp2 in
+              let matchInputTables = ["D bool [[1]] " ++ b' ++ " = " ++ (if length comp > 0 then  intercalate " & " comp  else "reshape(true,m)") ++ ";"] in
+              ("D", dv', decl ++ matchInputTables)
 
-                      AVar (Private VarText x) -> let (dv', decl) = if S.member x dv then
-                                                                        (dv, "temp_D_bool = (temp_D_xor_uint32 == " ++ x ++ ");")
-                                                                    else
-                                                                        (S.insert x dv, "D xor_uint32 [[1]] " ++ x ++ " = temp_D_xor_uint32; temp_D_bool = reshape(true,m);")
+getTypeVar :: (M.Map Arg Int) -> Arg -> (Bool, String,String,String)
+getTypeVar argMap arg =
+    case arg of
+        AVar (Private VarNum  x) -> (False, "D", "int32", x)
+        AVar (Private VarText x) -> (False, "D", "xor_uint32", x)
+        AVar (Public VarNum  x)  -> (False, "",  "int32", x)
+        AVar (Public VarText x)  -> (False, "",  "uint32", x)
+        AVar (Free z)            -> let i = if M.member arg argMap then argMap ! arg
+                                            else error $ error_argNotFound arg
+                                    in
+                                    (False, "D",  "T" ++ show i, "arg" ++ show i)
 
-                                                  in("D",dv', ["temp_D_xor_uint32 = " ++ head (varMap ! arg) ++ ";", decl,
-                                                              "D bool [[1]] " ++ b' ++ " = temp_D_bool & " ++
-                                                              if M.member arg argMap then "(args[" ++ show (argMap ! arg) ++ "] == " ++ x ++ ");"
-                                                              else "true;"])
+        AConstBool v -> (True, "", "bool",   case v of {True -> "true"; False -> "false"})
+        AConstNum  v -> (True, "", "int32",  show v)
+        AConstStr  v -> (True, "", "uint32", "CRC32(" ++ show v ++ ")")
 
-                      -- TODO we do not have public column in tdbhdf5, think whether we need to support this at all
-                      AVar (Public  VarNum x)  -> let (dv', decl) = if S.member x dv then
-                                                                        (dv, "temp_bool = (temp_int32 == " ++ x ++ ");")
-                                                                    else
-                                                                        (S.insert x dv, "int32 [[1]] " ++ x ++ " = temp_int32; temp_bool = reshape(true,m);")
-                                                  in ("",dv', ["temp_int32 = " ++ head (varMap ! arg) ++ ";", decl,
-                                                              "D bool [[1]] " ++ b' ++ " = temp_bool & " ++
-                                                              if M.member arg argMap then "(args[" ++ show (argMap ! arg) ++ "] == " ++ x ++ ");"
-                                                              else "true;"])
-
-                      AVar (Public  VarText x) -> let (dv', decl) = if S.member x dv then
-                                                                        (dv, "temp_bool = (temp_uint32 == " ++ x ++ ");")
-                                                                    else
-                                                                        (S.insert x dv, "uint32 [[1]] " ++ x ++ " = temp_uint32; temp_bool = reshape(true,m);")
-
-                                                   in("",dv', ["temp_uint32 = " ++ head (varMap ! arg) ++ ";", decl,
-                                                              "D bool [[1]] " ++ b' ++ " = temp_bool & " ++
-                                                              if M.member arg argMap then "(args[" ++ show (argMap ! arg) ++ "] == " ++ x ++ ");"
-                                                              else "true;"])
-
-                      AVar (Free z)  -> let x = if M.member arg argMap then "args[" ++ show (argMap ! arg) ++ "]"
-                                                else error $ error_nonGroundTableVar pred z i
-                                        in ("D",dv,["D bool [[1]] " ++ b' ++ " = (" ++ x ++ " == tdbReadColumn(ds," ++ show pred ++ ", " ++ show i ++ " :: uint));"])
-
-                      AConstNum z  -> ("D",dv,["D bool [[1]] " ++ b' ++ " = (" ++ show z ++ " == tdbReadColumn(ds," ++ show pred ++ ", " ++ show i ++ " :: uint));"])
-                      AConstStr z  -> ("D",dv,["D bool [[1]] " ++ b' ++ " = (CRC32(" ++ show z ++ ") == tdbReadColumn(ds," ++ show pred ++ ", " ++ show i ++ " :: uint));"])
-
-                      _                        -> error $ error_complexExpression arg
-
-
+        _           -> error $ error_complexExpression arg
 
 --------------------------
 -- is the term ground (i.e. does not contain any free variables)?
