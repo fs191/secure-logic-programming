@@ -99,12 +99,31 @@ bOperators =
 bTerm :: Parser Arg
 bTerm = aExpr <|> parens bExpr
 
-
 ------------------------------------------------------------
 ---- Parsing DataLog program
 ------------------------------------------------------------
-datalogProgram :: Parser (M.Map PName PMap, M.Map PName [Rule])
-datalogProgram = manyRules <|> oneRule
+
+-- TODO at some point, we want an aexpr instead of [RHS] everywhere, since there can be disjunctions as well
+datalogProgram :: Parser (M.Map PName PMap, M.Map PName [Rule], [RHS])
+datalogProgram = try datalogProgramWithGoal <|> datalogProgramWithoutGoal
+
+datalogProgramWithGoal :: Parser (M.Map PName PMap, M.Map PName [Rule], [RHS])
+datalogProgramWithGoal = do
+    (database,rules) <- manyRules <|> oneRule
+    goal <- datalogGoal
+    return $ (database,rules,goal)
+
+datalogProgramWithoutGoal :: Parser (M.Map PName PMap, M.Map PName [Rule], [RHS])
+datalogProgramWithoutGoal = do
+    (database,rules) <- manyRules <|> oneRule
+    return $ (database,rules,[])
+
+datalogGoal :: Parser [RHS]
+datalogGoal = do
+    symbol "?-"
+    rhs <- sepBy1 ruleBlock (symbol ",")
+    symbol "."
+    return rhs
 
 manyRules :: Parser (M.Map PName PMap, M.Map PName [Rule])
 manyRules = do

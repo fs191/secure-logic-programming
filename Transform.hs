@@ -13,12 +13,9 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 
 import Aexpr
-import CSVImport
 import ErrorMsg
-import Parser
 import ProgramOptions
 import Rule
-import SecreC
 
 -- a prefix of all fresh variables
 nv = "_X"
@@ -155,23 +152,11 @@ applyRule facts rules (p:ps) =
     let facts' = M.insert p factsp facts in
     applyRule facts' rules ps
 
-test args = do
-
-  let n = iterations args
-  let fileName = inFile args
-
-  (database,rules) <- parseDatalogFromFile fileName
-  putStrLn (show database)
-  putStrLn (show rules)
-  putStrLn "--------------------------------------------------------"
-  when (dbCreateTables args) $ writeDataToDB database
-  let facts = runIteration database rules 0 n
-
+showResult :: (M.Map PName PMap) -> String
+showResult facts =
   let res = map (\p ->
                      "==== [[ " ++ show p ++ "]] ==== \n"
                      ++ intercalate "\n\n" (map (\key -> predToString "" p key ((facts M.! p) M.! key) ++ "\n") (M.keys (facts M.! p)))
                 ) (M.keys facts)
-  putStrLn $ intercalate "\n" res
-
-  putStrLn $ intercalate "\n" (createSecreCNoGoal facts)
-
+  in
+  intercalate "\n" res

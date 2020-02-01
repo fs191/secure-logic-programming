@@ -15,12 +15,11 @@ import Aexpr
 import ErrorMsg
 import Rule
 
-
 indent = "    "
 nv0 = "b"
 colPrefix = "col_"
 
-createHeader = [
+defaultHeader = [
     -- import essentials
     "import stdlib;",
     "import shared3p;",
@@ -30,13 +29,20 @@ createHeader = [
     "import lp_essentials;\n",
     "domain pd_shared3p shared3p;\n"]
 
+defaultGoal = ["void main(){",
+               indent ++ "pd_shared3p uint32 dummy;",
+               indent ++ "//TODO: state your own goal here",
+               "}"]
+
 -- a SecreC program is a list of code lines
 -- if no particular goal is given, then we do not create a main statement
-createSecreCNoGoal :: (M.Map PName PMap) -> [String]
-createSecreCNoGoal predMap =
-    let header = createHeader in
+generateSecreCscript :: (M.Map PName PMap) -> [RHS] -> String
+generateSecreCscript predMap goals =
+    let header = defaultHeader in
     let body = concat $ M.mapWithKey createSecreCFuns predMap in
-    header ++ body
+    -- TODO add goal processing here
+    let goal = defaultGoal in
+    intercalate "\n" $ header ++ body ++ defaultGoal
 
 createSecreCFuns :: PName -> PMap -> [String]
 createSecreCFuns pname pmap =

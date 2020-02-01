@@ -15,6 +15,10 @@ Building for the first time:
 The executable is created in the subdirectory dist/build/lpsec, thus to execute it:
     dist/build/lpsec/lpsec
 
+Example run:
+
+    ./dist/build/lpsec/lpsec examples/auction.pl secreC/auction.sc --db-create-tables -n 2
+
 Later, only 
 `cabal build`
 is required to rebuild when files have changed.

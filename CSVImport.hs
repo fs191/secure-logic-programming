@@ -61,11 +61,10 @@ createHeader = [
     indent ++ "pd_shared3p bool _temp_D_bool;",
     indent ++ "pd_shared3p xor_uint8 _temp_D_string;"]
 
--- TODO write to a file, not the command line
-writeDataToDB :: M.Map PName PMap -> IO ()
-writeDataToDB database = do
+generateDataToDBscript :: M.Map PName PMap -> IO (String)
+generateDataToDBscript database = do
     dataMap <- extractDataFromTables database
-    putStrLn $ intercalate "\n" (createCSVImport dataMap)
+    return $ intercalate "\n" $ createCSVImport dataMap
 
 extractDataFromTables :: M.Map PName PMap -> IO (M.Map PName (M.Map AName Var, [AName], [[String]]))
 extractDataFromTables database = do
