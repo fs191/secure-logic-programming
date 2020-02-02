@@ -7,6 +7,7 @@ module SecreC where
 
 import Data.Hashable
 import Data.List
+import Data.Maybe
 import Debug.Trace
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -17,7 +18,9 @@ import Rule
 
 indent = "    "
 nv0 = "b"
-colPrefix = "col_"
+colPrefix  = "col_"
+argPrefix  = "arg_"
+goalPrefix = "goal_"
 
 defaultHeader = [
     -- import essentials
@@ -34,29 +37,50 @@ defaultGoal = ["void main(){",
                indent ++ "//TODO: state your own goal here",
                "}"]
 
+generateGoal goal =
+    case goal of
+        Just (goalPname, goalArgs) ->
+            -- TODO generate a nice goal statement here
+            defaultGoal
+        _ -> defaultGoal
+
 -- a SecreC program is a list of code lines
 -- if no particular goal is given, then we do not create a main statement
 generateSecreCscript :: (M.Map PName PMap) -> [RHS] -> String
 generateSecreCscript predMap goals =
-    let header = defaultHeader in
-    let body = concat $ M.mapWithKey createSecreCFuns predMap in
-    -- TODO add goal processing here
-    let goal = defaultGoal in
-    intercalate "\n" $ header ++ body ++ defaultGoal
 
-createSecreCFuns :: PName -> PMap -> [String]
-createSecreCFuns pname pmap =
+    -- TODO think whether we want to support more expressions in a goal
+    let goal = if length goals > 0 then
+                      case head goals of
+                          Fact goalPname goalArgs -> Just (goalPname, goalArgs)
+                          _                       -> Nothing
+               else
+                      Nothing
+    in
+    trace ("G: " ++ show goal) $
+    let header = defaultHeader in
+    let body = concat $ M.mapWithKey (createSecreCFuns goal) predMap in
+    let mainFun = generateGoal goal in
+
+    intercalate "\n" $ header ++ body ++ mainFun
+
+createSecreCFuns :: Maybe (PName, [Arg]) -> PName -> PMap -> [String]
+createSecreCFuns goal pname pmap =
+    let unnecessaryFun = case goal of {Just (goalPname, _) -> pname /= goalPname; _ -> False} in
+    if unnecessaryFun then [] else
     let (keys,values) = unzip (M.toList pmap) in
     let is = [0..length keys - 1] in
-    concat $ zipWith3 (createSecreCFun pname) is keys values
+    let fvars = case goal of {Just (_, goalArgs) -> map isFreeVar goalArgs; _ -> []} in
+    concat $ zipWith3 (createSecreCFun pname fvars) is keys values
 
-createSecreCFun :: PName -> Int -> [Arg] -> Arg -> [String]
-createSecreCFun pname index as bexpr =
+createSecreCFun :: PName -> [Bool] -> Int -> [Arg] -> Arg -> [String]
+createSecreCFun pname fvars' index as bexpr =
     --if not(isGround bexpr) then [] else
+    let fvars = if length fvars' == 0 then replicate (length as) False else fvars' in
     let is = [0..length as - 1] in
-    let declaration = [predToString "//" pname as bexpr,
-                       "template <domain D, " ++ intercalate ", " (map (\i -> "type T" ++ show i) is) ++ ">",
-                       "D bool goal_" ++ pname ++ "_" ++ show index ++ "(" ++ intercalate ", " (map (\i -> "D T" ++ show i ++ " arg" ++ show i) is) ++ "){"] in
+    let argDomains = map deriveDomain as in
+    let argCmp     = zipWith3 (\b a i -> if b then Just ("(" ++ argPrefix ++ show i ++ " == " ++ aexprToString (evalAexpr a) ++ ")") else Nothing) (map isConstTerm as) as is in
+    let bs         = map fromJust $ filter (\x -> case x of {Just _ -> True; _ -> False}) argCmp in
 
     let aexpr = foldBool bexpr in
     let (varMap,crossProductTable) = createCrossProducTable aexpr in
@@ -71,10 +95,18 @@ createSecreCFun pname index as bexpr =
                          [indent ++ "tdbCloseConnection(ds);"]
                      else []
     in
-    let argMap = M.fromList $ zip as is in
+    let boundedArgs = map fromJust $ filter (/= Nothing) $ zipWith (\b a -> if b then Nothing else Just a) fvars $ zip as is in
+    let argMap = M.fromList $ boundedArgs in
 
-    let (_,b,_,_,_,body) = aexprToSecreC S.empty argMap varMap 0 aexpr in
-    let footer = [indent ++ "return any(" ++ b ++ ");",
+    let (_,b,dt,_,_,body) = aexprToSecreC S.empty argMap varMap 0 aexpr in
+
+    -- TODO ideally, arg type should be matched agains the types stated in the goal
+    -- e.g. if the goal has a constant argument, we can declare it as public
+    let declaration = [predToString "//" pname as bexpr,
+                       "template <" ++ (if dt == Private then "domain D, " else "") ++ intercalate ", " (map (\(_,i) -> "type T" ++ show i) boundedArgs) ++ ">",
+                       domainToDecl dt ++ "bool " ++ goalPrefix ++ pname ++ "_" ++ show index ++ "(" ++ intercalate ", " (zipWith (\d (_,i) -> domainToDecl d ++ "T" ++ show i ++ " " ++ argPrefix ++ show i) argDomains boundedArgs) ++ "){"] in
+
+    let footer = [indent ++ "return any(" ++ intercalate " & " (b:bs) ++ ");",
                   "}\n\n"] in
     declaration ++ openDbConn ++ (map (indent ++) crossProductTable) ++ (map (indent ++) body) ++ closeDbConn ++ footer
 
@@ -123,10 +155,10 @@ processTableColumn tableName f m x i j =
 getColumn :: String -> Int -> String -> String -> Arg -> [String]
 getColumn tableName colIndex varName m arg =
     case arg of
-        AVar (Private VarNum  _) -> getIntColumn tableName colIndex "D int32 [[1]]" varName m
-        AVar (Private VarText _) -> getStrColumn tableName colIndex "" "D xor_uint32 [[1]]"varName m
-        AVar (Public VarNum  _)  -> getIntColumn tableName colIndex "uint32 [[1]]" varName m
-        AVar (Public VarText _)  -> getStrColumn tableName colIndex "declassify" "uint32 [[1]]"varName m
+        AVar (Bound Private VarNum  _) -> getIntColumn tableName colIndex (domainToDecl Private ++ "int32 [[1]]") varName m
+        AVar (Bound Private VarText _) -> getStrColumn tableName colIndex "" (domainToDecl Private ++ "xor_uint32 [[1]]") varName m
+        AVar (Bound Public VarNum  _)  -> getIntColumn tableName colIndex (domainToDecl Public ++ "uint32 [[1]]") varName m
+        AVar (Bound Public VarText _)  -> getStrColumn tableName colIndex "declassify" (domainToDecl Public ++ "uint32 [[1]]") varName m
         _                        -> error $ error_complexExpression arg
 
 getIntColumn :: String -> Int -> String -> String -> String -> [String]
@@ -138,14 +170,16 @@ getStrColumn tableName colIndex declassify varDecl varName m =
     [varDecl ++ " " ++ varName ++ " = reshape(0," ++ m ++ ");",
      "rv = tdbReadColumn(ds," ++ show tableName ++ ", " ++ show colIndex ++ " :: uint);",
      "for (uint i = 0; i < " ++ m ++ "; i++){",
-     indent ++ "D xor_uint8 [[1]] temp = tdbVmapGetVlenValue(rv, \"values\", i);",
+     indent ++ domainToDecl Private ++ "xor_uint8 [[1]] temp = tdbVmapGetVlenValue(rv, \"values\", i);",
      indent ++ varName ++ "[i] = " ++ declassify ++ "(CRC32(temp));",
      "}"]
 
--- TODO use nice construction for privacy types
-join "D" _ = "D"
-join _ "D" = "D"
-join _  _  = ""
+join Private _ = Private
+join _ Private = Private
+join _  _      = Public
+
+domainToDecl Public = ""
+domainToDecl Private = "D "
 
 -- TODO we are not good at doing dynamic typecheck here...
 join2 _ x "" = x
@@ -155,7 +189,7 @@ join2 _ "T" x = x
 join2 op x y  = if (x == y) then x else error $ error_typeOp op x y
 
 -- this assumes that the expression is "folded", i.e. is in DNF form with grouped AND / OR
-aexprToSecreC :: S.Set VName -> (M.Map Arg Int) -> (M.Map Arg [String]) -> Int -> AExpr Var -> (Int,String,String,String,S.Set VName,[String])
+aexprToSecreC :: S.Set VName -> (M.Map Arg Int) -> (M.Map Arg [String]) -> Int -> AExpr Var -> (Int,String,DomainType,String,S.Set VName,[String])
 aexprToSecreC declaredVars argMap varMap c' aexpr =
     let b = nv0 ++ show c' in
     let c = c' + 1 in
@@ -166,9 +200,9 @@ aexprToSecreC declaredVars argMap varMap c' aexpr =
                                    let (dt,dv,s2) = foldl (\(t0,dv0,ys0) (a,b,i) ->
                                                                let (t1,dv1,ys1) = processArg pred dv0 a b i in
                                                                (join t0 t1,dv1,ys0 ++ ys1)
-                                                          ) ("",declaredVars, []) $ zip3 as bs [0..] in
+                                                          ) (Public,declaredVars, []) $ zip3 as bs [0..] in
 
-                                   let s3 = ["D bool [[1]] " ++ b ++ " = (" ++ intercalate " & " bs ++ ");"] in
+                                   let s3 = [domainToDecl dt ++ "bool [[1]] " ++ b ++ " = (" ++ intercalate " & " bs ++ ");"] in
                                    (c'',b, dt,"bool",dv, s2 ++ s3)
 
         ANary AAnds xs -> processRecNary " & " c b xs
@@ -200,14 +234,14 @@ aexprToSecreC declaredVars argMap varMap c' aexpr =
 
     where
           processRecUnary op c b x      = let (c'',b', ptype, dtype, declaredVars', ys) = aexprToSecreC declaredVars argMap varMap c x in
-                                              (c'',b,  ptype, dtype, declaredVars', ys ++ [ptype ++ " " ++ dtype ++ " [[1]] " ++ b ++ " = " ++ op ++ "(" ++ b' ++ ");"])
+                                              (c'',b,  ptype, dtype, declaredVars', ys ++ [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = " ++ op ++ "(" ++ b' ++ ");"])
 
           processRecBinary isPrefixOp dtype0 op c b x1 x2 = let (c1,b1,ptype1,dtype1,dv1,ys1) = aexprToSecreC declaredVars argMap varMap c x1 in
                                           let (c2,b2,ptype2,dtype2,dv2,ys2) = aexprToSecreC dv1 argMap varMap c1 x2 in
                                           let ptype = join ptype1 ptype2 in
                                           let dtype = if dtype0 /= "" then dtype0 else join2 op dtype1 dtype2 in
                                           let rhs = if isPrefixOp then op ++ "(" ++ b1 ++ "," ++ b2 ++ ")" else b1 ++ op ++ b2 in
-                                          (c2, b, ptype, dtype, dv2, ys1 ++ ys2 ++ [ptype ++ " " ++ dtype ++ " [[1]] " ++ b ++ " = " ++ rhs ++ ";"])
+                                          (c2, b, ptype, dtype, dv2, ys1 ++ ys2 ++ [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = " ++ rhs ++ ";"])
 
           processRecNary op c b xs  = let (c'',bs, ptype, dtype, dv, ys) = foldl (\(c0, bs0, ptype0, dtype0, dv0, ys0) x ->
                                                                                  let (c1, b1, ptype1, dtype1, dv1, ys1) = aexprToSecreC dv0 argMap varMap c0 x in
@@ -215,9 +249,9 @@ aexprToSecreC declaredVars argMap varMap c' aexpr =
                                                                                  let dtype = if dtype0 == "" || (dtype1 == dtype0) then dtype1
                                                                                              else error $ error_typeOp op dtype1 dtype0 in
                                                                                  (c1, bs0 ++ [b1], ptype, dtype, dv1, ys0 ++ ys1)
-                                                                             ) (c,[],"","",S.empty,[]) xs in
+                                                                             ) (c,[],Public,"",S.empty,[]) xs in
 
-                                      (c'',b, ptype, dtype, dv, ys ++ [ptype ++ " " ++ dtype ++ " [[1]] " ++ b ++ " = (" ++ intercalate op bs ++ ");"])
+                                      (c'',b, ptype, dtype, dv, ys ++ [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = (" ++ intercalate op bs ++ ");"])
 
           processArg pred dv arg b' i =
               let (isConst, domain,varType,x) = getTypeVar argMap arg in
@@ -228,29 +262,29 @@ aexprToSecreC declaredVars argMap varMap c' aexpr =
               let (dv', comp0, decl) = if S.member x dv || isConst then
                                            (dv,            ["(" ++ z ++ " == " ++ x ++ ")"], [])
                                        else
-                                           (S.insert x dv, [], [domain ++ " " ++ varType ++ " [[1]] " ++ x ++ " = " ++ z ++ ";"])
+                                           (S.insert x dv, [], [domainToDecl domain ++ varType ++ " [[1]] " ++ x ++ " = " ++ z ++ ";"])
               in
               let comp1 = map (\z' -> "(" ++ z' ++ " == " ++ x ++ ")") zs in
-              let comp2 = if M.member arg argMap then ["(arg" ++ show (argMap ! arg) ++ " == " ++ x ++ ")"] else [] in
+              let comp2 = if M.member arg argMap then ["(" ++ argPrefix ++ show (argMap ! arg) ++ " == " ++ x ++ ")"] else [] in
               let comp = comp0 ++ comp1 ++ comp2 in
-              let matchInputTables = ["D bool [[1]] " ++ b' ++ " = " ++ (if length comp > 0 then  intercalate " & " comp  else "reshape(true,m)") ++ ";"] in
-              ("D", dv', decl ++ matchInputTables)
+              let matchInputTables = [domainToDecl domain ++ "bool [[1]] " ++ b' ++ " = " ++ (if length comp > 0 then  intercalate " & " comp  else "reshape(true,m)") ++ ";"] in
+              (domain, dv', decl ++ matchInputTables)
 
-getTypeVar :: (M.Map Arg Int) -> Arg -> (Bool, String,String,String)
+getTypeVar :: (M.Map Arg Int) -> Arg -> (Bool, DomainType, String, String)
 getTypeVar argMap arg =
     case arg of
-        AVar (Private VarNum  x) -> (False, "D", "int32", x)
-        AVar (Private VarText x) -> (False, "D", "xor_uint32", x)
-        AVar (Public VarNum  x)  -> (False, "",  "int32", x)
-        AVar (Public VarText x)  -> (False, "",  "uint32", x)
+        AVar (Bound Private VarNum  x) -> (False, Private, "int32", x)
+        AVar (Bound Private VarText x) -> (False, Private, "xor_uint32", x)
+        AVar (Bound Public VarNum  x)  -> (False, Public,  "int32", x)
+        AVar (Bound Public VarText x)  -> (False, Public,  "uint32", x)
         AVar (Free z)            -> let i = if M.member arg argMap then argMap ! arg
                                             else error $ error_argNotFound arg
                                     in
-                                    (False, "D",  "T" ++ show i, "arg" ++ show i)
+                                    (False, Private,  "T" ++ show i, argPrefix ++ show i)
 
-        AConstBool v -> (True, "", "bool",   case v of {True -> "true"; False -> "false"})
-        AConstNum  v -> (True, "", "int32",  show v)
-        AConstStr  v -> (True, "", "uint32", "CRC32(" ++ show v ++ ")")
+        AConstBool v -> (True, Public, "bool",   case v of {True -> "true"; False -> "false"})
+        AConstNum  v -> (True, Public, "int32",  show v)
+        AConstStr  v -> (True, Public, "uint32", "CRC32(" ++ show v ++ ")")
 
         _           -> error $ error_complexExpression arg
 
@@ -273,4 +307,30 @@ isGround aexpr =
 
     where processRec x = isGround x
 
+deriveDomain :: AExpr Var -> DomainType
+deriveDomain aexpr =
+    case aexpr of
+        AVar x -> case x of
+                      Bound domain _ _ -> domain
+                      -- if the type is not known in advance, it is always safe to take public
+                      Free _           -> Private
+
+        AConstBool _ -> Public
+        AConstNum  _ -> Public
+        AConstStr  _ -> Public
+
+        ANary _ xs      -> foldl join Public $ map processRec xs
+        AUnary _ x      -> processRec x
+        ABinary _ x1 x2 -> join (processRec x1) (processRec x2)
+
+    where processRec x = deriveDomain x
+
+------------------------------------------------------------------------------------
+isFreeVar :: AExpr Var -> Bool
+isFreeVar aexpr =
+    case aexpr of
+        AVar x -> case x of
+                      Free _ -> True
+                      _      -> False
+        _      -> False
 

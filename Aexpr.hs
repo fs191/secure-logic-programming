@@ -197,6 +197,23 @@ getAllAExprVarData f aexpr =
     where processRec x = getAllAExprVarData f x
 
 --------------------------
+-- is the term constant (i.e. does not contain any variables)?
+isConstTerm :: AExpr a -> Bool
+isConstTerm aexpr =
+    case aexpr of
+        AVar x -> False
+
+        AConstBool _ -> True
+        AConstNum  _ -> True
+        AConstStr  _ -> True
+
+        ANary _ xs      -> foldl (&&) True $ map processRec xs
+        AUnary _ x      -> processRec x
+        ABinary _ x1 x2 -> (processRec x1) && (processRec x2)
+
+    where processRec x = isConstTerm x
+
+--------------------------
 -- evaluate an aexpr
 evalAexpr :: (Show a) => AExpr a -> AExpr a
 evalAexpr aexpr =

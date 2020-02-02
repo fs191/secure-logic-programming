@@ -48,7 +48,7 @@ error_dbFileLengthsTooFew x ys = errorTag ++ "Insufficient row records for attri
 -- transformation errors
 -- TODO we could probably track the error location better...
 error_nonGroundTerm x  = errorTag ++ "A non-ground term " ++ show x ++ " used in ABB operation."
-error_nonConstantTerm x  = errorTag ++ "A non-ground term " ++ show x ++ " was tried to be evaluated."
+error_nonConstantTerm x  = errorTag ++ "A non-constant term " ++ show x ++ " was tried to be evaluated."
 error_nonGroundTableVar t x i  = inErrTag ++ "Table " ++ show t ++ " is called with a free variable " ++ show x ++ " on argument " ++ show i ++ " after unfolding."
 
 -- secrec code generation errors

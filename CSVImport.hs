@@ -1,9 +1,10 @@
 module CSVImport where
 
 ---------------------------------------------------------
----- Uploads table data to Sharmeind servers
+---- Uploads table data to Sharemind servers
 ----  as secred-shared values
 ---- this naive approach hard-codes data into SecreC file
+---- WARNING: do not use it with actual private data!!!!
 ---------------------------------------------------------
 
 import Data.List
@@ -80,10 +81,7 @@ extractDataFromTable (pname,argMap) = do
     return $ (pname, (typeMap,xs,yss))
     where processArg arg =
               case arg of
-                  AVar v@(Public  VarNum  z) -> (z,v)
-                  AVar v@(Public  VarText z) -> (z,v)
-                  AVar v@(Private VarNum  z) -> (z,v)
-                  AVar v@(Private VarText z) -> (z,v)
+                  AVar v@(Bound _ _ z) -> (z,v)
 
 -- a SecreC program is a list of code lines
 -- if no particular goal is given, we just 
@@ -117,12 +115,12 @@ createTableHeader :: PName -> M.Map AName Var -> AName -> [String]
 createTableHeader pname typeMap x =
     let dtype = (if M.member x typeMap then typeMap ! x else error $ error_unknownColumn x pname) in
     let (isVlen,dvar,var) = case dtype of
-                Public  VarNum  z -> ("","_temp_int32",z)
-                Private VarNum  z -> ("","_temp_D_int32",z)
+                Bound Public  VarNum  z -> ("","_temp_int32",z)
+                Bound Private VarNum  z -> ("","_temp_D_int32",z)
 
-                Public  VarText z -> ("Vlen","_temp_string",z)
-                Private VarText z -> ("Vlen","_temp_D_string",z)
-                _                 ->  error $ error_unsupportedColumnType x
+                Bound Public  VarText z -> ("Vlen","_temp_string",z)
+                Bound Private VarText z -> ("Vlen","_temp_D_string",z)
+                _                       ->  error $ error_unsupportedColumnType x
 
     in ["tdbVmapAdd" ++ isVlen ++ "Type(_params, \"types\", " ++ dvar ++ ");",
         "tdbVmapAddString(_params, \"names\", \"" ++ var ++ "\");"]
@@ -143,16 +141,16 @@ createRow pname typeMap (x:xs) (y:ys) =
     let dtype = (if M.member x typeMap then typeMap ! x else error $ error_unknownColumn x pname) in
     -- TODO we do not have public columns in tdbhf5, so public becomes secret-shared as well
     let s = case dtype of
-                Public  VarNum  z -> ["{pd_shared3p int32 " ++ z ++ " = " ++ y ++ ";",
-                                      " tdbVmapAddValue(_params, \"values\", " ++ z ++ ");}"]
-                Private VarNum  z -> ["{pd_shared3p int32 " ++ z ++ " = " ++ y ++ ";",
-                                      " tdbVmapAddValue(_params, \"values\", " ++ z ++ ");}"]
+                Bound Public  VarNum  z -> ["{pd_shared3p int32 " ++ z ++ " = " ++ y ++ ";",
+                                            " tdbVmapAddValue(_params, \"values\", " ++ z ++ ");}"]
+                Bound Private VarNum  z -> ["{pd_shared3p int32 " ++ z ++ " = " ++ y ++ ";",
+                                            " tdbVmapAddValue(_params, \"values\", " ++ z ++ ");}"]
 
-                Public  VarText z -> ["{pd_shared3p xor_uint8 [[1]] " ++ z ++ " = __bytes_from_string(\"" ++ y ++ "\");",
-                                      " tdbVmapAddVlenValue(_params, \"values\", " ++ z ++ ");}"]
-                Private VarText z -> ["{pd_shared3p xor_uint8 [[1]] " ++ z ++ " = __bytes_from_string(\"" ++ y ++ "\");",
-                                      " tdbVmapAddVlenValue(_params, \"values\", " ++ z ++ ");}"]
-                _                 ->  error $ error_unsupportedColumnType x
+                Bound Public  VarText z -> ["{pd_shared3p xor_uint8 [[1]] " ++ z ++ " = __bytes_from_string(\"" ++ y ++ "\");",
+                                            " tdbVmapAddVlenValue(_params, \"values\", " ++ z ++ ");}"]
+                Bound Private VarText z -> ["{pd_shared3p xor_uint8 [[1]] " ++ z ++ " = __bytes_from_string(\"" ++ y ++ "\");",
+                                            " tdbVmapAddVlenValue(_params, \"values\", " ++ z ++ ");}"]
+                _                       ->  error $ error_unsupportedColumnType x
 
     in s ++ createRow pname typeMap xs ys
                 

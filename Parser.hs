@@ -201,7 +201,7 @@ dbVar = do
   pType <- privacyType
   vType <- numType <|> strType
   vName <- varName
-  return $ pType vType vName
+  return $ Bound pType vType vName
 
 numType = do
     keyWord "int"
@@ -211,7 +211,7 @@ strType = do
     keyWord "string"
     return VarText
 
-privacyType :: Parser (VarType -> AName -> Var)
+privacyType :: Parser DomainType
 privacyType = privateType <|> publicType
 
 privateType = do

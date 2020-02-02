@@ -95,8 +95,7 @@ processFactPremiseInstance factPredMap thetaB' constr cnt' argsB argsF =
 
     -- load the conditions needed to satisfy the fact predicate with argsF
     let f x c = case x of
-                  Public  vt z -> AVar (Public  vt (nv ++ show c))
-                  Private vt z -> AVar (Private vt (nv ++ show c))
+                  Bound domain vt z -> AVar (Bound domain vt (nv ++ show c))
                   Free z       -> AVar (Free (nv ++ show c))
     in
     let argVarMap = M.fromList $ map (\z@(AVar x) -> (x,z)) (filter (\x -> case x of {AVar _ -> True; _ -> False}) argsF) in
@@ -123,8 +122,7 @@ processArgs cnt thetaB thetaF unifiable (argB':argsB) (argF':argsF) =
                 (AVar (Free x), _                  ) -> (updateTheta (Free x) argF thetaB, thetaF, unifiable, cnt)
 
                 (_            , AVar (Free y)      ) -> (thetaB, updateTheta (Free y      ) argB thetaF, unifiable, cnt)
-                (_            , AVar (Public  ty y)) -> (thetaB, updateTheta (Public  ty y) argB thetaF, unifiable, cnt)
-                (_            , AVar (Private ty y)) -> (thetaB, updateTheta (Private ty y) argB thetaF, unifiable, cnt)
+                (_            , AVar (Bound domain ty y)) -> (thetaB, updateTheta (Bound domain ty y) argB thetaF, unifiable, cnt)
 
                 _                                    -> (thetaB, thetaF, False, cnt)
 
