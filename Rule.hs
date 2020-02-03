@@ -15,8 +15,8 @@ type VName = String
 type PName = String
 
 -- possible (classes of) types of database attributes
-data DataType = VarNum | VarText deriving (Ord,Eq,Show)
-data DomainType = Public | Private deriving (Ord,Eq,Show)
+data DataType   = VarBool | VarNum | VarText | Unknown deriving (Ord,Eq,Show)
+data DomainType = Public  | Private                    deriving (Ord,Eq,Show)
 
 -- predicate argument, together with the privacy/data type
 -- here var is a database variable (not a free LP variable)

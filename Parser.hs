@@ -47,7 +47,7 @@ aExpr = makeExprParser aTerm aOperators
 
 aString = do
   t <- text
-  return $ AConstStr ("\'" ++ t ++ "\'")
+  return $ AConstStr ("\"" ++ t ++ "\"")
 
 aOperators :: [[Operator Parser Arg]]
 aOperators =
@@ -285,7 +285,7 @@ varName = identifier
 
 --reads an arbitrary string, all characters up to the first space
 text :: Parser String
-text = lexeme (C.char '\'' >> manyTill L.charLiteral (C.char '\''))
+text = lexeme (C.char '\"' >> manyTill L.charLiteral (C.char '\"'))
 
 -- this thing eats all spaces and comments
 spaceConsumer :: Parser ()

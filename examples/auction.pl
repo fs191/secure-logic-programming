@@ -5,3 +5,5 @@ bargain(X,Y,Z) :-
     sells(Y,Z,P1),
     buys(X,Z,P2),
     P1 =< P2.
+
+?- bargain(X,Y,"garlic").

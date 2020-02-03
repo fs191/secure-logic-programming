@@ -12,3 +12,5 @@ secureEDS(E,D,S) :-
 viewESM(E,S,M) :-
     secureEDS(E,D,S),
     dm(D,M).
+
+?- viewESM(X,Y,"manager1").
