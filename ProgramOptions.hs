@@ -10,7 +10,8 @@ data ProgramOptions
     inFile     :: FilePath,
     outFile     :: FilePath,
     iterations :: Int,
-    dbCreateTables :: Bool
+    dbCreateTables :: Bool,
+    outputOnlyBool :: Bool
   }
 
 
@@ -23,6 +24,9 @@ programArgs = ProgramOptions
               <> hidden
               <> help "Create the required tables in the database using the data in input files\n \
                        \ the script is written into file createdb_XXX where XXX is the specified output file")
+  <*> switch (long "yes-no-only"
+              <> hidden
+              <> help "Output only a yes/no result, even if the goal contains free variables")
 
 getProgramOptions :: IO ProgramOptions
 getProgramOptions = execParser opts

@@ -15,10 +15,6 @@ Building for the first time:
 The executable is created in the subdirectory dist/build/lpsec, thus to execute it:
     dist/build/lpsec/lpsec
 
-Example run:
-
-    ./dist/build/lpsec/lpsec examples/auction.pl secreC/auction.sc --db-create-tables -n 2
-
 Later, only 
 `cabal build`
 is required to rebuild when files have changed.
@@ -32,6 +28,23 @@ If dependencies or project structure has changed then
 `cabal build`
 
 may be necessary.
+
+
+##Example run:
+
+The following examples read datalog file auction.pl and create SecreC file auction.sc
+The parameter n is the upper bound on the number of iterations
+
+    ./dist/build/lpsec/lpsec examples/auction.pl secreC/auction.sc -n 2
+
+To create a script that uploads simulated data into Sharemind, use --db-create-tables
+WARNING: do not use it to upload real private data, as it is done in public!
+
+    ./dist/build/lpsec/lpsec examples/auction.pl secreC/auction.sc --db-create-tables -n 2
+
+If only 'yes/no' output is wanted, use --yes-no-only
+
+    ./dist/build/lpsec/lpsec examples/auction.pl secreC/auction.sc --yes-no-only -n 2
 
 ## License
 

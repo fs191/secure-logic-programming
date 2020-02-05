@@ -35,7 +35,8 @@ main = do
   traceIO $ showResult expandedFacts
   traceIO $ "--------------------------------------------------------"
 
-  let secrec = generateSecreCscript expandedFacts goal
+  let boolOnly = (outputOnlyBool args)
+  let secrec = generateSecreCscript boolOnly expandedFacts goal
 
   -- Output the results
   if outFilePath /= ""

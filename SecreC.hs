@@ -20,6 +20,7 @@ indent = "    "
 boolPrefix = "b_"
 colPrefix  = "col_"
 argPrefix  = "arg_"
+resPrefix  = "res_"
 goalPrefix = "goal_"
 
 defaultHeader = [
@@ -36,20 +37,36 @@ defaultGoal = ["void main(){",
                -- Sharemind gives confusing error messages if the program does not use any private variables
                indent ++ "pd_shared3p uint32 dummy;",
                indent ++ "//TODO: state your own goal here",
+               indent ++ "publish(\"NOTICE: no goal specified in the main function\",false);",
                "}"]
 
-generateGoal :: [DomainType] -> Maybe (String,[Arg]) -> [String]
-generateGoal ds goal =
+generateGoal :: Bool -> [String] -> [DomainType] -> Maybe (String,[Arg]) -> [String]
+generateGoal boolOnly structTypes ds goal =
     case goal of
-        Just (goalPname, goalArgs) ->
-
+        Just (pname, as) ->
+            let is = [0..length as-1] in
             let js = [0..length ds-1] in
-            let bs = map (\j -> boolPrefix ++ show j) js in
-            let (args,declarations) = unzip $ concat $ zipWith generateGoalArg goalArgs [0..length goalArgs-1] in
-            ["void main(){"]
-               ++ map (indent ++) declarations
-               ++ zipWith3 (\b d j -> indent ++ domainToMainDecl d ++ "bool " ++ b ++ " = " ++ goalPrefix ++ goalPname ++ "_" ++ show j ++ "(" ++ intercalate "," args ++ ");") bs ds js
-               ++ [indent ++ "print(declassify(" ++ intercalate " | " bs ++ "));", "}"]
+            let (args,declarations) = unzip $ concat $ zipWith generateGoalArg as is in
+
+            let callGoals = if boolOnly then
+                                let bs = map (\j -> boolPrefix ++ show j) js in
+                                let s0 = zipWith3 (\b d j -> domainToMainDecl d ++ "bool " ++ b ++ " = " ++ goalPrefix
+                                                             ++ pname ++ "_" ++ show j ++ "(" ++ intercalate "," args ++ ");") bs ds js in
+                                let s1 = ["publish(\"result\", declassify(" ++ intercalate " | " bs ++ "));"] in
+                                s0 ++ s1
+                            else
+
+                                let bs = map (\j -> resPrefix ++ show j) js in
+                                let fvars = map isFreeVar as in
+                                let is' = map snd $ filter (\(fv,_) -> fv) $ zip fvars is in
+                                let s0 = zipWith4 (\b d j st -> "public " ++ st ++ " " ++ b ++ " = " ++ goalPrefix
+                                                                 ++ pname ++ "_" ++ show j ++ "(" ++ intercalate "," args ++ ");") bs ds js structTypes in
+                                let sizes = concat $ zipWith (\b j -> map (\i -> "size(" ++ b ++ "." ++ argPrefix ++ show i ++ ")") is') bs js in
+                                let s1 = ["publish(\"result\", " ++ (if length sizes > 0 then "(" ++ intercalate " + " sizes ++ " > 0)" else "true") ++ ");"] in
+                                let s2 = concat $ zipWith (\b j -> map (\i -> "publish(\"result_" ++ show i ++ show j
+                                                              ++ "\", declassify(" ++ b ++ "." ++ argPrefix ++ show i ++ "));") is') bs js in
+                                s0 ++ s1 ++ s2
+            in (["void main(){"] ++ (map (indent ++) (declarations ++ callGoals)) ++ ["}"])
 
         _ -> defaultGoal
 
@@ -71,10 +88,43 @@ generateGoalArg arg i =
         -- a free argument can be evaluated to anything and is not instantiated
         AVar (Free z) -> []
 
+generateStruct :: [(Bool,Arg,DomainType,DataType,Int)] -> String -> [String]
+generateStruct freeArgs structName =
+
+    let template = generateTemplateDecl True freeArgs in
+    [template, "struct " ++ structName, "{"]
+        ++ map generateStructArg freeArgs
+        ++ ["}"]
+
+generateStructArg :: (Bool,Arg,DomainType,DataType,Int) -> String
+generateStructArg (_,a,d,t,i) =
+    domainToDecl d ++ typeToString d t i ++ " [[1]] " ++ argPrefix ++ show i ++ ";"
+
+generateReturn freeArgs structType =
+    ["public " ++ structType ++ " result;"]
+        ++ map generateReturnArg freeArgs
+        ++ ["return(result);"]
+
+generateReturnArg :: (Bool,Arg,DomainType,DataType,Int) -> String
+generateReturnArg (_,_,_,t,i) =
+    let argName = argPrefix ++ show i in
+    "result." ++ argName ++ " = choose(b, " ++ argName ++ ", " ++ argName ++ " & 0);"
+
+-- we need a domain template D only if private variables are used at all
+generateTemplateDecl cond args =
+    let templateDomain = if cond && elem Private (map (\(_,_,d,_,_) -> d) args) then ["domain D "] else [] in
+    let template = templateDomain ++ (map (\(_,_,_,_,i) -> "type T" ++ show i) $ filter (\(_,_,_,t,_) -> t == Unknown) args) in
+    if length template > 0 then "template <" ++ intercalate ", " template ++ ">" else ""
+
+generateTemplateUse cond args =
+    let templateDomain = if cond || elem Private (map (\(_,_,d,_,_) -> d) args) then ["pd_shared3p"] else [] in
+    let template = templateDomain ++ (map (\(_,_,d,t,i) -> typeToString d t i) args) in
+    if length template > 0 then "<" ++ intercalate ", " template ++ ">" else ""
+
 -- a SecreC program is a list of code lines
 -- if no particular goal is given, then we do not create a main statement
-generateSecreCscript :: (M.Map PName PMap) -> [RHS] -> String
-generateSecreCscript predMap goals =
+generateSecreCscript :: Bool -> (M.Map PName PMap) -> [RHS] -> String
+generateSecreCscript boolOnly predMap goals =
 
     -- TODO think whether we want to support more expressions in a goal
     let goal = if length goals > 0 then
@@ -86,23 +136,48 @@ generateSecreCscript predMap goals =
     in
     trace ("G: " ++ show goal) $
     let header = defaultHeader in
-    let (ds,body) = unzip $ concat $ M.mapWithKey (createSecreCFuns goal) predMap in
-    let mainFun = generateGoal ds goal in
 
-    intercalate "\n" $ header ++ concat body ++ mainFun
+    -- if the goal exists, generate a 'struct' for its outputs
+    let (structDef,structName) = case goal of
+                         Just (pname, as) ->
+                             if boolOnly then ([],"") else
+                             let structName = resPrefix ++ pname in
+                             let fvars = map isFreeVar as in
+                             let ds = map deriveDomain as in
+                             let ts = map deriveType as in
+                             let is = [0..length as - 1] in
 
-createSecreCFuns :: Maybe (PName, [Arg]) -> PName -> PMap -> [(DomainType, [String])]
-createSecreCFuns goal pname pmap =
+                             let allArgs  = zip5 fvars as ds ts is in
+                             let freeArgs = filter (\(b,_,_,_,_) -> b) allArgs in
+
+                             let structDef = generateStruct freeArgs structName in
+
+                             (structDef,structName)
+                         _ -> ([],"")
+    in
+
+    let (ds,structTypes,body) = unzip3 $ concat $ M.mapWithKey (createSecreCFuns boolOnly goal structName) predMap in
+    let mainFun = generateGoal boolOnly structTypes ds goal in
+
+    intercalate "\n" $ header ++ structDef ++ concat body ++ mainFun
+
+createSecreCFuns :: Bool -> Maybe (PName, [Arg]) -> String -> PName -> PMap -> [(DomainType, String, [String])]
+createSecreCFuns boolOnly goal structName pname pmap =
     let unnecessaryFun = case goal of {Just (goalPname, _) -> pname /= goalPname; _ -> False} in
     if unnecessaryFun then [] else
     let (keys,values) = unzip (M.toList pmap) in
     let is = [0..length keys - 1] in
-    let goalArgs = case goal of {Just (_, goalArgs) -> goalArgs; _ -> []} in
-    zipWith3 (createSecreCFun pname goalArgs) is keys values
+    let as = case goal of {Just (_, goalArgs) -> goalArgs; _ -> []} in
 
-createSecreCFun :: PName -> [Arg] -> Int -> [Arg] -> Arg -> (DomainType, [String])
-createSecreCFun pname asG index as bexpr =
+
+    zipWith3 (createSecreCFun boolOnly pname structName as) is keys values
+
+createSecreCFun :: Bool -> PName -> String -> [Arg] -> Int -> [Arg] -> Arg -> (DomainType, String, [String])
+createSecreCFun boolOnly pname structName asG index as bexpr =
+
     --if not(isGround bexpr) then [] else
+    let funName = goalPrefix ++ pname ++ "_" ++ show index in
+
     let fvars = if length asG == 0 then replicate (length as) False else map isFreeVar asG in
     let is = [0..length as - 1] in
 
@@ -123,32 +198,37 @@ createSecreCFun pname asG index as bexpr =
     let aexpr = foldBool bexpr in
     let (varMap,crossProductTable) = createCrossProducTable aexpr in
     let openDbConn = if length crossProductTable > 0 then
-                         [indent ++ "uint m = 0;",
-                          indent ++ "uint rv;",
-                          indent ++ "string ds = \"DS1\";",
-                          indent ++ "tdbOpenConnection(ds);"]
+                         ["uint m = 0;",
+                          "uint rv;",
+                          "string ds = \"DS1\";",
+                          "tdbOpenConnection(ds);"]
                      else []
     in
     let closeDbConn = if length crossProductTable > 0 then
-                         [indent ++ "tdbCloseConnection(ds);"]
+                         ["tdbCloseConnection(ds);"]
                      else []
     in
 
-    let argMap = M.fromList $ map (\(_,a,d,t,i) -> (a,(d,t,i))) boundedArgs in
-    let (_,b,domain,_,_,body) = aexprToSecreC S.empty argMap varMap 0 aexpr in
+    let boundedArgMap = M.fromList $ map (\(_,a,d,t,i) -> (a,(d,t,i))) boundedArgs in
+    let freeArgMap    = M.fromList $ map (\(_,a,d,t,i) -> (a,(d,t,i))) freeArgs in
 
-    -- we need a domain template D only if private variables are used at all
-    let templateDomain = if length crossProductTable > 0 || elem Private ds then ["domain D "]
-                         else [] in
-    let template = templateDomain ++ (map (\(_,_,_,_,i) -> "type T" ++ show i) $ filter (\(_,_,_,t,_) -> t == Unknown) boundedArgs) in
+    let (_,b,domain,_,_,body) = aexprToSecreC S.empty boundedArgMap freeArgMap varMap 0 aexpr in
+    let finalChoice = [domainToDecl domain ++ "bool [[1]] b = (" ++ intercalate " & " (b:argCmp) ++ ");"] in
 
+    let structDomain = generateTemplateUse False freeArgs in
+    let structType   = structName ++ structDomain in
+
+    let funType     = if boolOnly || structType == "" then domainToDecl domain ++ "bool" else structType in
+    let funReturn   = if boolOnly || structType == "" then ["return(any(b));"] else generateReturn freeArgs structType in
+
+    let template     = generateTemplateDecl False allArgs in
     let declaration = [predToString "//" pname as bexpr,
-                       if length template > 0 then "template <" ++ intercalate ", " template ++ ">" else "",
-                       domainToDecl domain ++ "bool " ++ goalPrefix ++ pname ++ "_" ++ show index ++ "(" ++ intercalate ", " (map (\(_,_,d,t,i) -> domainToDecl d ++ typeToString d t i ++ " " ++ argPrefix ++ show i) boundedArgs) ++ "){"] in
+                       template,
+                       funType ++ " " ++ funName ++ "(" ++ intercalate ", " (map (\(_,_,d,t,i) -> domainToDecl d ++ typeToString d t i ++ " " ++ argPrefix ++ show i) boundedArgs) ++ "){"] in
 
-    let footer = [indent ++ "return any(" ++ intercalate " & " (b:argCmp) ++ ");",
-                  "}\n\n"] in
-    (domain, declaration ++ openDbConn ++ (map (indent ++) crossProductTable) ++ (map (indent ++) body) ++ closeDbConn ++ footer)
+    let footer = ["}\n\n"] in
+
+    (domain, structType, declaration ++ map (indent ++) (openDbConn ++ crossProductTable ++ body ++ closeDbConn ++ finalChoice ++ funReturn) ++ footer)
 
 -- create a big cross product table with a map from 
 -- TODO can be much more efficient if we take into account Primary / Foreign keys
@@ -223,7 +303,7 @@ meet _ Public = Public
 meet _  _     = Private
 
 domainToDecl Public = ""
-domainToDecl Private = "D "
+domainToDecl Private = "pd_shared3p "
 
 domainToMainDecl Public = ""
 domainToMainDecl Private = "pd_shared3p "
@@ -236,13 +316,14 @@ join2 _ x "T" = x
 join2 _ "T" x = x
 join2 op x y  = if (x == y) then x else error $ error_typeOp op x y
 
-meet2 x Unknown = Unknown
+meet2 x Unknown = x
 meet2 Unknown x = x
 meet2 x y  = if (x == y) then x else error $ error_typeOp "argument matching" x y
 
 -- this assumes that the expression is "folded", i.e. is in DNF form with grouped AND / OR
-aexprToSecreC :: S.Set VName -> (M.Map Arg (DomainType,DataType,Int)) -> (M.Map Arg [String]) -> Int -> AExpr Var -> (Int,String,DomainType,String,S.Set VName,[String])
-aexprToSecreC declaredVars argMap varMap c' aexpr =
+aexprToSecreC :: S.Set VName -> (M.Map Arg (DomainType,DataType,Int)) -> (M.Map Arg (DomainType,DataType,Int)) -> (M.Map Arg [String]) -> Int -> AExpr Var
+                 -> (Int,String,DomainType,String,S.Set VName,[String])
+aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c' aexpr =
     let b = boolPrefix ++ show c' in
     let c = c' + 1 in
     case aexpr of
@@ -280,23 +361,23 @@ aexprToSecreC declaredVars argMap varMap c' aexpr =
         ABinary AGE x1 x2  -> processRecBinary False "bool" " >= " c b x1 x2
         ABinary AGT x1 x2  -> processRecBinary False "bool" " > " c b x1 x2
 
-        _                  -> let (_, domain, dtype, x) = getTypeVar argMap aexpr in
+        _                  -> let (_, domain, dtype, x) = getTypeVar False boundedArgMap freeArgMap aexpr in
                               (c', x, domain, dtype, declaredVars,[])
 
 
     where
-          processRecUnary op c b x      = let (c'',b', ptype, dtype, declaredVars', ys) = aexprToSecreC declaredVars argMap varMap c x in
+          processRecUnary op c b x      = let (c'',b', ptype, dtype, declaredVars', ys) = aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c x in
                                               (c'',b,  ptype, dtype, declaredVars', ys ++ [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = " ++ op ++ "(" ++ b' ++ ");"])
 
-          processRecBinary isPrefixOp dtype0 op c b x1 x2 = let (c1,b1,ptype1,dtype1,dv1,ys1) = aexprToSecreC declaredVars argMap varMap c x1 in
-                                          let (c2,b2,ptype2,dtype2,dv2,ys2) = aexprToSecreC dv1 argMap varMap c1 x2 in
+          processRecBinary isPrefixOp dtype0 op c b x1 x2 = let (c1,b1,ptype1,dtype1,dv1,ys1) = aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c x1 in
+                                          let (c2,b2,ptype2,dtype2,dv2,ys2) = aexprToSecreC dv1 boundedArgMap freeArgMap varMap c1 x2 in
                                           let ptype = join ptype1 ptype2 in
                                           let dtype = if dtype0 /= "" then dtype0 else join2 op dtype1 dtype2 in
                                           let rhs = if isPrefixOp then op ++ "(" ++ b1 ++ "," ++ b2 ++ ")" else b1 ++ op ++ b2 in
                                           (c2, b, ptype, dtype, dv2, ys1 ++ ys2 ++ [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = " ++ rhs ++ ";"])
 
           processRecNary op c b xs  = let (c'',bs, ptype, dtype, dv, ys) = foldl (\(c0, bs0, ptype0, dtype0, dv0, ys0) x ->
-                                                                                 let (c1, b1, ptype1, dtype1, dv1, ys1) = aexprToSecreC dv0 argMap varMap c0 x in
+                                                                                 let (c1, b1, ptype1, dtype1, dv1, ys1) = aexprToSecreC dv0 boundedArgMap freeArgMap varMap c0 x in
                                                                                  let ptype = join ptype1 ptype0 in
                                                                                  let dtype = if dtype0 == "" || (dtype1 == dtype0) then dtype1
                                                                                              else error $ error_typeOp op dtype1 dtype0 in
@@ -306,33 +387,44 @@ aexprToSecreC declaredVars argMap varMap c' aexpr =
                                       (c'',b, ptype, dtype, dv, ys ++ [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = (" ++ intercalate op bs ++ ");"])
 
           processArg pred dv arg b' i =
-              let (isConst, domain,varType,x) = getTypeVar argMap arg in
+              let (isConst, domain,varType,x) = getTypeVar True boundedArgMap freeArgMap arg in
 
               let (z:zs) = if M.member arg varMap then varMap ! arg
                            else error $ error_tableArgNotFound pred arg i
               in
-              let (dv', comp0, decl) = if S.member x dv || isConst then
-                                           (dv,            ["(" ++ z ++ " == " ++ x ++ ")"], [])
-                                       else
+              let (dv0, comp0, decl0) = if S.member x dv || isConst then
+                                           (dv,            ["(" ++ x ++ " == " ++ z ++ ")"], [])
+                                        else
                                            (S.insert x dv, [], [domainToDecl domain ++ varType ++ " [[1]] " ++ x ++ " = " ++ z ++ ";"])
               in
-              let comp1 = map (\z' -> "(" ++ z' ++ " == " ++ x ++ ")") zs in
               -- TODO evaluating x before arg_i helps if a public arg_i is compared with private x
               -- we need to swap the arguments if it is the other direction
-              let comp2 = if M.member arg argMap then ["(" ++ x ++ " == " ++ argPrefix ++ (show . (\(_,_,i) -> i)) (argMap ! arg) ++ ")"] else [] in
+              let (dv1, comp1, decl1) = if M.member arg boundedArgMap then
+                                                let argName = argPrefix ++ (show . (\(_,_,i) -> i)) (boundedArgMap ! arg) in
+                                                (dv0,                  ["(" ++ x ++ " == " ++ argName ++ ")"], [])
+                                        else if M.member arg freeArgMap then
+                                            let argName = argPrefix ++ (show . (\(_,_,i) -> i)) (freeArgMap ! arg) in
+                                            if S.member argName dv0 then
+                                                (dv0,                  ["(" ++ argName ++ " == " ++ z ++ ")"], [])
+                                            else
+                                                (S.insert argName dv0, [], [domainToDecl domain ++ varType ++ " [[1]] " ++ argName ++ " = " ++ z ++ ";"])
+                                        else (dv0, [], [])
+              in
+              let comp2 = map (\z' -> "(" ++ x ++ " == " ++ z' ++ ")") zs in
               let comp = comp0 ++ comp1 ++ comp2 in
               let matchInputTables = [domainToDecl domain ++ "bool [[1]] " ++ b' ++ " = " ++ (if length comp > 0 then  intercalate " & " comp  else "reshape(true,m)") ++ ";"] in
-              (domain, dv', decl ++ matchInputTables)
+              (domain, dv1, decl0 ++ decl1 ++ matchInputTables)
 
-getTypeVar :: (M.Map Arg (DomainType,DataType,Int)) -> Arg -> (Bool, DomainType, String, String)
-getTypeVar argMap arg =
+getTypeVar :: Bool -> M.Map Arg (DomainType,DataType,Int) -> M.Map Arg (DomainType,DataType,Int) -> Arg -> (Bool, DomainType, String, String)
+getTypeVar allowFreeArg boundedArgMap freeArgMap arg =
     case arg of
         AVar (Bound Private VarNum  x) -> (False, Private, "int32", x)
         AVar (Bound Private VarText x) -> (False, Private, "xor_uint32", x)
         AVar (Bound Public VarNum  x)  -> (False, Public,  "int32", x)
         AVar (Bound Public VarText x)  -> (False, Public,  "uint32", x)
-        AVar (Free z)            -> let (d,t,i) = if M.member arg argMap then argMap ! arg
-                                            else error $ error_argNotFound arg
+        AVar (Free z)            -> let (d,t,i) = if M.member arg boundedArgMap then boundedArgMap ! arg
+                                                  else if allowFreeArg && M.member arg freeArgMap then freeArgMap ! arg
+                                                  else error $ error_argNotFound arg
                                     in
                                     (False, d, typeToString d t i, argPrefix ++ show i)
 
