@@ -25,6 +25,10 @@ goalPrefix = "goal_"
 cntPrefix  = "n_"
 piPrefix   = "pi_"
 
+strColumn s = s ++ "_str"
+tempVar s = s ++ "_tmp"
+dimPar s = " [[" ++ s ++ "]] "
+
 defaultHeader = [
     -- import essentials
     "import stdlib;",
@@ -55,7 +59,7 @@ generateGoal boolOnly structTypes ds goal =
                                 let bs = map (\j -> boolPrefix ++ show j) js in
                                 let s0 = zipWith3 (\b d j -> domainToMainDecl d ++ "bool " ++ b ++ " = " ++ goalPrefix
                                                              ++ pname ++ "_" ++ show j ++ "(" ++ intercalate "," args ++ ");") bs ds js in
-                                let s1 = ["publish(\"result\", " ++ declassify dd ++ "(" ++ intercalate " | " bs ++ "));"] in
+                                let s1 = ["publish(\"result\", " ++ declassify dd Public ++ "(" ++ intercalate " | " bs ++ "));"] in
                                 s0 ++ s1
                             else
 
@@ -66,15 +70,15 @@ generateGoal boolOnly structTypes ds goal =
                                 let s0 = zipWith4 (\b d j st -> "public " ++ st ++ " " ++ b ++ " = " ++ goalPrefix
                                                                  ++ pname ++ "_" ++ show j ++ "(" ++ intercalate "," args ++ ");") bs ds js structTypes in
 
-                                let s1 = ["publish(\"result\", " ++ declassify dd ++ "(" ++ intercalate " | " (map (\b -> "any(" ++ b ++ ".b)") bs) ++ "));"] in
+                                let s1 = ["publish(\"result\", " ++ declassify dd Public ++ "(" ++ intercalate " | " (map (\b -> "any(" ++ b ++ ".b)") bs) ++ "));"] in
                                 let s2 = if length as == 0 then []
-                                         else concat $ zipWith3 (\b d j -> ["uint32 " ++ cntPrefix ++ show j ++ " = " ++ declassify d ++ "(sum((uint32)" ++ b ++ ".b));",
+                                         else concat $ zipWith3 (\b d j -> ["uint32 " ++ cntPrefix ++ show j ++ " = " ++ declassify d Public ++ "(sum((uint32)" ++ b ++ ".b));",
                                                                        domainToMainDecl d ++ "uint32 [[1]] " ++ piPrefix ++ show j ++ "  = countSortPermutation(!" ++ b ++ ".b);"]
                                                           ) bs ds js in
                                 let s3 = if length as == 0 then []
                                          else concat $ zipWith3 (\b d j -> map (\a -> "publish(\"result_" ++ show j ++ "_" ++ a
-                                                                             ++ "\", " ++ declassify d ++ "(mySlice(applyPermutation(" ++ b ++ "." ++ a
-                                                                             ++ "," ++ piPrefix ++ show j ++ "), 0, " ++ cntPrefix ++ show j  ++ ")));") as
+                                                                             ++ "\", " ++ declassify d Public ++ "(mySlice(applyPermutation(" ++ b ++ "." ++ a
+                                                                             ++ "," ++ piPrefix ++ show j ++ "), 0, " ++ cntPrefix ++ show j ++ ")));") as
                                                           ) bs ds js in
 
                                 s0 ++ s1 ++ s2 ++ s3
@@ -91,12 +95,12 @@ generateGoalArg arg i =
         -- a constant is hard-coded
         AConstBool v -> [(argName, domainToMainDecl Public ++ "bool "   ++ argName ++ " = " ++ case v of {True -> "true"; False -> "false"} ++ ";")]
         AConstNum  v -> [(argName, domainToMainDecl Public ++ "bool "   ++ argName ++ " = " ++ show v ++ ";")]
-        AConstStr  v -> [(argName, domainToMainDecl Public ++ "uint32 " ++ argName ++ " = " ++ declassify Private ++ "(CRC32(bl_str(" ++ v ++ ") :: pd_shared3p xor_uint8));")]
+        AConstStr  v -> [(argName, domainToMainDecl Public ++ "uint32 " ++ argName ++ " = " ++ declassify Private Public ++ "(CRC32(bl_str(" ++ v ++ ") :: pd_shared3p xor_uint8));")]
 
         -- a bounded argument comes as an input
         AVar (Bound domain  VarNum  x) -> [(argName, domainToMainDecl domain  ++ "int32 "      ++ argName ++ " = argument(" ++ show x ++ ");")]
         AVar (Bound Private VarText x) -> [(argName, domainToMainDecl Private ++ "xor_uint32 " ++ argName ++ " = CRC32(bl_str(argument(" ++ show x ++ ")) :: pd_shared3p xor_uint8);")]
-        AVar (Bound Public  VarText x) -> [(argName, domainToMainDecl Public  ++ "uint32 "     ++ argName ++ " = " ++ declassify Private ++ "(CRC32(bl_str(argument(" ++ show x ++ ")) :: pd_shared3p xor_uint8));")]
+        AVar (Bound Public  VarText x) -> [(argName, domainToMainDecl Public  ++ "uint32 "     ++ argName ++ " = " ++ declassify Private Public ++ "(CRC32(bl_str(argument(" ++ show x ++ ")) :: pd_shared3p xor_uint8));")]
 
         -- a free argument can be evaluated to anything and is not instantiated
         AVar (Free z) -> []
@@ -111,7 +115,7 @@ generateStruct freeArgs structName =
 
 generateStructArg :: (Bool,Arg,DomainType,DataType,Int) -> String
 generateStructArg (_,a,d,t,i) =
-    domainToStructDecl d ++ typeToString d t i ++ " [[1]] " ++ argPrefix ++ show i ++ ";"
+    domainToStructDecl d ++ typeToString False d t i ++ dimPar (typeToDim False d t i) ++ argPrefix ++ show i ++ ";"
 
 generateReturn freeArgs structType =
     ["public " ++ structType ++ " result;", "result.b = b;"]
@@ -126,13 +130,17 @@ generateReturnArg (_,_,_,t,i) =
 -- we need a domain template D only if private variables are used at all
 generateTemplateDecl cond args =
     --let templateDomain = if cond && elem Private (map (\(_,_,d,_,_) -> d) args) then ["domain D "] else [] in
-    let templateDomain = if cond then ["domain D "] else [] in
-    let template = templateDomain ++ (map (\(_,_,_,_,i) -> "type T" ++ show i) $ filter (\(_,_,_,t,_) -> t == Unknown) args) in
+    let s0 = if cond then ["domain D "] else [] in
+    let s1 = map (\(_,_,_,_,i) -> "type T" ++ show i) $ filter (\(_,_,_,t,_) -> t == Unknown) args in
+    let s2 = map (\(_,_,_,_,i) -> "dim N" ++ show i) $ filter (\(_,_,_,t,_) -> t == Unknown) args in
+    let template = s0 ++ s1 ++ s2 in
     if length template > 0 then "template <" ++ intercalate ", " template ++ ">" else ""
 
 generateTemplateUse cond args =
-    let templateDomain = if cond || elem Private (map (\(_,_,d,_,_) -> d) args) then ["pd_shared3p"] else ["public"] in
-    let template = templateDomain ++ (map (\(_,_,d,t,i) -> typeToString d t i) args) in
+    let s0 = if cond || elem Private (map (\(_,_,d,_,_) -> d) args) then ["pd_shared3p"] else ["public"] in
+    let s1 = map (\(_,_,d,t,i) -> typeToString False d t i) args in
+    let s2 = map (\(_,_,d,t,i) -> typeToDim False d t i) args in
+    let template = s0 ++ s1 ++ s2 in
     if length template > 0 then "<" ++ intercalate ", " template ++ ">" else ""
 
 -- a SecreC program is a list of code lines
@@ -204,7 +212,7 @@ createSecreCFun boolOnly pname structName asG index as bexpr =
     -- if predicate contains a constant argument, a bound variable in the goal should be compared to that constant
     let argInit = concat $ map (\(_,a,d,t,i) -> if isConstTerm a then
                                                     let ai = argPrefix ++ show i in
-                                                    [domainToDecl d ++ typeToString d t i ++ " [[1]] " ++ ai ++ "(m); " ++ ai ++ " = " ++ aexprToString (evalAexpr a) ++ ";"]
+                                                    [domainToDecl d ++ typeToString False d t i ++ dimPar (typeToDim False d t i) ++ ai ++ "(m); " ++ ai ++ " = " ++ aexprToString (evalAexpr a) ++ ";"]
                                                 else []) freeArgs in
     let argCmp  = concat $ map (\(_,a,d,t,i) -> if isConstTerm a then
                                                     ["(" ++ argPrefix ++ show i ++ " == " ++ aexprToString (evalAexpr a) ++ ")"]
@@ -239,7 +247,7 @@ createSecreCFun boolOnly pname structName asG index as bexpr =
     let template     = generateTemplateDecl False allArgs in
     let declaration = [predToString "//" pname as bexpr,
                        template,
-                       funType ++ " " ++ funName ++ "(" ++ intercalate ", " (map (\(_,_,d,t,i) -> domainToDecl d ++ typeToString d t i ++ " " ++ argPrefix ++ show i) boundedArgs) ++ "){"] in
+                       funType ++ " " ++ funName ++ "(" ++ intercalate ", " (map (\(_,_,d,t,i) -> domainToDecl d ++ typeToString True d t i ++ " " ++ argPrefix ++ show i) boundedArgs) ++ "){"] in
 
     let footer = ["}\n\n"] in
 
@@ -281,33 +289,47 @@ processTables c ms (f:fs) ((tableName,xs):rest) =
 processTableColumn :: String -> String -> String -> Arg -> Int -> Int -> [String]
 processTableColumn tableName f m x i j =
     let colj = colPrefix ++ show j in
-    let s0 = getColumn tableName i colj m x in
-    let s1 = [colj ++ " = copyBlock(myReplicate(" ++ colj ++ ", " ++ f ++ "_ms, " ++ f ++ "_ns), {" ++ f ++ "_m * " ++ f ++ "_n}, {m / (" ++ f ++ "_m * " ++ f ++ "_n)});"] in
+    let s0 = getColumn tableName f i colj m x in
+    let s1 = [] in
     s0 ++ s1
 
 
 -- TODO a Free variable should theoretically result in a dynamic type, but we do not have such constructions yet
-getColumn :: String -> Int -> String -> String -> Arg -> [String]
-getColumn tableName colIndex varName m arg =
+getColumn :: String -> String -> Int -> String -> String -> Arg -> [String]
+getColumn tableName f colIndex varName m arg =
     case arg of
-        AVar (Bound Private VarNum  _) -> getIntColumn tableName colIndex (domainToDecl Private ++ "int32 [[1]]") varName m
-        AVar (Bound Private VarText _) -> getStrColumn tableName colIndex Public (domainToDecl Private ++ "xor_uint32 [[1]]") varName m
-        AVar (Bound Public VarNum  _)  -> getIntColumn tableName colIndex (domainToDecl Public ++ "uint32 [[1]]") varName m
-        AVar (Bound Public VarText _)  -> getStrColumn tableName colIndex Private (domainToDecl Public ++ "uint32 [[1]]") varName m
+        AVar (Bound Private VarNum  _) -> getIntColumn tableName f colIndex (domainToDecl Private ++ "int32 [[1]]") varName m
+        AVar (Bound Private VarText _) -> getStrColumn tableName f colIndex Private varName m
+        AVar (Bound Public VarNum  _)  -> getIntColumn tableName f colIndex (domainToDecl Public ++ "uint32 [[1]]") varName m
+        AVar (Bound Public VarText _)  -> getStrColumn tableName f colIndex Public varName m
         _                        -> error $ error_complexExpression arg
 
-getIntColumn :: String -> Int -> String -> String -> String -> [String]
-getIntColumn tableName colIndex varDecl varName _ =
-    [varDecl ++ " " ++ varName ++ " = tdbReadColumn(ds," ++ show tableName ++ ", " ++ show colIndex ++ " :: uint);"]
+getIntColumn :: String -> String -> Int -> String -> String -> String -> [String]
+getIntColumn tableName f colIndex varDecl varName _ =
+    [varDecl ++ " " ++ varName ++ " = getIntColumn(ds," ++ show tableName ++ ", " ++ show colIndex ++ " :: uint, m, " ++ f ++ "_m, " ++ f ++ "_n);"]
 
-getStrColumn :: String -> Int -> DomainType -> String -> String -> String -> [String]
-getStrColumn tableName colIndex d varDecl varName m =
-    [varDecl ++ " " ++ varName ++ " = reshape(0," ++ m ++ ");",
-     "rv = tdbReadColumn(ds," ++ show tableName ++ ", " ++ show colIndex ++ " :: uint);",
-     "for (uint i = 0; i < " ++ m ++ "; i++){",
-     indent ++ domainToDecl Private ++ "xor_uint8 [[1]] temp = tdbVmapGetVlenValue(rv, \"values\", i);",
-     indent ++ varName ++ "[i] = " ++ declassify d ++ "(CRC32(temp));",
-     "}"]
+getStrColumn :: String -> String -> Int -> DomainType -> String -> String -> [String]
+getStrColumn tableName f i d varName m =
+
+    -- domain of the extracted column
+    let domain  = domainToDecl d in
+    let domain2 = domainToFullDecl Private in
+    -- name of the string column
+    let varNameStr = strColumn varName in
+
+    -- types of the two result columns, and the temporary variable that holds classified data
+    let varType    = typeToString True  d VarText i in
+    let varTypeStr = typeToString False d VarText i in
+
+    -- dimension for the hash and the pure string columns
+    let varDim     = typeToDim True  d VarText i in
+    let varDimStr  = typeToDim False d VarText i in
+
+    let temp = tempVar varName in
+    let struct = if d == Private then "strColumnPrivate" else "strColumnPublic" in
+    [struct ++ "<" ++ domain2 ++ ">" ++ temp ++ " = getStrColumn(ds, \"" ++ tableName ++ "\", " ++ show i ++ " :: uint, m, " ++ f ++ "_m, " ++ f ++ "_n);",
+    domain ++ varType    ++ dimPar varDim    ++ varName    ++ " = " ++ temp ++ "." ++ "col"           ++ ";",
+    domain ++ varTypeStr ++ dimPar varDimStr ++ varNameStr ++ " = " ++ temp ++ "." ++ strColumn "col" ++ ";"]
 
 join Private _ = Private
 join _ Private = Private
@@ -327,8 +349,13 @@ domainToDecl Private = "pd_shared3p "
 domainToMainDecl Public = ""
 domainToMainDecl Private = "pd_shared3p "
 
-declassify Public = ""
-declassify Private = "declassify"
+domainToFullDecl Public = "public"
+domainToFullDecl Private = "pd_shared3p "
+
+declassify Public  Public  = ""
+declassify Public  Private = ""
+declassify Private Private = ""
+declassify Private Public = "declassify"
 
 -- TODO we are not good at doing dynamic typecheck here...
 -- rewrite everything using datatype construction
@@ -427,15 +454,43 @@ aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c' aexpr =
                                         else if M.member arg freeArgMap then
                                             let argName = argPrefix ++ (show . (\(_,_,i) -> i)) (freeArgMap ! arg) in
                                             if S.member argName dv0 then
-                                                (dv0,                  ["(" ++ argName ++ " == " ++ z ++ ")"], [])
+                                                (dv0,                  [getFreeVarCmp arg argName z], [])
                                             else
-                                                (S.insert argName dv0, [], [domainToDecl domain ++ varType ++ " [[1]] " ++ argName ++ " = " ++ z ++ ";"])
+                                                (S.insert argName dv0, [], [getFreeVarAsgn arg argName z])
                                         else (dv0, [], [])
               in
               let comp2 = map (\z' -> "(" ++ x ++ " == " ++ z' ++ ")") zs in
               let comp = comp0 ++ comp1 ++ comp2 in
               let matchInputTables = [domainToDecl domain ++ "bool [[1]] " ++ b' ++ " = " ++ (if length comp > 0 then  intercalate " & " comp  else "reshape(true,m)") ++ ";"] in
               (domain, dv1, decl0 ++ decl1 ++ matchInputTables)
+
+getFreeVarCmp :: Arg -> String -> String -> String
+getFreeVarCmp arg x z =
+    case arg of
+        AVar (Bound Private VarNum  _) -> "(" ++ x ++ " == " ++ z ++ ");"
+        AVar (Bound Private VarText _) -> "(" ++ x ++ " == " ++ strColumn z ++ ");"
+        AVar (Bound Public VarNum   _) -> "(" ++ x ++ " == " ++ z ++ ");"
+        AVar (Bound Public VarText  _) -> "(" ++ x ++ " == " ++ strColumn z ++ ");"
+
+        AConstBool _ -> "(" ++ x ++ " == " ++ z ++ ");"
+        AConstNum  _ -> "(" ++ x ++ " == " ++ z ++ ");"
+        AConstStr  _ -> "(" ++ x ++ " == " ++ strColumn z ++ ");"
+
+        _           -> error $ error_complexExpression arg
+
+getFreeVarAsgn :: Arg -> String -> String -> String
+getFreeVarAsgn arg x z =
+    case arg of
+        AVar (Bound Private VarNum  _) -> domainToDecl Private ++ "int32"     ++ " [[1]] " ++ x ++ " = " ++ z ++ ";"
+        AVar (Bound Private VarText _) -> domainToDecl Private ++ "xor_uint8" ++ " [[2]] " ++ x ++ " = " ++ strColumn z ++ ";"
+        AVar (Bound Public VarNum   _) -> domainToDecl Public  ++ "int32"     ++ " [[1]] " ++ x ++ " = " ++ z ++ ";"
+        AVar (Bound Public VarText  _) -> domainToDecl Public  ++ "uint8"     ++ " [[2]] " ++ x ++ " = " ++ strColumn z ++ ";"
+
+        AConstBool _ -> domainToDecl Public ++ "bool"  ++ " [[1]] " ++ x ++ " = " ++ z ++ ";"
+        AConstNum  _ -> domainToDecl Public ++ "int32" ++ " [[1]] " ++ x ++ " = " ++ z ++ ";"
+        AConstStr  _ -> domainToDecl Public ++ "uint8" ++ " [[2]] " ++ x ++ " = " ++ strColumn z ++ ";"
+
+        _           -> error $ error_complexExpression arg
 
 getTypeVar :: Bool -> M.Map Arg (DomainType,DataType,Int) -> M.Map Arg (DomainType,DataType,Int) -> Arg -> (Bool, DomainType, String, String)
 getTypeVar allowFreeArg boundedArgMap freeArgMap arg =
@@ -448,7 +503,7 @@ getTypeVar allowFreeArg boundedArgMap freeArgMap arg =
                                                   else if allowFreeArg && M.member arg freeArgMap then freeArgMap ! arg
                                                   else error $ error_argNotFound arg
                                     in
-                                    (False, d, typeToString d t i, argPrefix ++ show i)
+                                    (False, d, typeToString True d t i, argPrefix ++ show i)
 
         AConstBool v -> (True, Public, "bool",   case v of {True -> "true"; False -> "false"})
         AConstNum  v -> (True, Public, "int32",  show v)
@@ -457,15 +512,25 @@ getTypeVar allowFreeArg boundedArgMap freeArgMap arg =
         _           -> error $ error_complexExpression arg
 
 --------------------------
-typeToString :: DomainType -> DataType -> Int -> String
-typeToString domain dtype i =
+typeToString :: Bool -> DomainType -> DataType -> Int -> String
+typeToString isCRC domain dtype i =
     case dtype of
         VarBool -> "bool"
         VarNum  -> "int32"
         VarText -> case domain of
-                       Public  -> "uint32"
-                       Private -> "xor_uint32"
+                       Public  -> if isCRC then "uint32" else "uint8"
+                       Private -> if isCRC then "xor_uint32" else "xor_uint8"
         _       -> "T" ++ show i
+
+typeToDim :: Bool -> DomainType -> DataType -> Int -> String
+typeToDim isCRC domain dtype i =
+    case dtype of
+        VarBool -> "1"
+        VarNum  -> "1"
+        VarText -> case domain of
+                       Public  -> if isCRC then "1" else "2"
+                       Private -> if isCRC then "1" else "2"
+        _       -> "N" ++ show i
 
 --------------------------
 -- is the term ground (i.e. does not contain any free variables)?
