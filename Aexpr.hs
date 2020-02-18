@@ -29,6 +29,7 @@ data ABinOp
   | AMin | AMax
   | AAnd | AOr
   | ALT | ALE | AEQ | AGE | AGT
+  | AAsgn
   deriving (Ord,Eq,Show)
 
 data AListOp
@@ -150,6 +151,7 @@ simplifyBool expr =
     x3
 
 ------------------------------------------------------------------------------------
+-- this is currently used only for visual feedback, so the syntax of printed messages is not important
 aexprToString :: Show a => AExpr a -> String
 aexprToString aexpr =
     case aexpr of
@@ -179,6 +181,7 @@ aexprToString aexpr =
         ABinary AEQ x1 x2  -> "(" ++ aexprToString x1 ++ " = " ++ aexprToString x2 ++ ")"
         ABinary AGE x1 x2  -> "(" ++ aexprToString x1 ++ " >= " ++ aexprToString x2 ++ ")"
         ABinary AGT x1 x2  -> "(" ++ aexprToString x1 ++ " > " ++ aexprToString x2 ++ ")"
+        ABinary AAsgn x1 x2  -> "(" ++ aexprToString x1 ++ " := " ++ aexprToString x2 ++ ")"
 
 --------------------------
 -- get certain data of all variables

@@ -76,7 +76,7 @@ extractDataFromTables database = do
 -- TODO generalize the separator
 extractDataFromTable :: (PName,PMap) -> IO (PName, (M.Map AName Var, [AName], [[String]]))
 extractDataFromTable (pname,argMap) = do
-    (xs,yss) <- readDBString ("examples/database/" ++ pname ++ ".db") ";"
+    (xs,yss) <- readDBString ("examples/database/" ++ pname ++ ".csv") ";"
     let typeMap = M.fromList $ map processArg $ head (M.keys argMap)
     return $ (pname, (typeMap,xs,yss))
     where processArg arg =

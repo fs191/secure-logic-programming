@@ -369,6 +369,7 @@ meet2 x Unknown = x
 meet2 Unknown x = x
 meet2 x y  = if (x == y) then x else error $ error_typeOp "argument matching" x y
 
+-- TODO let us pass the data type not as a string, but as DataType object
 -- this assumes that the expression is "folded", i.e. is in DNF form with grouped AND / OR
 aexprToSecreC :: S.Set VName -> (M.Map Arg (DomainType,DataType,Int)) -> (M.Map Arg (DomainType,DataType,Int)) -> (M.Map Arg [String]) -> Int -> AExpr Var
                  -> (Int,String,DomainType,String,S.Set VName,[String])
@@ -409,6 +410,15 @@ aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c' aexpr =
         ABinary AEQ x1 x2  -> processRecBinary False "bool" " == " c b x1 x2
         ABinary AGE x1 x2  -> processRecBinary False "bool" " >= " c b x1 x2
         ABinary AGT x1 x2  -> processRecBinary False "bool" " > " c b x1 x2
+
+        ABinary AAsgn (AVar (Free v)) x  -> let (c'',b', ptype, dtype, dv', ys') = aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c x in
+                                            let (dv'', ys'') = if S.member v dv' then
+                                                         (dv', [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = (" ++ v ++ " == " ++ b' ++ ");"])
+                                                     else
+                                                         (S.insert v dv', [domainToDecl ptype ++ dtype ++ " [[1]] " ++ v ++ " = " ++ b' ++ ";",
+                                                                           domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = " ++ "true;"])
+                                            in
+                                            (c'',v,  ptype, "bool", dv'', ys' ++ ys'')
 
         _                  -> let (_, domain, dtype, x) = getTypeVar False boundedArgMap freeArgMap aexpr in
                               (c', x, domain, dtype, declaredVars,[])
@@ -499,11 +509,16 @@ getTypeVar allowFreeArg boundedArgMap freeArgMap arg =
         AVar (Bound Private VarText x) -> (False, Private, "xor_uint32", x)
         AVar (Bound Public VarNum  x)  -> (False, Public,  "int32", x)
         AVar (Bound Public VarText x)  -> (False, Public,  "uint32", x)
-        AVar (Free z)            -> let (d,t,i) = if M.member arg boundedArgMap then boundedArgMap ! arg
-                                                  else if allowFreeArg && M.member arg freeArgMap then freeArgMap ! arg
-                                                  else error $ error_argNotFound arg
-                                    in
-                                    (False, d, typeToString True d t i, argPrefix ++ show i)
+        AVar (Free z)            -> if M.member arg boundedArgMap then
+                                        let (d,t,i) = boundedArgMap ! arg in
+                                        (False, d, typeToString True d t i, argPrefix ++ show i)
+                                    else if allowFreeArg && M.member arg freeArgMap then
+                                        let (d,t,i) = freeArgMap ! arg in
+                                        (False, d, typeToString True d t i, argPrefix ++ show i)
+                                    -- TODO we actually want error here, and we need to store a separate map
+                                    -- for variables generated in assigments of the form 'X is Y'
+                                    --else error $ error_argNotFound arg
+                                    else (False, Private, "", z)
 
         AConstBool v -> (True, Public, "bool",   case v of {True -> "true"; False -> "false"})
         AConstNum  v -> (True, Public, "int32",  show v)
@@ -602,6 +617,7 @@ deriveType aexpr =
         ABinary AEQ x1 x2  -> VarBool
         ABinary AGE x1 x2  -> VarBool
         ABinary AGT x1 x2  -> VarBool
+        _                  -> Unknown
 
 deriveConditionalDomain :: [Arg] -> [Arg] -> [DomainType]
 deriveConditionalDomain asF [] = map deriveDomain asF

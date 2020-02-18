@@ -82,11 +82,11 @@ bOperators =
     [ Prefix notAExpr]
 
   , [ InfixL (ABinary ALE <$ symbol "=<")
-    , InfixL ((\x y -> AUnary ANot (ABinary AEQ x y)) <$ symbol "<>")
-    , InfixL ((\x y -> AUnary ANot (ABinary AEQ x y)) <$ symbol "!=")
+    , InfixL ((\x y -> AUnary ANot (ABinary AEQ x y)) <$ symbol "\\=")
     , InfixL (ABinary ALT <$ symbol "<")
     , InfixL (ABinary AEQ <$ symbol "==")
     , InfixL (ABinary AEQ <$ symbol "=")
+    , InfixL (ABinary AAsgn <$ symbol "is")
     , InfixL (ABinary AGE <$ symbol ">=")
     , InfixL (ABinary AGT <$ symbol ">") ]
 
@@ -154,11 +154,14 @@ ruleClause pname args = do
 
 factClause pname args = do
   void(delimRules)
-  return $ Left (pname, M.singleton args (AConstNum 1))
+  return $ Left (pname, M.singleton args (AConstBool True))
 
 dbClause = do
-  keyWord ("data")
+  symbol ":-"
+  keyWord ("type")
+  symbol "("
   (pname,args) <- ruleHead
+  symbol ")"
   void(delimRules)
   return $ Left (pname, M.singleton args (ANary (AMember pname) args))
 
@@ -191,16 +194,17 @@ ruleBlockBexpr = do
   return $ ABB bexpr
 
 var :: Parser Var
-var = dbVar <|> freeVar
+var = try dbVar <|> freeVar
 
 freeVar = do
     x <- varName
     return $ Free x
 
 dbVar = do
+  vName <- varName
+  symbol ":"
   pType <- privacyType
   vType <- numType <|> strType
-  vName <- varName
   return $ Bound pType vType vName
 
 numType = do

@@ -1,5 +1,5 @@
-data eds(public string employee,public string department,private int salary).
-data dm(public string department, public string manager).
+:-type(eds(employee:public string,department:public string, salary:private int)).
+:-type(dm(department:public string, manager:public string)).
 
 secureEDS(E,D,0) :-
     eds(E,D,S),
