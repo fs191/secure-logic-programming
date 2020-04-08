@@ -59,7 +59,7 @@ generateGoal boolOnly structTypes ds goal =
                                 let bs = map (\j -> boolPrefix ++ show j) js in
                                 let s0 = zipWith3 (\b d j -> domainToMainDecl d ++ "bool " ++ b ++ " = " ++ goalPrefix
                                                              ++ pname ++ "_" ++ show j ++ "(" ++ intercalate "," args ++ ");") bs ds js in
-                                let s1 = ["publish(\"result\", " ++ declassify dd Public ++ "(" ++ intercalate " | " bs ++ "));"] in
+                                let s1 = ["publish(\"yes/no_answer\", " ++ declassify dd Public ++ "(" ++ intercalate " | " bs ++ "));"] in
                                 s0 ++ s1
                             else
 
@@ -70,13 +70,13 @@ generateGoal boolOnly structTypes ds goal =
                                 let s0 = zipWith4 (\b d j st -> "public " ++ st ++ " " ++ b ++ " = " ++ goalPrefix
                                                                  ++ pname ++ "_" ++ show j ++ "(" ++ intercalate "," args ++ ");") bs ds js structTypes in
 
-                                let s1 = ["publish(\"result\", " ++ declassify dd Public ++ "(" ++ intercalate " | " (map (\b -> "any(" ++ b ++ ".b)") bs) ++ "));"] in
+                                let s1 = ["publish(\"yes/no answer\", " ++ declassify dd Public ++ "(" ++ intercalate " | " (map (\b -> "any(" ++ b ++ ".b)") bs) ++ "));"] in
                                 let s2 = if length as == 0 then []
                                          else concat $ zipWith3 (\b d j -> ["uint32 " ++ cntPrefix ++ show j ++ " = " ++ declassify d Public ++ "(sum((uint32)" ++ b ++ ".b));",
                                                                        domainToMainDecl d ++ "uint32 [[1]] " ++ piPrefix ++ show j ++ "  = countSortPermutation(!" ++ b ++ ".b);"]
                                                           ) bs ds js in
                                 let s3 = if length as == 0 then []
-                                         else concat $ zipWith3 (\b d j -> map (\a -> "publish(\"result_" ++ show j ++ "_" ++ a
+                                         else concat $ zipWith3 (\b d j -> map (\a -> "publish(\"valuation_" ++ show j ++ "_" ++ a
                                                                              ++ "\", " ++ declassify d Public ++ "(mySlice(applyPermutation(" ++ b ++ "." ++ a
                                                                              ++ "," ++ piPrefix ++ show j ++ "), 0, " ++ cntPrefix ++ show j ++ ")));") as
                                                           ) bs ds js in
@@ -145,18 +145,27 @@ generateTemplateUse cond args =
 
 -- a SecreC program is a list of code lines
 -- if no particular goal is given, then we do not create a main statement
-generateSecreCscript :: Bool -> (M.Map PName PMap) -> [RHS] -> String
-generateSecreCscript boolOnly predMap goals =
+generateSecreCscript :: Bool -> (M.Map PName PMap) -> ([Arg],[Arg],[RHS]) -> String
+generateSecreCscript boolOnly predMap (xs,ys,goals) =
 
     -- TODO think whether we want to support more expressions in a goal
+    -- TODO we currently treat all inputs as strings, we need to genralize it (also in plain prolog)
     let goal = if length goals > 0 then
                       case head goals of
-                          Fact goalPname goalArgs -> Just (goalPname, goalArgs)
-                          _                       -> Nothing
+                          Fact gn ga -> let xs' = intercalate "," (map (rhsToString "") xs) in
+                                        let ys' = intercalate "," (map (rhsToString "") ys) in
+                                        trace ("goal([" ++ xs' ++ "],[" ++ ys' ++ "]) :- " ++ ruleHeadToString "" gn ga) $
+                                        let goalArgs = map (\x -> if elem x xs then
+                                                                      case x of
+                                                                          AVar (Free z) -> AVar (Bound Private VarText z)
+                                                                          _             -> x
+                                                                  else x
+                                                           ) ga in
+                                        Just (gn, goalArgs)
+                          _          -> Nothing
                else
                       Nothing
     in
-    trace ("G: " ++ show goal) $
     let header = defaultHeader in
 
     -- if the goal exists, generate a 'struct' for its outputs

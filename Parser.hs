@@ -33,7 +33,7 @@ type Parser = Parsec Void String
 ---------------------------------------------------------------------------------------------
 -- keywords
 allKeyWordList :: [String]
-allKeyWordList = ["data","int","string","private","public"]
+allKeyWordList = ["data","int","string","private","public","type","goal"]
 
 allKeyWords :: S.Set String -- set of reserved "words"
 allKeyWords = S.fromList allKeyWordList
@@ -47,7 +47,7 @@ aExpr = makeExprParser aTerm aOperators
 
 aString = do
   t <- text
-  return $ AConstStr ("\"" ++ t ++ "\"")
+  return $ AConstStr ("\'" ++ t ++ "\'")
 
 aOperators :: [[Operator Parser Arg]]
 aOperators =
@@ -104,26 +104,39 @@ bTerm = aExpr <|> parens bExpr
 ------------------------------------------------------------
 
 -- TODO at some point, we want an aexpr instead of [RHS] everywhere, since there can be disjunctions as well
-datalogProgram :: Parser (M.Map PName PMap, M.Map PName [Rule], [RHS])
+datalogProgram :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Arg],[Arg],[RHS]))
 datalogProgram = try datalogProgramWithGoal <|> datalogProgramWithoutGoal
 
-datalogProgramWithGoal :: Parser (M.Map PName PMap, M.Map PName [Rule], [RHS])
+datalogProgramWithGoal :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Arg],[Arg],[RHS]))
 datalogProgramWithGoal = do
     (database,rules) <- manyRules <|> oneRule
     goal <- datalogGoal
     return $ (database,rules,goal)
 
-datalogProgramWithoutGoal :: Parser (M.Map PName PMap, M.Map PName [Rule], [RHS])
+datalogProgramWithoutGoal :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Arg],[Arg],[RHS]))
 datalogProgramWithoutGoal = do
     (database,rules) <- manyRules <|> oneRule
-    return $ (database,rules,[])
+    return $ (database,rules,([],[],[]))
 
-datalogGoal :: Parser [RHS]
+datalogGoal :: Parser ([Arg],[Arg],[RHS])
 datalogGoal = do
-    symbol "?-"
+    keyWord "goal"
+    symbol "("
+    xs <- list
+    symbol ","
+    ys <- list
+    symbol ")"
+    symbol ":-"
     rhs <- sepBy1 ruleBlock (symbol ",")
     symbol "."
-    return rhs
+    return (xs,ys,rhs)
+
+list :: Parser [Arg]
+list = do
+    symbol "["
+    xs <- sepBy aTerm (symbol ",")
+    symbol "]"
+    return xs
 
 manyRules :: Parser (M.Map PName PMap, M.Map PName [Rule])
 manyRules = do
@@ -158,7 +171,7 @@ factClause pname args = do
 
 dbClause = do
   symbol ":-"
-  keyWord ("type")
+  keyWord "type"
   symbol "("
   (pname,args) <- ruleHead
   symbol ")"
@@ -169,7 +182,7 @@ ruleHead :: Parser (PName, [Arg])
 ruleHead = do
   pname  <- varName
   symbol "("
-  args <- sepBy1 aTerm (symbol ",")
+  args <- sepBy aTerm (symbol ",")
   symbol ")"
   return (pname, args)
 
@@ -289,7 +302,7 @@ varName = identifier
 
 --reads an arbitrary string, all characters up to the first space
 text :: Parser String
-text = lexeme (C.char '\"' >> manyTill L.charLiteral (C.char '\"'))
+text = lexeme (C.char '\'' >> manyTill L.charLiteral (C.char '\''))
 
 -- this thing eats all spaces and comments
 spaceConsumer :: Parser ()

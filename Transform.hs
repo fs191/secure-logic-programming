@@ -20,19 +20,6 @@ import Rule
 -- a prefix of all fresh variables
 nv = "_X"
 
--- this is for debugging only
-printSubst theta =
-    concat $ map (\(k,v) -> show k ++ " -> " ++ show v ++ "\n") (M.toList theta)
-
--- update the substitution
-updateTheta :: Var -> Arg -> M.Map Var Arg -> M.Map Var Arg
-updateTheta a b theta =
-
-    let theta' = M.insert a b theta in
-    M.fromList $ map (\(x,y) -> case y of
-                                    AVar z -> if z == a then (x,b) else (x,y)
-                                    _      -> (x,y)
-                     ) (M.toList theta')
 
 -- use the rule to generate all possible facts from the given existing facts
 -- p :- q1 ... qn
@@ -66,9 +53,11 @@ processRulePremise _ thetas (ABB aexpr) =
 
 
 processABBPremise :: Arg -> (M.Map Var Arg, Arg, Int) -> [(M.Map Var Arg, Arg, Int)]
-processABBPremise aexpr' (theta,constr,cnt) =
+processABBPremise aexpr' (theta',constr,cnt) =
 
-    let aexpr    = updateAexprVars theta AVar aexpr' in
+    let aexpr''       = updateAexprVars theta' AVar aexpr' in
+    let (aexpr, theta) = assignmentsToTheta aexpr'' theta' in
+
     let allTypes = getAllAExprVarData (\x -> case x of {Free _ -> 0; _ -> 1}) aexpr in
 
     -- TODO we can apply constant folding and see if it is computable without private variables
@@ -102,32 +91,46 @@ processFactPremiseInstance factPredMap thetaB' constr cnt' argsB argsF =
     let (cnt, thetaF', constrF) = updateAexprVarsFold f cnt' M.empty $ factPredMap M.! argsF in
 
     --here theta starts branching into several new thetas
-    let (thetaB,thetaF,unifiable,newCnt) = processArgs cnt thetaB' thetaF' True argsB argsF in
+    let (thetaB,thetaF,unifiable,constrUnif) = processArgs thetaB' thetaF' True (AConstBool True) argsB argsF in
 
     if not unifiable then []
-    else [(thetaB, ABinary AAnd constr (updateAexprVars thetaF AVar constrF), newCnt)]
+    else [(thetaB, ABinary AAnd constr $ ABinary AAnd (updateAexprVars thetaF AVar constrF) constrUnif, cnt)]
 
-processArgs :: Int -> (M.Map Var Arg) -> (M.Map Var Arg) -> Bool -> [Arg] -> [Arg] -> (M.Map Var Arg, M.Map Var Arg, Bool, Int)
-processArgs cnt thetaB thetaF unifiable [] [] = (thetaB,thetaF,unifiable,cnt)
-processArgs cnt thetaB thetaF unifiable (argB':argsB) (argF':argsF) =
+processArgs :: (M.Map Var Arg) -> (M.Map Var Arg) -> Bool -> Arg -> [Arg] -> [Arg] -> (M.Map Var Arg, M.Map Var Arg, Bool, Arg)
+processArgs thetaB thetaF unifiable constr [] [] = (thetaB,thetaF,unifiable,constr)
+processArgs thetaB thetaF unifiable constr (argB':argsB) (argF':argsF) =
 
-    --apply theta
-    let argB = case argB' of {AVar x -> if M.member x thetaB then thetaB M.! x else argB'; _ -> argB'} in
-    let argF = case argF' of {AVar x -> if M.member x thetaF then thetaF M.! x else argF'; _ -> argF'} in
+    -- apply substitutions that we already have
+    let argB = applyTheta argB' thetaB in
+    let argF = applyTheta argF' thetaF in
 
-    -- TODO argF can also be a more complex expression that we may want to rewrite
-    let (thetaB', thetaF', unifiable', cnt') = if (argB == argF) then (thetaB,thetaF,unifiable,cnt) else
+    let (thetaB', thetaF', unifiable', constr') =
+
+          -- if the terms already unify, do not add any more constraints
+          if (argB == argF) then
+            (thetaB,thetaF,unifiable,constr)
+
+          -- otherwise, the terms may still unify, but we possibly need to update substitution
+          else
             case (argB,argF) of
 
-                (AVar (Free x), _                  ) -> (updateTheta (Free x) argF thetaB, thetaF, unifiable, cnt)
+                (AVar x@(Free _), _) -> (updateTheta x argF thetaB, thetaF, unifiable, constr)
 
-                (_            , AVar (Free y)      ) -> (thetaB, updateTheta (Free y      ) argB thetaF, unifiable, cnt)
-                (_            , AVar (Bound domain ty y)) -> (thetaB, updateTheta (Bound domain ty y) argB thetaF, unifiable, cnt)
+                (_, AVar y@(Free _)) -> (thetaB, updateTheta y argB thetaF, unifiable, constr)
 
-                _                                    -> (thetaB, thetaF, False, cnt)
+                -- different constants can never be unifiable
+                -- TODO we need to go deeper and apply constant propagation here
+                (AConstBool _, AConstBool _) -> (thetaB, thetaF, False, constr)
+                (AConstNum _,  AConstNum _)  -> (thetaB, thetaF, False, constr)
+                (AConstStr _,  AConstStr _)  -> (thetaB, thetaF, False, constr)
 
-    in processArgs cnt' thetaB' thetaF' unifiable' argsB argsF
+                -- if terms are potentially unifiable (depending on private data), we add an equality constraint
+                _  -> (thetaB, thetaF, unifiable, ABinary AAnd constr (ABinary AEQ argB argF))
 
+    in processArgs thetaB' thetaF' unifiable' constr' argsB argsF
+
+deriveAllFacts :: (M.Map PName PMap) -> (M.Map PName [Rule]) -> Int -> (M.Map PName PMap)
+deriveAllFacts facts rules n = runIteration facts rules 0 n
 
 runIteration :: (M.Map PName PMap) -> (M.Map PName [Rule]) -> Int -> Int -> (M.Map PName PMap)
 runIteration facts _ _ 0 = facts
@@ -150,11 +153,81 @@ applyRule facts rules (p:ps) =
     let facts' = M.insert p factsp facts in
     applyRule facts' rules ps
 
-showResult :: (M.Map PName PMap) -> String
-showResult facts =
+
+--------------------------------
+-- this is for debugging only
+showFactMap :: (M.Map PName PMap) -> String
+showFactMap facts =
   let res = map (\p ->
-                     "==== [[ " ++ show p ++ "]] ==== \n"
+                     "%% [[ " ++ p ++ "]] %% \n"
                      ++ intercalate "\n\n" (map (\key -> predToString "" p key ((facts M.! p) M.! key) ++ "\n") (M.keys (facts M.! p)))
                 ) (M.keys facts)
   in
   intercalate "\n" res
+
+
+printSubst theta =
+    concat $ map (\(k,v) -> show k ++ " -> " ++ show v ++ "\n") (M.toList theta)
+
+------------------------------------------------------------------------------------
+-- TODO move this to a separate module?
+
+-- extract assignments into a substitution
+assignmentsToTheta :: Arg -> M.Map Var Arg -> (Arg, M.Map Var Arg)
+assignmentsToTheta aexpr theta =
+    case aexpr of
+
+        AUnary  f x      -> let (y,theta') = processRec theta x in
+                            (AUnary f y, theta')
+
+        -- we assume in advance that LHS of an assignment is a free variable,
+        -- and that there are no other assignments in RHS
+        ABinary AAsgn (AVar x) y -> (AConstBool True, M.insert x y theta)
+
+        ABinary f x1 x2  -> let (y1,theta1) = processRec theta  x1 in
+                            let (y2,theta2) = processRec theta1 x2 in
+                            (ABinary f y1 y2, theta2)
+
+        ANary f xs       -> let (ys,theta') = foldl (\(ys0, th0) x -> let (y,th) = processRec th0 x in (y:ys0, th)) ([], theta) xs in
+                            (ANary f ys, theta')
+
+        _                -> (aexpr,theta)
+
+    where processRec theta' x = assignmentsToTheta x theta'
+
+-- apply a substitution
+applyTheta :: Arg -> M.Map Var Arg -> Arg
+applyTheta aexpr theta =
+    case aexpr of
+
+        AVar      x -> if M.member x theta then theta M.! x else AVar x
+        AUnary  f x -> AUnary f $ processRec x
+
+        -- we assume in advance that LHS of an assignment is a free variable
+        -- otherwise, treat the source program as incorrect
+        ABinary AAsgn (AVar x) y -> let z = processRec y in
+                                    if M.member x theta then
+                                        ABinary AEQ (theta M.! x) z
+                                    else
+                                        ABinary AAsgn (AVar x) z
+
+        ABinary f x1 x2  -> let y1 = processRec x1 in
+                            let y2 = processRec x2 in
+                            ABinary f y1 y2
+
+        ANary f xs       -> ANary f $ map (processRec) xs
+
+        x                -> x
+
+    where processRec x = applyTheta x theta
+
+-- update the substitution
+updateTheta :: Var -> Arg -> M.Map Var Arg -> M.Map Var Arg
+updateTheta a b theta =
+
+    let theta' = M.insert a b theta in
+    M.fromList $ map (\(x,y) -> case y of
+                                    AVar z -> if z == a then (x,b) else (x,y)
+                                    _      -> (x,y)
+                     ) (M.toList theta')
+

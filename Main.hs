@@ -1,44 +1,67 @@
 import ProgramOptions
 import Parser
-import Transform
-import CSVImport
-import SecreC
+
+import Optimize(optimize)
+import Preprocess(preprocess)
+import Transform(deriveAllFacts, showFactMap)
+import CSVImport(generateDataToDBscript)
+import SecreC(generateSecreCscript)
 
 import Control.Monad
 import Debug.Trace
 
 main :: IO ()
 main = do
+  -- command line arguments
   args <- getProgramOptions
 
+  -- the upper bound on the number of search steps
   let n = iterations args
+
+  -- text file containing input Datalog program
   let inFileName = inFile args
+
+  -- text file containing output SecreC program
   let outFilePath = outFile args
 
-  (database,rules,goal) <- parseDatalogFromFile inFileName
+  -- parse the input datalog program
+  (facts,rules,goal) <- parseDatalogFromFile inFileName
 
-  traceIO $ (show database)
-  traceIO $ (show rules)
-  traceIO $ (show goal)
-  traceIO $ "--------------------------------------------------------"
+  -- Verify that parser works correctly
+  --traceIO $ (show facts)
+  --traceIO $ (show rules)
+  --traceIO $ (show goal)
+  --traceIO $ "--------------------------------------------------------"
 
+  -- create a Sharemind script that can be used to upload the tables used in given program
+  -- WARNING: this is used for testing only, do not apply it to actual private data!
   when (dbCreateTables args) $ do
-      createdb <- generateDataToDBscript database
+      createdb <- generateDataToDBscript facts
       let outFileDir  = reverse $ dropWhile (/= '/') (reverse outFilePath)
       let outFileName = reverse $ takeWhile (/= '/') (reverse outFilePath)
 
       let createdbPath = outFileDir ++ "createdb_" ++ outFileName
       writeFile createdbPath createdb
 
-  let expandedFacts = runIteration database rules 0 n
+  -- apply Magic Sets or some alternative preprocessing here
+  let (facts', rules', goal') = preprocess facts rules goal
 
-  traceIO $ showResult expandedFacts
-  traceIO $ "--------------------------------------------------------"
+  -- using rules, generate all facts that we get in up to 'n' steps of rule application
+  let expandedFacts = deriveAllFacts facts' rules' n
 
+  -- we do all optimizations of computation (like constant propagation) here
+  let optimizedExpandendFacts = optimize expandedFacts
+
+  -- show the transformation result
+  traceIO $ showFactMap optimizedExpandendFacts
+
+  -- we can output either only yes/no answer, or also valuations of free variables
   let boolOnly = (outputOnlyBool args)
-  let secrec = generateSecreCscript boolOnly expandedFacts goal
+  let secrec = generateSecreCscript boolOnly optimizedExpandendFacts goal'
 
   -- Output the results
   if outFilePath /= ""
      then writeFile outFilePath secrec
      else putStrLn secrec
+
+

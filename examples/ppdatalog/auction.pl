@@ -7,4 +7,4 @@ bargain(X,Y,Z) :-
     Z = V,
     P1 =< P2.
 
-?- bargain(X,Y,"garlic").
+goal([],[Y]) :- bargain('alice',Y,'garlic').

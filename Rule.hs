@@ -36,4 +36,63 @@ type PMap = M.Map [Arg] Arg
 
 predToString :: String -> PName -> [Arg] -> Arg -> String
 predToString prefix pname args bexpr =
-    prefix ++ pname ++ "(" ++ intercalate "," (map aexprToString args) ++ ") :-\n" ++ prefix ++ aexprToString bexpr ++ "."
+    ruleHeadToString prefix pname args ++ " :-\n" ++ prefix ++ ruleIndent ++ rhsToString prefix bexpr ++ "."
+
+------------------------------------------------------------------------------------
+ruleDomainToString Public = ""
+ruleDomainToString Private = "private"
+
+ruleTypeToString VarBool = "bool"
+ruleTypeToString VarNum  = "int"
+ruleTypeToString VarText = "string"
+ruleTypeToString Unknown = "unknown"
+
+ruleIndent = "  "
+
+ruleHeadToString prefix pname args  = prefix ++ pname ++ "(" ++ intercalate "," (map (rhsToString prefix) args) ++ ")"
+
+-- this is currently used only for visual feedback, so the syntax of printed messages is not very important
+rhsToString :: String -> AExpr Var -> String
+rhsToString prefix aexpr =
+    case aexpr of
+        AVar (Bound domainType dataType vName) -> ruleDomainToString domainType ++ " " ++ ruleTypeToString dataType ++ " " ++ vName
+        AVar (Free vName) -> vName
+        AConstBool b -> case b of {True -> "true"; False -> "false"}
+        AConstNum c -> show c
+        AConstStr s -> s
+
+        ANary (AMember pred) args -> pred ++ "(" ++ intercalate "," (map processRec args) ++ ")"
+
+        ANary ASum xs -> "(" ++ intercalate " + " (map processRec xs) ++ ")"
+        ANary AProd xs -> "(" ++ intercalate " * " (map processRec xs) ++ ")"
+        ANary AAnds xs -> ruleIndent ++ intercalate (",\n" ++ prefix ++ ruleIndent) (map processRec xs)
+        ANary AOrs  xs -> ruleIndent ++ "(" ++ intercalate (";\n\n" ++ prefix ++ ruleIndent) (map processRec xs) ++ ")"
+
+        AUnary ANeg x -> "( - " ++ processRec x ++ ")"
+        AUnary ANot x -> "\\+(" ++ processRec x ++ ")"
+
+        ABinary ADiv x1 x2 -> "(" ++ processRec x1 ++ " / " ++ processRec x2 ++ ")"
+        ABinary AMult x1 x2 -> "(" ++ processRec x1 ++ " * " ++ processRec x2 ++ ")"
+        ABinary AAdd x1 x2 -> "(" ++ processRec x1 ++ " + " ++ processRec x2 ++ ")"
+        ABinary ASub x1 x2 -> "(" ++ processRec x1 ++ " - " ++ processRec x2 ++ ")"
+        ABinary AAnd x1 x2 -> processRec x1 ++ ",\n" ++ prefix ++ ruleIndent ++ processRec x2
+        ABinary AOr  x1 x2 -> processRec x1 ++ ";\n\n" ++ prefix ++ ruleIndent ++ processRec x2 ++ ")"
+        ABinary ALT x1 x2  -> "(" ++ processRec x1 ++ " < " ++ processRec x2 ++ ")"
+        ABinary ALE x1 x2  -> "(" ++ processRec x1 ++ " <= " ++ processRec x2 ++ ")"
+        ABinary AEQ x1 x2  -> "(" ++ processRec x1 ++ " = " ++ processRec x2 ++ ")"
+        ABinary AGE x1 x2  -> "(" ++ processRec x1 ++ " >= " ++ processRec x2 ++ ")"
+        ABinary AGT x1 x2  -> "(" ++ processRec x1 ++ " > " ++ processRec x2 ++ ")"
+        ABinary AAsgn x1 x2  -> "(" ++ processRec x1 ++ " := " ++ processRec x2 ++ ")"
+     where processRec x = rhsToString prefix x
+
+
+--------------------------------
+-- this is for debugging only
+showFactMap :: (M.Map PName PMap) -> String
+showFactMap facts =
+  let res = map (\p ->
+                     "%% [[ " ++ p ++ "]] %% \n"
+                     ++ intercalate "\n\n" (map (\key -> predToString "" p key ((facts M.! p) M.! key) ++ "\n") (M.keys (facts M.! p)))
+                ) (M.keys facts)
+  in
+  intercalate "\n" res

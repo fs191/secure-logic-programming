@@ -1,5 +1,9 @@
 module Aexpr where
 
+---------------------------------------------------------
+---- Arithmetic expression
+---------------------------------------------------------
+
 import Data.Hashable
 import Data.List
 import Debug.Trace
@@ -252,6 +256,9 @@ evalAexpr aexpr =
         ABinary AEQ x1 x2  -> AConstBool $ (processRecAny x1) == (processRecAny x2)
         ABinary AGE x1 x2  -> AConstBool $ (processRecNum x1) >= (processRecNum x2)
         ABinary AGT x1 x2  -> AConstBool $ (processRecNum x1) > (processRecNum x2)
+
+        ABinary AAsgn x1 x2  -> AConstBool $ (processRecAny x1) == (processRecAny x2)
+
     where processRecAny x  = let y = evalAexpr x in
                                     case y of
                                         (AConstBool c) -> show c
