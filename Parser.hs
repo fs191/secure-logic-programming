@@ -42,14 +42,14 @@ allKeyWords = S.fromList allKeyWordList
 -- Parsing a function as a complex expression --
 ------------------------------------------------
 
-aExpr :: Parser Arg
+aExpr :: Parser Term
 aExpr = makeExprParser aTerm aOperators
 
 aString = do
   t <- text
   return $ AConstStr ("\'" ++ t ++ "\'")
 
-aOperators :: [[Operator Parser Arg]]
+aOperators :: [[Operator Parser Term]]
 aOperators =
   [ [ InfixL (ABinary AMax <$ symbol "\\/")
     , InfixL (ABinary AMin  <$ symbol "/\\") ]
@@ -62,13 +62,13 @@ aOperators =
 
   ]
 
-aTerm :: Parser Arg
+aTerm :: Parser Term
 aTerm = parens aExpr
   <|> AVar <$> var
   <|> AConstNum <$> signedInt
   <|> aString
 
-bExpr :: Parser Arg
+bExpr :: Parser Term
 bExpr = makeExprParser bTerm bOperators
 
 notAExpr :: Parser (AExpr a -> AExpr a)
@@ -76,7 +76,7 @@ notAExpr = do
   caseInsensKeyWord "\\+"
   return $ AUnary ANot
 
-bOperators :: [[Operator Parser Arg]]
+bOperators :: [[Operator Parser Term]]
 bOperators =
   [
     [ Prefix notAExpr]
@@ -96,29 +96,29 @@ bOperators =
 
   ]
 
-bTerm :: Parser Arg
+bTerm :: Parser Term
 bTerm = aExpr <|> parens bExpr
 
 ------------------------------------------------------------
 ---- Parsing DataLog program
 ------------------------------------------------------------
 
--- TODO at some point, we want an aexpr instead of [RHS] everywhere, since there can be disjunctions as well
-datalogProgram :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Arg],[Arg],[RHS]))
+-- TODO at some point, we want a Formula instead of [Formula] everywhere
+datalogProgram :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Term],[Term],[Formula]))
 datalogProgram = try datalogProgramWithGoal <|> datalogProgramWithoutGoal
 
-datalogProgramWithGoal :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Arg],[Arg],[RHS]))
+datalogProgramWithGoal :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Term],[Term],[Formula]))
 datalogProgramWithGoal = do
     (database,rules) <- manyRules <|> oneRule
     goal <- datalogGoal
     return $ (database,rules,goal)
 
-datalogProgramWithoutGoal :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Arg],[Arg],[RHS]))
+datalogProgramWithoutGoal :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Term],[Term],[Formula]))
 datalogProgramWithoutGoal = do
     (database,rules) <- manyRules <|> oneRule
     return $ (database,rules,([],[],[]))
 
-datalogGoal :: Parser ([Arg],[Arg],[RHS])
+datalogGoal :: Parser ([Term],[Term],[Formula])
 datalogGoal = do
     keyWord "goal"
     symbol "("
@@ -127,11 +127,11 @@ datalogGoal = do
     ys <- list
     symbol ")"
     symbol ":-"
-    rhs <- sepBy1 ruleBlock (symbol ",")
+    formula <- sepBy1 ruleBlock (symbol ",")
     symbol "."
-    return (xs,ys,rhs)
+    return (xs,ys,formula)
 
-list :: Parser [Arg]
+list :: Parser [Term]
 list = do
     symbol "["
     xs <- sepBy aTerm (symbol ",")
@@ -178,7 +178,7 @@ dbClause = do
   void(delimRules)
   return $ Left (pname, M.singleton args (ANary (AMember pname) args))
 
-ruleHead :: Parser (PName, [Arg])
+ruleHead :: Parser (PName, [Term])
 ruleHead = do
   pname  <- varName
   symbol "("
@@ -186,22 +186,22 @@ ruleHead = do
   symbol ")"
   return (pname, args)
 
-ruleTail :: Parser [RHS]
+ruleTail :: Parser [Formula]
 ruleTail = do
   bs <- sepBy1 ruleBlock delimRows
   void(delimRules)
   return bs
 
 -- a rule may contain a reference to a database fact, another rule, or a boolean expression
-ruleBlock :: Parser RHS
+ruleBlock :: Parser Formula
 ruleBlock = try ruleBlockPred <|> ruleBlockBexpr
 
-ruleBlockPred :: Parser RHS
+ruleBlockPred :: Parser Formula
 ruleBlockPred = do
   (pname,args) <- ruleHead
   return $ Fact pname args
 
-ruleBlockBexpr :: Parser RHS
+ruleBlockBexpr :: Parser Formula
 ruleBlockBexpr = do
   bexpr <- bExpr
   return $ ABB bexpr

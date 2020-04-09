@@ -5,9 +5,9 @@ main :-
     current_prolog_flag(argv, Argv),
     [Script|Xs] = Argv,
     [Script],
-    goal(Xs,Ys),
-    write('true'),nl,
-    write(Ys),nl,
+    findall(Ys, goal(Xs,Ys), Yss),
+    (Yss = [] -> write('false') ; write('true')), nl,
+    forall(member(Ys,Yss), (write(Ys),nl)),
     halt(0).
 main :-
     write('false'),nl,

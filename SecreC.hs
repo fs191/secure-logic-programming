@@ -5,6 +5,7 @@ module SecreC where
 ----  to SecreC
 ---------------------------------------------------------
 
+-- TODO this module is very messy and needs thorough refactoring
 import Data.Hashable
 import Data.List
 import Data.Maybe
@@ -46,7 +47,7 @@ defaultGoal = ["void main(){",
                indent ++ "publish(\"NOTICE: no goal specified in the main function\",false);",
                "}"]
 
-generateGoal :: Bool -> [String] -> [DomainType] -> Maybe (String,[Arg]) -> [String]
+generateGoal :: Bool -> [String] -> [DomainType] -> Maybe (String,[Term]) -> [String]
 generateGoal boolOnly structTypes ds goal =
     case goal of
         Just (pname, args') ->
@@ -87,7 +88,7 @@ generateGoal boolOnly structTypes ds goal =
 
         _ -> defaultGoal
 
-generateGoalArg :: Arg -> Int -> [(String,String)]
+generateGoalArg :: Term -> Int -> [(String,String)]
 generateGoalArg arg i =
     let argName = argPrefix ++ show i in
     case arg of
@@ -105,7 +106,7 @@ generateGoalArg arg i =
         -- a free argument can be evaluated to anything and is not instantiated
         AVar (Free z) -> []
 
-generateStruct :: [(Bool,Arg,DomainType,DataType,Int)] -> String -> [String]
+generateStruct :: [(Bool,Term,DomainType,DataType,Int)] -> String -> [String]
 generateStruct freeArgs structName =
 
     let template = generateTemplateDecl True freeArgs in
@@ -113,7 +114,7 @@ generateStruct freeArgs structName =
         ++ map generateStructArg freeArgs
         ++ ["}"]
 
-generateStructArg :: (Bool,Arg,DomainType,DataType,Int) -> String
+generateStructArg :: (Bool,Term,DomainType,DataType,Int) -> String
 generateStructArg (_,a,d,t,i) =
     domainToStructDecl d ++ typeToString False d t i ++ dimPar (typeToDim False d t i) ++ argPrefix ++ show i ++ ";"
 
@@ -122,7 +123,7 @@ generateReturn freeArgs structType =
         ++ map generateReturnArg freeArgs
         ++ ["return(result);"]
 
-generateReturnArg :: (Bool,Arg,DomainType,DataType,Int) -> String
+generateReturnArg :: (Bool,Term,DomainType,DataType,Int) -> String
 generateReturnArg (_,_,_,t,i) =
     let argName = argPrefix ++ show i in
     "result." ++ argName ++ " = " ++ argName ++ ";"
@@ -145,15 +146,15 @@ generateTemplateUse cond args =
 
 -- a SecreC program is a list of code lines
 -- if no particular goal is given, then we do not create a main statement
-generateSecreCscript :: Bool -> (M.Map PName PMap) -> ([Arg],[Arg],[RHS]) -> String
+generateSecreCscript :: Bool -> (M.Map PName PMap) -> ([Term],[Term],[Formula]) -> String
 generateSecreCscript boolOnly predMap (xs,ys,goals) =
 
     -- TODO think whether we want to support more expressions in a goal
     -- TODO we currently treat all inputs as strings, we need to genralize it (also in plain prolog)
     let goal = if length goals > 0 then
                       case head goals of
-                          Fact gn ga -> let xs' = intercalate "," (map (rhsToString "") xs) in
-                                        let ys' = intercalate "," (map (rhsToString "") ys) in
+                          Fact gn ga -> let xs' = intercalate "," (map (formulaToString "") xs) in
+                                        let ys' = intercalate "," (map (formulaToString "") ys) in
                                         trace ("goal([" ++ xs' ++ "],[" ++ ys' ++ "]) :- " ++ ruleHeadToString "" gn ga) $
                                         let goalArgs = map (\x -> if elem x xs then
                                                                       case x of
@@ -192,7 +193,7 @@ generateSecreCscript boolOnly predMap (xs,ys,goals) =
 
     intercalate "\n" $ header ++ structDef ++ concat body ++ mainFun
 
-createSecreCFuns :: Bool -> Maybe (PName, [Arg]) -> String -> PName -> PMap -> [(DomainType, String, [String])]
+createSecreCFuns :: Bool -> Maybe (PName, [Term]) -> String -> PName -> PMap -> [(DomainType, String, [String])]
 createSecreCFuns boolOnly goal structName pname pmap =
     let unnecessaryFun = case goal of {Just (goalPname, _) -> pname /= goalPname; _ -> False} in
     if unnecessaryFun then [] else
@@ -203,7 +204,7 @@ createSecreCFuns boolOnly goal structName pname pmap =
 
     zipWith3 (createSecreCFun boolOnly pname structName as) is keys values
 
-createSecreCFun :: Bool -> PName -> String -> [Arg] -> Int -> [Arg] -> Arg -> (DomainType, String, [String])
+createSecreCFun :: Bool -> PName -> String -> [Term] -> Int -> [Term] -> Term -> (DomainType, String, [String])
 createSecreCFun boolOnly pname structName asG index as bexpr =
 
     --if not(isGround bexpr) then [] else
@@ -264,7 +265,7 @@ createSecreCFun boolOnly pname structName asG index as bexpr =
 
 -- create a big cross product table with a map from 
 -- TODO can be much more efficient if we take into account Primary / Foreign keys
-createCrossProducTable :: AExpr Var -> (M.Map Arg [String], [String])
+createCrossProducTable :: AExpr Var -> (M.Map Term [String], [String])
 createCrossProducTable aexpr =
     let zs = extractAllPredicates aexpr in
     if length zs == 0 then (M.empty, []) else
@@ -276,7 +277,7 @@ createCrossProducTable aexpr =
     let colMap = map (\(x,j) -> (x,[colPrefix ++ show j])) colMapData in
     (M.fromListWith (++) colMap, s0 ++ s1 ++ s2)
 
-processTables :: Int -> [String] -> [String] -> [(String,[Arg])] -> ([(Arg,Int)],[String],[String])
+processTables :: Int -> [String] -> [String] -> [(String,[Term])] -> ([(Term,Int)],[String],[String])
 processTables _ _ _ [] = ([],[],[])
 processTables c ms (f:fs) ((tableName,xs):rest) =
 
@@ -295,7 +296,7 @@ processTables c ms (f:fs) ((tableName,xs):rest) =
     let (colMapRest, before, after) = processTables (c + length xs) (m:ms) fs rest in
     (zip xs js ++ colMapRest, s0 ++ before, s1 ++ s2 ++ after)
 
-processTableColumn :: String -> String -> String -> Arg -> Int -> Int -> [String]
+processTableColumn :: String -> String -> String -> Term -> Int -> Int -> [String]
 processTableColumn tableName f m x i j =
     let colj = colPrefix ++ show j in
     let s0 = getColumn tableName f i colj m x in
@@ -304,7 +305,7 @@ processTableColumn tableName f m x i j =
 
 
 -- TODO a Free variable should theoretically result in a dynamic type, but we do not have such constructions yet
-getColumn :: String -> String -> Int -> String -> String -> Arg -> [String]
+getColumn :: String -> String -> Int -> String -> String -> Term -> [String]
 getColumn tableName f colIndex varName m arg =
     case arg of
         AVar (Bound Private VarNum  _) -> getIntColumn tableName f colIndex (domainToDecl Private ++ "int32 [[1]]") varName m
@@ -380,7 +381,7 @@ meet2 x y  = if (x == y) then x else error $ error_typeOp "argument matching" x 
 
 -- TODO let us pass the data type not as a string, but as DataType object
 -- this assumes that the expression is "folded", i.e. is in DNF form with grouped AND / OR
-aexprToSecreC :: S.Set VName -> (M.Map Arg (DomainType,DataType,Int)) -> (M.Map Arg (DomainType,DataType,Int)) -> (M.Map Arg [String]) -> Int -> AExpr Var
+aexprToSecreC :: S.Set VName -> (M.Map Term (DomainType,DataType,Int)) -> (M.Map Term (DomainType,DataType,Int)) -> (M.Map Term [String]) -> Int -> AExpr Var
                  -> (Int,String,DomainType,String,S.Set VName,[String])
 aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c' aexpr =
     let b = boolPrefix ++ show c' in
@@ -483,7 +484,7 @@ aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c' aexpr =
               let matchInputTables = [domainToDecl domain ++ "bool [[1]] " ++ b' ++ " = " ++ (if length comp > 0 then  intercalate " & " comp  else "reshape(true,m)") ++ ";"] in
               (domain, dv1, decl0 ++ decl1 ++ matchInputTables)
 
-getFreeVarCmp :: Arg -> String -> String -> String
+getFreeVarCmp :: Term -> String -> String -> String
 getFreeVarCmp arg x z =
     case arg of
         AVar (Bound Private VarNum  _) -> "(" ++ x ++ " == " ++ z ++ ");"
@@ -497,7 +498,7 @@ getFreeVarCmp arg x z =
 
         _           -> error $ error_complexExpression arg
 
-getFreeVarAsgn :: Arg -> String -> String -> String
+getFreeVarAsgn :: Term -> String -> String -> String
 getFreeVarAsgn arg x z =
     case arg of
         AVar (Bound Private VarNum  _) -> domainToDecl Private ++ "int32"     ++ " [[1]] " ++ x ++ " = " ++ z ++ ";"
@@ -511,7 +512,7 @@ getFreeVarAsgn arg x z =
 
         _           -> error $ error_complexExpression arg
 
-getTypeVar :: Bool -> M.Map Arg (DomainType,DataType,Int) -> M.Map Arg (DomainType,DataType,Int) -> Arg -> (Bool, DomainType, String, String)
+getTypeVar :: Bool -> M.Map Term (DomainType,DataType,Int) -> M.Map Term (DomainType,DataType,Int) -> Term -> (Bool, DomainType, String, String)
 getTypeVar allowFreeArg boundedArgMap freeArgMap arg =
     case arg of
         AVar (Bound Private VarNum  x) -> (False, Private, "int32", x)
@@ -628,14 +629,14 @@ deriveType aexpr =
         ABinary AGT x1 x2  -> VarBool
         _                  -> Unknown
 
-deriveConditionalDomain :: [Arg] -> [Arg] -> [DomainType]
+deriveConditionalDomain :: [Term] -> [Term] -> [DomainType]
 deriveConditionalDomain asF [] = map deriveDomain asF
 deriveConditionalDomain (aF:asF) (aG:asG) =
     let dF = deriveDomain aF in
     let dG = deriveDomain aG in
     (meet dF dG) : (deriveConditionalDomain asF asG)
 
-deriveConditionalType :: [Arg] -> [Arg] -> [DataType]
+deriveConditionalType :: [Term] -> [Term] -> [DataType]
 deriveConditionalType asF [] = map deriveType asF
 deriveConditionalType (aF:asF) (aG:asG) =
     let dF = deriveType aF in

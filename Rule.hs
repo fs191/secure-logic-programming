@@ -20,23 +20,25 @@ data DomainType = Public  | Private                    deriving (Ord,Eq,Show)
 
 -- predicate argument, together with the privacy/data type
 -- here var is a database variable (not a free LP variable)
-data Var = Bound DomainType DataType AName | Free VName deriving (Ord,Eq,Show)
-type Arg = AExpr Var
+data Var  = Bound DomainType DataType AName | Free VName deriving (Ord,Eq,Show)
+type Term = AExpr Var
 
--- rule
-data Rule = Rule [Arg] [RHS] deriving Show
+-- a rule has a list of arguments and a list of formulae that comprise rule premise
+-- TODO a single premise would be sufficent, as it can be an AND of other formulae
+data Rule = Rule [Term] [Formula] deriving Show
 
--- a RHS predicate can be either arithetic blackbox operation (like "=") or a fact defined in LP
-data RHS = Fact PName [Arg] | ABB Arg deriving Show
+-- a formula can be either boolean arithetic blackbox operation (like "=") or a fact defined in LP
+-- TODO the current approach allows formulae to be non-boolean expressions, we should fix it
+data Formula = Fact PName [Term] | ABB Term deriving Show
 
 -- a predicate map is a mapping from a list of arguments of a predicate
 -- to a boolean expresion desrribing the condtions on with those arguments satisfy the predicate
 -- e.g. 'p(0). p(x) :- x < 1000.' would be expressed as a map {[0] -> True, [x] -> {x < 1000}}
-type PMap = M.Map [Arg] Arg
+type PMap = M.Map [Term] Term
 
-predToString :: String -> PName -> [Arg] -> Arg -> String
+predToString :: String -> PName -> [Term] -> Term -> String
 predToString prefix pname args bexpr =
-    ruleHeadToString prefix pname args ++ " :-\n" ++ prefix ++ ruleIndent ++ rhsToString prefix bexpr ++ "."
+    ruleHeadToString prefix pname args ++ " :-\n" ++ prefix ++ ruleIndent ++ formulaToString prefix bexpr ++ "."
 
 ------------------------------------------------------------------------------------
 ruleDomainToString Public = ""
@@ -49,11 +51,11 @@ ruleTypeToString Unknown = "unknown"
 
 ruleIndent = "  "
 
-ruleHeadToString prefix pname args  = prefix ++ pname ++ "(" ++ intercalate "," (map (rhsToString prefix) args) ++ ")"
+ruleHeadToString prefix pname args  = prefix ++ pname ++ "(" ++ intercalate "," (map (formulaToString prefix) args) ++ ")"
 
 -- this is currently used only for visual feedback, so the syntax of printed messages is not very important
-rhsToString :: String -> AExpr Var -> String
-rhsToString prefix aexpr =
+formulaToString :: String -> AExpr Var -> String
+formulaToString prefix aexpr =
     case aexpr of
         AVar (Bound domainType dataType vName) -> ruleDomainToString domainType ++ " " ++ ruleTypeToString dataType ++ " " ++ vName
         AVar (Free vName) -> vName
@@ -83,7 +85,7 @@ rhsToString prefix aexpr =
         ABinary AGE x1 x2  -> "(" ++ processRec x1 ++ " >= " ++ processRec x2 ++ ")"
         ABinary AGT x1 x2  -> "(" ++ processRec x1 ++ " > " ++ processRec x2 ++ ")"
         ABinary AAsgn x1 x2  -> "(" ++ processRec x1 ++ " := " ++ processRec x2 ++ ")"
-     where processRec x = rhsToString prefix x
+     where processRec x = formulaToString prefix x
 
 
 --------------------------------

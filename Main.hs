@@ -3,7 +3,7 @@ import Parser
 
 import Optimize(optimize)
 import Preprocess(preprocess)
-import Transform(deriveAllFacts, showFactMap)
+import Transform(deriveAllGroundRules, showAllRules)
 import CSVImport(generateDataToDBscript)
 import SecreC(generateSecreCscript)
 
@@ -47,17 +47,22 @@ main = do
   let (facts', rules', goal') = preprocess facts rules goal
 
   -- using rules, generate all facts that we get in up to 'n' steps of rule application
-  let expandedFacts = deriveAllFacts facts' rules' n
+  -- since we are working with symbolic data, our "facts" are actually "ground rules", i.e. rules without free variables,
+  -- but they may have bounded variables that will be taken from the datbase
+  -- the output is if type 'M.Map PName PMap' where:
+  -- - PName is the predicate name, e.g. 'buys'
+  -- - PMap maps 'arguments of the predicate' to 'RHS of the corresponding ground rule'
+  let groundRules = deriveAllGroundRules facts' rules' n
 
   -- we do all optimizations of computation (like constant propagation) here
-  let optimizedExpandendFacts = optimize expandedFacts
+  let optimizedGroundRules = optimize groundRules
 
   -- show the transformation result
-  traceIO $ showFactMap optimizedExpandendFacts
+  traceIO $ showAllRules optimizedGroundRules
 
   -- we can output either only yes/no answer, or also valuations of free variables
   let boolOnly = (outputOnlyBool args)
-  let secrec = generateSecreCscript boolOnly optimizedExpandendFacts goal'
+  let secrec = generateSecreCscript boolOnly optimizedGroundRules goal'
 
   -- Output the results
   if outFilePath /= ""
