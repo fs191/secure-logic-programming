@@ -41,62 +41,92 @@ updateTheta a b (Th theta) =
 
 
 -- extract assignments into a substitution
-assignmentsToTheta :: Term -> Subst -> (Term, Subst)
-assignmentsToTheta aexpr theta =
-    case aexpr of
+assignmentsToTheta :: Formula -> Subst -> (Formula, Subst)
+assignmentsToTheta bexpr theta =
+    case bexpr of
 
-        AUnary  f x      -> let (y,theta') = processRec theta x in
-                            (AUnary f y, theta')
+        BUnary  f x      -> let (y,theta') = processRec theta x in
+                            (BUnary f y, theta')
 
         -- we assume in advance that LHS of an assignment is a free variable,
         -- and that there are no other assignments in RHS
-        ABinary AAsgn (AVar x) y -> (AConstBool True, updateTheta x y theta)
+        BBinPred BAsgn (AVar x) y -> (BConstBool True, updateTheta x y theta)
 
-        ABinary f x1 x2  -> let (y1,theta1) = processRec theta  x1 in
+        BBinary f x1 x2  -> let (y1,theta1) = processRec theta  x1 in
                             let (y2,theta2) = processRec theta1 x2 in
-                            (ABinary f y1 y2, theta2)
+                            (BBinary f y1 y2, theta2)
 
-        ANary f xs       -> let (ys,theta') = foldl (\(ys0, th0) x -> let (y,th) = processRec th0 x in (y:ys0, th)) ([], theta) xs in
-                            (ANary f ys, theta')
+        BNary f xs       -> let (ys,theta') = foldl (\(ys0, th0) x -> let (y,th) = processRec th0 x in (y:ys0, th)) ([], theta) xs in
+                            (BNary f ys, theta')
 
-        _                -> (aexpr,theta)
+        _                -> (bexpr,theta)
 
     where processRec theta' x = assignmentsToTheta x theta'
 
 -- apply a substitution
-applyTheta :: Subst -> Term -> Term
-applyTheta theta aexpr =
-    case aexpr of
-
-        AVar      x -> evalTheta theta x
-        AUnary  f x -> AUnary f $ processRec x
+applyToFormula :: Subst -> Formula -> Formula
+applyToFormula theta bexpr =
+    case bexpr of
 
         -- we assume in advance that LHS of an assignment is a free variable
         -- otherwise, treat the source program as incorrect
-        ABinary AAsgn (AVar x) y -> let z = processRec y in
-                                    if memberTheta x theta then
-                                        ABinary AEQ (evalTheta theta x) z
-                                    else
-                                        ABinary AAsgn (AVar x) z
+        BBinPred BAsgn (AVar x) y -> let z = applyToTerm theta y in
+                                     if memberTheta x theta then
+                                         BBinPred BEQ (evalTheta theta x) z
+                                     else
+                                         BBinPred BAsgn (AVar x) z
 
-        ABinary f x1 x2  -> let y1 = processRec x1 in
-                            let y2 = processRec x2 in
-                            ABinary f y1 y2
+        BBinPred  f x1 x2 -> BBinPred f (applyToTerm theta x1) (applyToTerm theta x2)
+        BListPred f xs    -> BListPred f $ map (applyToTerm theta) xs
 
-        ANary f xs       -> ANary f $ map (processRec) xs
+        BUnary f x      -> BUnary f $ applyToFormula theta x
+        BBinary f x1 x2 -> BBinary f (applyToFormula theta x1) (applyToFormula theta x2)
+        BNary f xs      -> BNary f $ map (applyToFormula theta) xs
+
+        x               -> x
+
+applyToTerm :: Subst -> Term -> Term
+applyToTerm theta aexpr =
+    case aexpr of
+
+        AVar      x -> evalTheta theta x
+
+        AUnary  f x      -> AUnary f $ processRec x
+        ABinary f x1 x2  -> ABinary f (processRec x1) (processRec x2)
+        ANary f xs       -> ANary f $ map processRec xs
 
         x                -> x
 
-    where processRec x = applyTheta theta x
+    where processRec x = applyToTerm theta x
 
+-- TODO continue from here
 -- replace all variables with fresh names, store the replacement into a substitution
 -- the fresh names are numbered starting from the input counter
 -- TODO this would be better to implement using a state monad
-refreshVariableNames :: Int -> Term -> (Int, Subst, Term)
-refreshVariableNames = refreshVariableNamesRec emptyTheta
+refreshVarNames :: Int -> Formula -> (Int, Subst, Formula)
+refreshVarNames = refreshVarNamesRec emptyTheta
 
-refreshVariableNamesRec :: Subst -> Int -> Term -> (Int, Subst, Term)
-refreshVariableNamesRec theta c aexpr =
+refreshVarNamesRec theta c bexpr =
+    case bexpr of
+
+        BConstBool x -> (c, theta, BConstBool x)
+
+        BBinPred op x1 x2 -> let (c',  theta',  y1) = refreshVarNamesRecTerm theta  c  x1 in
+                            let (c'', theta'', y2)  = refreshVarNamesRecTerm theta' c' x2 in
+                            (c'', theta'', BBinPred op y1 y2)
+        BListPred op xs    -> let (c',theta',ys) = foldl (\(c0, theta0, ys0) y0 -> let (c1, theta1, y1) = refreshVarNamesRecTerm theta0 c0 y0 in (c1, theta1, ys0 ++ [y1])) (c, theta, []) xs in
+                            (c', theta', BListPred op ys)
+
+        BNary   op xs    -> let (c',theta',ys) = foldl (\(c0, theta0, ys0) y0 -> let (c1, theta1, y1) = refreshVarNamesRec theta0 c0 y0 in (c1, theta1, ys0 ++ [y1])) (c, theta, []) xs in
+                            (c', theta', BNary op ys)
+        BUnary  op x     -> let (c',  theta',  y)  = refreshVarNamesRec theta c x  in
+                            (c', theta', BUnary op y)
+        BBinary op x1 x2 -> let (c',  theta',  y1) = refreshVarNamesRec theta c x1 in
+                            let (c'', theta'', y2) = refreshVarNamesRec theta' c' x2 in
+                            (c'', theta'', BBinary op y1 y2)
+
+refreshVarNamesRecTerm :: Subst -> Int -> Term -> (Int, Subst, Term)
+refreshVarNamesRecTerm theta c aexpr =
     case aexpr of
 
         AVar x      -> if memberTheta x theta then (c, theta, evalTheta theta x)
@@ -106,7 +136,6 @@ refreshVariableNamesRec theta c aexpr =
                                    Free z       -> AVar (Free (nv ++ show c))
                            in
                            (c+1, updateTheta x freshVar theta, freshVar)
-        AConstBool x -> (c, theta, AConstBool x)
         AConstNum  x -> (c, theta, AConstNum x)
         AConstStr  x -> (c, theta, AConstStr x)
 
@@ -118,7 +147,7 @@ refreshVariableNamesRec theta c aexpr =
                             let (c'', theta'', y2) = processRec c' theta' x2 in
                             (c'', theta'', ABinary op y1 y2)
 
-    where processRec c theta x =refreshVariableNamesRec theta c x
+    where processRec c theta x =refreshVarNamesRecTerm theta c x
 
 
 

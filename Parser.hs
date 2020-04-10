@@ -68,42 +68,69 @@ aTerm = parens aExpr
   <|> AConstNum <$> signedInt
   <|> aString
 
-bExpr :: Parser Term
+bExpr :: Parser Formula
 bExpr = makeExprParser bTerm bOperators
 
-notAExpr :: Parser (AExpr a -> AExpr a)
-notAExpr = do
+notBExpr :: Parser (Formula -> Formula)
+notBExpr = do
   caseInsensKeyWord "\\+"
-  return $ AUnary ANot
+  return $ BUnary BNot
 
-bOperators :: [[Operator Parser Term]]
+eqOpSymbol1 = do
+  symbol "=<"
+  return BLT
+eqOpSymbol2 = do
+  symbol "<"
+  return BLE
+eqOpSymbol3 = do
+  symbol "=="
+  return BEQ
+eqOpSymbol4 = do
+  symbol "="
+  return BEQ
+eqOpSymbol5 = do
+  symbol ">="
+  return BGE
+eqOpSymbol6 = do
+  symbol ">"
+  return BGT
+
+acompExpr :: Parser Formula
+acompExpr = do
+  x1 <- aExpr
+  f <- eqOpSymbol1 <|> eqOpSymbol2 <|> eqOpSymbol3 <|> eqOpSymbol4 <|> eqOpSymbol5 <|> eqOpSymbol6
+  x2 <- aExpr
+  return $ BBinPred f x1 x2
+
+bpredExpr :: Parser Formula
+bpredExpr = do
+  pname  <- varName
+  symbol "("
+  args <- sepBy aTerm (symbol ",")
+  symbol ")"
+  return $ BListPred (BPredName pname) args
+
+bOperators :: [[Operator Parser Formula]]
 bOperators =
   [
-    [ Prefix notAExpr]
-
-  , [ InfixL (ABinary ALE <$ symbol "=<")
-    , InfixL ((\x y -> AUnary ANot (ABinary AEQ x y)) <$ symbol "\\=")
-    , InfixL (ABinary ALT <$ symbol "<")
-    , InfixL (ABinary AEQ <$ symbol "==")
-    , InfixL (ABinary AEQ <$ symbol "=")
-    , InfixL (ABinary AAsgn <$ symbol "is")
-    , InfixL (ABinary AGE <$ symbol ">=")
-    , InfixL (ABinary AGT <$ symbol ">") ]
+    [ Prefix notBExpr]
 
   --TODO we will need to use LP notation here
-  , [ InfixL (ABinary AAnd <$ caseInsensKeyWord "and")]
-  , [ InfixL (ABinary AOr  <$ caseInsensKeyWord "or")]
+  , [ InfixL (BBinary BAnd <$ caseInsensKeyWord "and")]
+  , [ InfixL (BBinary BOr  <$ caseInsensKeyWord "or")]
 
   ]
 
-bTerm :: Parser Term
-bTerm = aExpr <|> parens bExpr
+bTerm :: Parser Formula
+bTerm = parens bExpr
+  <|> acompExpr
+  <|> bpredExpr
 
 ------------------------------------------------------------
 ---- Parsing DataLog program
 ------------------------------------------------------------
 
--- TODO at some point, we want a Formula instead of [Formula] everywhere
+--                        facts(database)   rules               goal: inputs, outputs, formulae to satisfy
 datalogProgram :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Term],[Term],[Formula]))
 datalogProgram = try datalogProgramWithGoal <|> datalogProgramWithoutGoal
 
@@ -167,7 +194,7 @@ ruleClause pname args = do
 
 factClause pname args = do
   void(delimRules)
-  return $ Left (pname, M.singleton args (AConstBool True))
+  return $ Left (pname, M.singleton args (BConstBool True))
 
 dbClause = do
   symbol ":-"
@@ -176,7 +203,7 @@ dbClause = do
   (pname,args) <- ruleHead
   symbol ")"
   void(delimRules)
-  return $ Left (pname, M.singleton args (ANary (AMember pname) args))
+  return $ Left (pname, M.singleton args (BListPred (BPredName pname) args))
 
 ruleHead :: Parser (PName, [Term])
 ruleHead = do
@@ -199,12 +226,12 @@ ruleBlock = try ruleBlockPred <|> ruleBlockBexpr
 ruleBlockPred :: Parser Formula
 ruleBlockPred = do
   (pname,args) <- ruleHead
-  return $ Fact pname args
+  return $ BListPred (BPredName pname) args
 
 ruleBlockBexpr :: Parser Formula
 ruleBlockBexpr = do
   bexpr <- bExpr
-  return $ ABB bexpr
+  return $ bexpr
 
 var :: Parser Var
 var = try dbVar <|> freeVar

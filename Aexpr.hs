@@ -1,7 +1,7 @@
 module Aexpr where
 
 ---------------------------------------------------------
----- Arithmetic expression
+---- Arithmetic and Boolean expressions
 ---------------------------------------------------------
 
 import Data.Hashable
@@ -12,11 +12,9 @@ import qualified Data.Set as S
 
 import ErrorMsg
 
--- we want to parse complex expressions and transform them to Expr afterwards
--- TODO try to add more AConst types
+-- artihmetic expressions
 data AExpr a
   = AVar a
-  | AConstBool Bool
   | AConstNum Int
   | AConstStr String
   | AUnary  AUnOp   (AExpr a)
@@ -25,80 +23,107 @@ data AExpr a
   deriving (Ord,Eq,Show)
 
 data AUnOp
-  = ANeg | ANot
+  = ANeg
   deriving (Ord,Eq,Show)
 
 data ABinOp
   = ADiv | AMult | AAdd | ASub
   | AMin | AMax
-  | AAnd | AOr
-  | ALT | ALE | AEQ | AGE | AGT
-  | AAsgn
   deriving (Ord,Eq,Show)
 
 data AListOp
-  = ASum  | AProd | AAnds | AOrs | AMember String
+  = ASum  | AProd
+  deriving (Ord,Eq,Show)
+
+-- boolean expressions
+data BExpr a
+  = BConstBool Bool
+  | BBinPred  BBinPredOp (AExpr a) (AExpr a)
+  | BListPred BListPredOp [AExpr a]
+  | BUnary  BUnOp   (BExpr a)
+  | BBinary BBinOp  (BExpr a) (BExpr a)
+  | BNary   BListOp [BExpr a]
+  deriving (Ord,Eq,Show)
+
+data BUnOp
+  = BNot
+  deriving (Ord,Eq,Show)
+
+data BBinOp
+  = BAnd | BOr
+  deriving (Ord,Eq,Show)
+
+data BBinPredOp
+  = BLT | BLE | BEQ | BGE | BGT | BAsgn
+  deriving (Ord,Eq,Show)
+
+data BListPredOp
+  = BPredName String
+  deriving (Ord,Eq,Show)
+
+data BListOp
+  = BAnds | BOrs
   deriving (Ord,Eq,Show)
 
 -- this has been stolen from Data.Logic.Propositional.NormalForms and adjusted to our data types
-neg :: AExpr a -> AExpr a
-neg = AUnary ANot
+neg :: BExpr a -> BExpr a
+neg = BUnary BNot
 
-disj :: AExpr a -> AExpr a -> AExpr a
-disj = ABinary AOr
+disj :: BExpr a -> BExpr a -> BExpr a
+disj = BBinary BOr
 
-conj :: AExpr a -> AExpr a -> AExpr a
-conj = ABinary AAnd
+conj :: BExpr a -> BExpr a -> BExpr a
+conj = BBinary BAnd
 
-toNNF :: AExpr a -> AExpr a
-toNNF (AUnary ANot (AUnary ANot expr))       = toNNF expr
+toNNF :: BExpr a -> BExpr a
+toNNF (BUnary BNot (BUnary BNot expr))       = toNNF expr
 
-toNNF (ABinary AAnd exp1 exp2)              = toNNF exp1 `conj` toNNF exp2
-toNNF (AUnary ANot (ABinary AAnd exp1 exp2)) = toNNF $ neg exp1 `disj` neg exp2
+toNNF (BBinary BAnd exp1 exp2)               = toNNF exp1 `conj` toNNF exp2
+toNNF (BUnary BNot (BBinary BAnd exp1 exp2)) = toNNF $ neg exp1 `disj` neg exp2
 
-toNNF (ABinary AOr exp1 exp2)               = toNNF exp1 `disj` toNNF exp2
-toNNF (AUnary ANot (ABinary AOr exp1 exp2))  = toNNF $ neg exp1 `conj` neg exp2
+toNNF (BBinary BOr exp1 exp2)               = toNNF exp1 `disj` toNNF exp2
+toNNF (BUnary BNot (BBinary BOr exp1 exp2))  = toNNF $ neg exp1 `conj` neg exp2
 
 toNNF expr                                 = expr
 
-toCNF :: AExpr a -> AExpr a
+toCNF :: BExpr a -> BExpr a
 toCNF = toCNF' . toNNF
   where
-    toCNF' :: AExpr a -> AExpr a
-    toCNF' (ABinary AAnd exp1 exp2) = toCNF' exp1 `conj` toCNF' exp2
-    toCNF' (ABinary AOr  exp1 exp2) = toCNF' exp1 `dist` toCNF' exp2
+    toCNF' :: BExpr a -> BExpr a
+    toCNF' (BBinary BAnd exp1 exp2) = toCNF' exp1 `conj` toCNF' exp2
+    toCNF' (BBinary BOr  exp1 exp2) = toCNF' exp1 `dist` toCNF' exp2
     toCNF' expr                    = expr
     
-    dist :: AExpr a -> AExpr a -> AExpr a
-    dist (ABinary AAnd e11 e12) e2 = (e11 `dist` e2) `conj` (e12 `dist` e2)
-    dist e1 (ABinary AAnd e21 e22) = (e1 `dist` e21) `conj` (e1 `dist` e22)
+    dist :: BExpr a -> BExpr a -> BExpr a
+    dist (BBinary BAnd e11 e12) e2 = (e11 `dist` e2) `conj` (e12 `dist` e2)
+    dist e1 (BBinary BAnd e21 e22) = (e1 `dist` e21) `conj` (e1 `dist` e22)
     dist e1 e2                    = e1 `disj` e2
 
-toDNF :: AExpr a -> AExpr a
+toDNF :: BExpr a -> BExpr a
 toDNF = toDNF' . toNNF
   where
-    toDNF' :: AExpr a -> AExpr a
-    toDNF' (ABinary AAnd exp1 exp2) = toDNF' exp1 `dist` toDNF' exp2
-    toDNF' (ABinary AOr exp1 exp2) = toDNF' exp1 `disj` toDNF' exp2
+    toDNF' :: BExpr a -> BExpr a
+    toDNF' (BBinary BAnd exp1 exp2) = toDNF' exp1 `dist` toDNF' exp2
+    toDNF' (BBinary BOr exp1 exp2) = toDNF' exp1 `disj` toDNF' exp2
     toDNF' expr                    = expr
 
-    dist :: AExpr a -> AExpr a -> AExpr a
-    dist (ABinary AOr e11 e12) e2 = (e11 `dist` e2) `disj` (e12 `dist` e2)
-    dist e1 (ABinary AOr e21 e22) = (e1 `dist` e21) `disj` (e1 `dist` e22)
+    dist :: BExpr a -> BExpr a -> BExpr a
+    dist (BBinary BOr e11 e12) e2 = (e11 `dist` e2) `disj` (e12 `dist` e2)
+    dist e1 (BBinary BOr e21 e22) = (e1 `dist` e21) `disj` (e1 `dist` e22)
     dist e1 e2                    = e1 `conj` e2
 
-fromDNFtoList :: (Eq a) => AExpr a -> [[AExpr a]]
+fromDNFtoList :: (Eq a) => BExpr a -> [[BExpr a]]
 fromDNFtoList expr =
     case expr of
-        (ABinary AOr  exp1 exp2) -> fromDNFtoList exp1 ++ fromDNFtoList exp2
-        (ABinary AAnd exp1 exp2) -> zipWith (++) (fromDNFtoList exp1) (fromDNFtoList exp2)
+        (BBinary BOr  exp1 exp2) -> fromDNFtoList exp1 ++ fromDNFtoList exp2
+        (BBinary BAnd exp1 exp2) -> zipWith (++) (fromDNFtoList exp1) (fromDNFtoList exp2)
         x                        -> [[x]]
 
-fromListtoDNF :: (Eq a) => [[AExpr a]] -> AExpr a
-fromListtoDNF xss = ANary AOrs $ map (ANary AAnds) xss
+fromListtoDNF :: (Eq a) => [[BExpr a]] -> BExpr a
+fromListtoDNF xss = BNary BOrs $ map (BNary BAnds) xss
 
 -- simplify a boolean expression
-foldBool :: (Show a, Eq a) => AExpr a -> AExpr a
+foldBool :: (Show a, Eq a) => BExpr a -> BExpr a
 foldBool expr =
     let exprDNF = toDNF expr in
     let xss = fromDNFtoList exprDNF in
@@ -108,43 +133,43 @@ foldBool expr =
     --trace ("############" ++ show xss ++ "\n") $
     res
 
-unfoldBool :: (Eq a) => AExpr a -> AExpr a
-unfoldBool (ANary AAnds []) = AConstBool True
-unfoldBool (ANary AAnds (x:xs)) =
-    foldl (ABinary AAnd) (unfoldBool x) $ map unfoldBool xs
+unfoldBool :: (Eq a) => BExpr a -> BExpr a
+unfoldBool (BNary BAnds []) = BConstBool True
+unfoldBool (BNary BAnds (x:xs)) =
+    foldl (BBinary BAnd) (unfoldBool x) $ map unfoldBool xs
 
-unfoldBool (ANary AOrs []) = AConstBool False
-unfoldBool (ANary AOrs (x:xs)) =
-    foldl (ABinary AOr) (unfoldBool x) $ map unfoldBool xs
+unfoldBool (BNary BOrs []) = BConstBool False
+unfoldBool (BNary BOrs (x:xs)) =
+    foldl (BBinary BOr) (unfoldBool x) $ map unfoldBool xs
 
 unfoldBool x = x
 
-simplifyFoldedBool :: (Eq a) => AExpr a -> AExpr a
-simplifyFoldedBool (ANary AOrs []) = AConstBool False
-simplifyFoldedBool (ANary AOrs xs) =
+simplifyFoldedBool :: (Eq a) => BExpr a -> BExpr a
+simplifyFoldedBool (BNary BOrs []) = BConstBool False
+simplifyFoldedBool (BNary BOrs xs) =
     let ys = map simplifyFoldedBool xs in
-    if elem (AConstBool True) ys then (AConstBool True)
+    if elem (BConstBool True) ys then (BConstBool True)
     else
-         let zs = filter ((AConstBool False) /=) ys in
+         let zs = filter ((BConstBool False) /=) ys in
          case zs of
-             []  -> AConstBool False
+             []  -> BConstBool False
              [z] -> z
-             _   -> ANary AOrs $ nub zs
+             _   -> BNary BOrs $ nub zs
 
-simplifyFoldedBool (ANary AAnds []) = AConstBool True
-simplifyFoldedBool (ANary AAnds xs) =
+simplifyFoldedBool (BNary BAnds []) = BConstBool True
+simplifyFoldedBool (BNary BAnds xs) =
     let ys = map simplifyFoldedBool xs in
-    if elem (AConstBool False) ys then (AConstBool False)
+    if elem (BConstBool False) ys then (BConstBool False)
     else
-         let zs = filter ((AConstBool True) /=) ys in
+         let zs = filter ((BConstBool True) /=) ys in
          case zs of
-             []  -> AConstBool True
+             []  -> BConstBool True
              [z] -> z
-             _   -> ANary AAnds $ nub zs
+             _   -> BNary BAnds $ nub zs
 
 simplifyFoldedBool x = x
 
-simplifyBool :: (Show a, Eq a) => AExpr a -> AExpr a
+simplifyBool :: (Show a, Eq a) => BExpr a -> BExpr a
 simplifyBool expr =
     let x1 = foldBool expr in
     let x2 = simplifyFoldedBool x1 in
@@ -155,174 +180,175 @@ simplifyBool expr =
     x3
 
 ------------------------------------------------------------------------------------
--- this is currently used only for visual feedback, so the syntax of printed messages is not important
-aexprToString :: Show a => AExpr a -> String
-aexprToString aexpr =
+-- this is currently used only for visual feedback
+ruleIndent = "  "
+
+aexprToString :: (a -> String) -> AExpr a -> String
+aexprToString f aexpr =
     case aexpr of
-        AVar x -> show x
-        AConstBool b -> case b of {True -> "true"; False -> "false"}
+        AVar x -> f x
         AConstNum c -> show c
         AConstStr s -> s
 
-        ANary (AMember pred) args -> pred ++ "(" ++ intercalate "," (map aexprToString args) ++ ")"
+        ANary ASum xs -> "(" ++ intercalate " + " (map (aexprToString f) xs) ++ ")"
+        ANary AProd xs -> "(" ++ intercalate " * " (map (aexprToString f) xs) ++ ")"
 
-        ANary ASum xs -> "(" ++ intercalate " + " (map aexprToString xs) ++ ")"
-        ANary AProd xs -> "(" ++ intercalate " * " (map aexprToString xs) ++ ")"
-        ANary AAnds xs -> "(" ++ intercalate " AND " (map aexprToString xs) ++ ")"
-        ANary AOrs  xs -> "(" ++ intercalate " OR " (map aexprToString xs) ++ ")"
+        AUnary ANeg x -> "( - " ++ aexprToString f x ++ ")"
 
-        AUnary ANeg x -> "( - " ++ aexprToString x ++ ")"
-        AUnary ANot x -> "not(" ++ aexprToString x ++ ")"
+        ABinary ADiv x1 x2 -> "(" ++ aexprToString f x1 ++ " / " ++ aexprToString f x2 ++ ")"
+        ABinary AMult x1 x2 -> "(" ++ aexprToString f x1 ++ " * " ++ aexprToString f x2 ++ ")"
+        ABinary AAdd x1 x2 -> "(" ++ aexprToString f x1 ++ " + " ++ aexprToString f x2 ++ ")"
+        ABinary ASub x1 x2 -> "(" ++ aexprToString f x1 ++ " - " ++ aexprToString f x2 ++ ")"
+        ABinary AMin x1 x2  -> "min(" ++ aexprToString f x1 ++ ", " ++ aexprToString f x2 ++ ")"
+        ABinary AMax x1 x2  -> "max(" ++ aexprToString f x1 ++ ", " ++ aexprToString f x2 ++ ")"
 
-        ABinary ADiv x1 x2 -> "(" ++ aexprToString x1 ++ " / " ++ aexprToString x2 ++ ")"
-        ABinary AMult x1 x2 -> "(" ++ aexprToString x1 ++ " * " ++ aexprToString x2 ++ ")"
-        ABinary AAdd x1 x2 -> "(" ++ aexprToString x1 ++ " + " ++ aexprToString x2 ++ ")"
-        ABinary ASub x1 x2 -> "(" ++ aexprToString x1 ++ " - " ++ aexprToString x2 ++ ")"
-        ABinary AAnd x1 x2 -> "(" ++ aexprToString x1 ++ " AND " ++ aexprToString x2 ++ ")"
-        ABinary AOr  x1 x2 -> "(" ++ aexprToString x1 ++ " OR " ++ aexprToString x2 ++ ")"
-        ABinary ALT x1 x2  -> "(" ++ aexprToString x1 ++ " < " ++ aexprToString x2 ++ ")"
-        ABinary ALE x1 x2  -> "(" ++ aexprToString x1 ++ " <= " ++ aexprToString x2 ++ ")"
-        ABinary AEQ x1 x2  -> "(" ++ aexprToString x1 ++ " = " ++ aexprToString x2 ++ ")"
-        ABinary AGE x1 x2  -> "(" ++ aexprToString x1 ++ " >= " ++ aexprToString x2 ++ ")"
-        ABinary AGT x1 x2  -> "(" ++ aexprToString x1 ++ " > " ++ aexprToString x2 ++ ")"
-        ABinary AAsgn x1 x2  -> "(" ++ aexprToString x1 ++ " := " ++ aexprToString x2 ++ ")"
+bexprToString :: String -> (a -> String) -> BExpr a -> String
+bexprToString prefix f aexpr =
+    case aexpr of
+        BConstBool b -> case b of {True -> "true"; False -> "false"}
+
+        BBinPred BLT x1 x2 -> "(" ++ aexprToString f x1 ++ " < " ++ aexprToString f x2 ++ ")"
+        BBinPred BLE x1 x2 -> "(" ++ aexprToString f x1 ++ " =< " ++ aexprToString f x2 ++ ")"
+        BBinPred BEQ x1 x2 -> "(" ++ aexprToString f x1 ++ " == " ++ aexprToString f x2 ++ ")"
+        BBinPred BGE x1 x2 -> "(" ++ aexprToString f x1 ++ " >= " ++ aexprToString f x2 ++ ")"
+        BBinPred BGT x1 x2 -> "(" ++ aexprToString f x1 ++ " > " ++ aexprToString f x2 ++ ")"
+        BBinPred BAsgn x1 x2 -> "(" ++ aexprToString f x1 ++ " is " ++ aexprToString f x2 ++ ")"
+
+        BListPred (BPredName pred) args -> pred ++ "(" ++ intercalate "," (map (aexprToString f) args) ++ ")"
+
+        BNary BAnds xs -> ruleIndent ++ intercalate (",\n" ++ prefix ++ ruleIndent) (map (bexprToString prefix f) xs)
+        BNary BOrs  xs -> ruleIndent ++ "(" ++ intercalate (";\n\n" ++ prefix ++ ruleIndent) (map (bexprToString prefix f) xs) ++ ")"
+
+        BUnary BNot x -> "not(" ++ bexprToString prefix f x ++ ")"
+
+        BBinary BAnd x1 x2 -> bexprToString prefix f x1 ++ ",\n" ++ prefix ++ ruleIndent ++ bexprToString prefix f x2
+        BBinary BOr  x1 x2 -> bexprToString prefix f x1 ++ ";\n\n" ++ prefix ++ ruleIndent ++ bexprToString prefix f x2
 
 --------------------------
 -- get certain data of all variables
-getAllAExprVarData :: Ord b => (a -> b) -> AExpr a -> S.Set b
-getAllAExprVarData f aexpr =
+getAExprVars :: Ord b => (a -> b) -> AExpr a -> S.Set b
+getAExprVars f aexpr =
     case aexpr of
-        AVar x       -> S.singleton $ f x
-        AConstBool b -> S.empty
-        AConstNum  c -> S.empty
-        AConstStr  c -> S.empty
+        AVar x      -> S.singleton $ f x
+        AConstNum _ -> S.empty
+        AConstStr _ -> S.empty
 
-        ANary _ xs      -> foldr S.union S.empty $ map processRec xs
-        AUnary _ x      -> processRec x
-        ABinary _ x1 x2 -> S.union (processRec x1) (processRec x2)
+        ANary _ xs      -> foldr S.union S.empty $ map (getAExprVars f) xs
+        AUnary _ x      -> getAExprVars f x
+        ABinary _ x1 x2 -> S.union (getAExprVars f x1) (getAExprVars f x2)
 
-    where processRec x = getAllAExprVarData f x
+getBExprVars :: Ord b => (a -> b) -> BExpr a -> S.Set b
+getBExprVars f bexpr =
+    case bexpr of
+        BConstBool _      -> S.empty
+        BBinPred  _ x1 x2 -> S.union (getAExprVars f x1) (getAExprVars f x2)
+        BListPred _ xs    -> foldr S.union S.empty $ map (getAExprVars f) xs
+
+        BNary _ xs      -> foldr S.union S.empty $ map (getBExprVars f) xs
+        BUnary _ x      -> getBExprVars f x
+        BBinary _ x1 x2 -> S.union (getBExprVars f x1) (getBExprVars f x2)
 
 --------------------------
--- is the term constant (i.e. does not contain any variables)?
-isConstTerm :: AExpr a -> Bool
-isConstTerm aexpr =
+-- is the expression constant (i.e. does not contain any variables)?
+isConstAexpr :: AExpr a -> Bool
+isConstAexpr aexpr =
     case aexpr of
         AVar x -> False
 
-        AConstBool _ -> True
         AConstNum  _ -> True
         AConstStr  _ -> True
 
-        ANary _ xs      -> foldl (&&) True $ map processRec xs
-        AUnary _ x      -> processRec x
-        ABinary _ x1 x2 -> (processRec x1) && (processRec x2)
+        ANary _ xs      -> foldl (&&) True $ map isConstAexpr xs
+        AUnary _ x      -> isConstAexpr x
+        ABinary _ x1 x2 -> (isConstAexpr x1) && (isConstAexpr x2)
 
-    where processRec x = isConstTerm x
+isConstBexpr :: BExpr a -> Bool
+isConstBexpr bexpr =
+    case bexpr of
+        BConstBool _      -> True
+        BBinPred  _ x1 x2 -> (isConstAexpr x1) && (isConstAexpr x2)
+        BListPred _ xs    -> foldl (&&) True $ map isConstAexpr xs
+
+        BNary _ xs      -> foldl (&&) True $ map isConstBexpr xs
+        BUnary _ x      -> isConstBexpr x
+        BBinary _ x1 x2 -> (isConstBexpr x1) && (isConstBexpr x2)
 
 --------------------------
--- evaluate an aexpr
+-- evaluate an expression
 evalAexpr :: (Show a) => AExpr a -> AExpr a
 evalAexpr aexpr =
     case aexpr of
-        AVar x      -> error $ error_nonConstantTerm (aexprToString aexpr)
-        AConstBool b -> AConstBool b
+        AVar x       -> error $ error_nonConstantTerm (aexprToString show aexpr)
         AConstNum c  -> AConstNum c
         AConstStr c  -> AConstStr c
 
-        ANary (AMember p) xs -> error $ error_nonConstantTerm (aexprToString aexpr)
+        ANary ASum  xs -> AConstNum $ sum $ map processRec xs
+        ANary AProd xs -> AConstNum $ product $ map processRec xs
 
-        ANary ASum  xs -> AConstNum $ sum $ map processRecNum xs
-        ANary AProd xs -> AConstNum $ product $ map processRecNum xs
+        AUnary ANeg x -> AConstNum  $ 0 - (processRec x)
 
-        ANary AAnds xs -> AConstBool $ foldl (&&) True  $ map processRecBool xs
-        ANary AOrs  xs -> AConstBool $ foldl (||) False $ map processRecBool xs
+        ABinary ADiv x1 x2  -> AConstNum $ div (processRec x1) (processRec x2)
+        ABinary AMult x1 x2 -> AConstNum $ (processRec x1) * (processRec x2)
+        ABinary AAdd x1 x2  -> AConstNum $ (processRec x1) + (processRec x2)
+        ABinary ASub x1 x2  -> AConstNum $ (processRec x1) - (processRec x2)
+        ABinary AMin x1 x2  -> AConstNum $ min (processRec x1) (processRec x2)
+        ABinary AMax x1 x2  -> AConstNum $ max (processRec x1) (processRec x2)
 
-        AUnary ANeg x -> AConstNum  $ 0 - (processRecNum x)
-        AUnary ANot x -> AConstBool $ (not (processRecBool x))
+    where processRec x  = let y = evalAexpr x in
+                                    case y of
+                                        (AConstNum c)  -> c
+                                        _              -> error $ error_typeNum y
 
-        ABinary ADiv x1 x2  -> AConstNum $ div (processRecNum x1) (processRecNum x2)
-        ABinary AMult x1 x2 -> AConstNum $ (processRecNum x1) * (processRecNum x2)
-        ABinary AAdd x1 x2  -> AConstNum $ (processRecNum x1) + (processRecNum x2)
-        ABinary ASub x1 x2  -> AConstNum $ (processRecNum x1) - (processRecNum x2)
-        ABinary AMin x1 x2  -> AConstNum $ min (processRecNum x1) (processRecNum x2)
-        ABinary AMax x1 x2  -> AConstNum $ max (processRecNum x1) (processRecNum x2)
 
-        ABinary AAnd x1 x2 -> AConstBool $ (processRecBool x1) && (processRecBool x2)
-        ABinary AOr  x1 x2 -> AConstBool $ (processRecBool x1) || (processRecBool x2)
+evalBexpr :: (Show a) => BExpr a -> BExpr a
+evalBexpr bexpr =
+    case bexpr of
 
-        ABinary ALT x1 x2  -> AConstBool $ (processRecNum x1) < (processRecNum x2)
-        ABinary ALE x1 x2  -> AConstBool $ (processRecNum x1) <= (processRecNum x2)
-        ABinary AEQ x1 x2  -> AConstBool $ (processRecAny x1) == (processRecAny x2)
-        ABinary AGE x1 x2  -> AConstBool $ (processRecNum x1) >= (processRecNum x2)
-        ABinary AGT x1 x2  -> AConstBool $ (processRecNum x1) > (processRecNum x2)
+        BConstBool b       -> BConstBool b
 
-        ABinary AAsgn x1 x2  -> AConstBool $ (processRecAny x1) == (processRecAny x2)
+        BBinPred BLT x1 x2 -> BConstBool $ (processRecNum x1) < (processRecNum x2)
+        BBinPred BLE x1 x2 -> BConstBool $ (processRecNum x1) <= (processRecNum x2)
+        BBinPred BEQ x1 x2 -> BConstBool $ (processRecAny x1) == (processRecAny x2)
+        BBinPred BGE x1 x2 -> BConstBool $ (processRecNum x1) >= (processRecNum x2)
+        BBinPred BGT x1 x2 -> BConstBool $ (processRecNum x1) > (processRecNum x2)
+
+        -- we get error from evalAexpr if here is a free variable, which is good
+        -- alternatively, we could carry a substitution
+        BBinPred BAsgn x1 x2 -> BConstBool $ (processRecAny x1) == (processRecAny x2)
+
+        BListPred (BPredName _) _ -> error $ error_nonConstantTerm (bexprToString "" show bexpr)
+
+        BNary BAnds xs -> BConstBool $ foldl (&&) True  $ map processRecBool xs
+        BNary BOrs  xs -> BConstBool $ foldl (||) False $ map processRecBool xs
+
+        BUnary BNot x -> BConstBool $ (not (processRecBool x))
+
+        BBinary BAnd x1 x2 -> BConstBool $ (processRecBool x1) && (processRecBool x2)
+        BBinary BOr  x1 x2 -> BConstBool $ (processRecBool x1) || (processRecBool x2)
 
     where processRecAny x  = let y = evalAexpr x in
                                     case y of
-                                        (AConstBool c) -> show c
                                         (AConstNum c)  -> show c
                                         (AConstStr c)  -> c
           processRecNum x  = let y = evalAexpr x in
                                     case y of
                                         (AConstNum c)  -> c
                                         _              -> error $ error_typeNum y
-          processRecBool x = let y = evalAexpr x in
+          processRecBool x = let y = evalBexpr x in
                                     case y of
-                                        (AConstBool c) -> c
+                                        (BConstBool c) -> c
                                         _              -> error $ error_typeBool y
-
 ------------------------------------------------------------------------------------
-updateAexprVars :: Ord a => (M.Map a (AExpr b)) -> (a -> AExpr b) -> AExpr a -> AExpr b
-updateAexprVars dataMap f aexpr =
-    case aexpr of
+extractAllPredicates :: BExpr a -> [(String, [AExpr a])]
+extractAllPredicates bexpr =
+    case bexpr of
 
-        AVar x      -> if M.member x dataMap then dataMap M.! x else f x
-        AConstBool c -> AConstBool c
-        AConstNum  c -> AConstNum c
-        AConstStr  c -> AConstStr c
+        BListPred (BPredName f) xs -> [(f,xs)]
 
-        ANary op xs       -> ANary   op (map processRec xs)
-        AUnary  op x      -> AUnary  op (processRec x)
-        ABinary op x1 x2  -> ABinary op (processRec x1) (processRec x2)
+        BNary _ xs      -> concat $ map processRec xs
+        BUnary _ x      -> processRec x
+        BBinary _ x1 x2 -> (processRec x1) ++ (processRec x2)
+        _               -> []
 
-    where processRec x = updateAexprVars dataMap f x
-
-------------------------------------------------------------------------------------
-updateAexprVarsFold :: Ord a => (a -> Int -> AExpr b) -> Int -> M.Map a (AExpr b) -> AExpr a -> (Int, M.Map a (AExpr b), AExpr b)
-updateAexprVarsFold f c theta aexpr =
-    case aexpr of
-
-        AVar x      -> if M.member x theta then (c, theta, theta M.! x)
-                       else
-                           let freshVar = f x c in
-                           (c+1, M.insert x freshVar theta, freshVar)
-        AConstBool x -> (c, theta, AConstBool x)
-        AConstNum  x -> (c, theta, AConstNum x)
-        AConstStr  x -> (c, theta, AConstStr x)
-
-        ANary   op xs    -> let (c',theta',ys) = foldl (\(c0, theta0, ys0) y0 -> let (c1, theta1, y1) = processRec c0 theta0 y0 in (c1, theta1, ys0 ++ [y1])) (c, theta, []) xs in
-                            (c', theta', ANary op ys)
-        AUnary  op x     -> let (c',  theta',  y)  = processRec c  theta  x  in
-                            (c', theta', AUnary op y)
-        ABinary op x1 x2 -> let (c',  theta',  y1) = processRec c  theta  x1 in
-                            let (c'', theta'', y2) = processRec c' theta' x2 in
-                            (c'', theta'', ABinary op y1 y2)
-
-    where processRec c theta x = updateAexprVarsFold f c theta x
-
-------------------------------------------------------------------------------------
-extractAllPredicates :: AExpr a -> [(String, [AExpr a])]
-extractAllPredicates aexpr =
-    case aexpr of
-
-        AUnary  _ x      -> processRec x
-        ABinary _ x1 x2  -> (processRec x1) ++ (processRec x2)
-
-        ANary (AMember f) xs -> [(f,xs)]
-        ANary _ xs           -> concat $ map processRec xs
-
-        _                    -> []
     where processRec x = extractAllPredicates x
 

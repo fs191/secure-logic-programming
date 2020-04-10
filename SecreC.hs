@@ -18,7 +18,8 @@ import ErrorMsg
 import Rule
 
 indent = "    "
-boolPrefix = "b_"
+bexprPrefix = "b_"
+aexprPrefix = "x_"
 colPrefix  = "col_"
 argPrefix  = "arg_"
 resPrefix  = "res_"
@@ -57,7 +58,7 @@ generateGoal boolOnly structTypes ds goal =
             let (args,declarations) = unzip $ concat $ zipWith generateGoalArg args' is in
 
             let callGoals = if boolOnly then
-                                let bs = map (\j -> boolPrefix ++ show j) js in
+                                let bs = map (\j -> bexprPrefix ++ show j) js in
                                 let s0 = zipWith3 (\b d j -> domainToMainDecl d ++ "bool " ++ b ++ " = " ++ goalPrefix
                                                              ++ pname ++ "_" ++ show j ++ "(" ++ intercalate "," args ++ ");") bs ds js in
                                 let s1 = ["publish(\"yes/no_answer\", " ++ declassify dd Public ++ "(" ++ intercalate " | " bs ++ "));"] in
@@ -94,7 +95,6 @@ generateGoalArg arg i =
     case arg of
 
         -- a constant is hard-coded
-        AConstBool v -> [(argName, domainToMainDecl Public ++ "bool "   ++ argName ++ " = " ++ case v of {True -> "true"; False -> "false"} ++ ";")]
         AConstNum  v -> [(argName, domainToMainDecl Public ++ "bool "   ++ argName ++ " = " ++ show v ++ ";")]
         AConstStr  v -> [(argName, domainToMainDecl Public ++ "uint32 " ++ argName ++ " = " ++ declassify Private Public ++ "(CRC32(bl_str(" ++ v ++ ") :: pd_shared3p xor_uint8));")]
 
@@ -153,8 +153,9 @@ generateSecreCscript boolOnly predMap (xs,ys,goals) =
     -- TODO we currently treat all inputs as strings, we need to genralize it (also in plain prolog)
     let goal = if length goals > 0 then
                       case head goals of
-                          Fact gn ga -> let xs' = intercalate "," (map (formulaToString "") xs) in
-                                        let ys' = intercalate "," (map (formulaToString "") ys) in
+                          BListPred (BPredName gn) ga ->
+                                        let xs' = intercalate "," (map termToString xs) in
+                                        let ys' = intercalate "," (map termToString ys) in
                                         trace ("goal([" ++ xs' ++ "],[" ++ ys' ++ "]) :- " ++ ruleHeadToString "" gn ga) $
                                         let goalArgs = map (\x -> if elem x xs then
                                                                       case x of
@@ -204,8 +205,8 @@ createSecreCFuns boolOnly goal structName pname pmap =
 
     zipWith3 (createSecreCFun boolOnly pname structName as) is keys values
 
-createSecreCFun :: Bool -> PName -> String -> [Term] -> Int -> [Term] -> Term -> (DomainType, String, [String])
-createSecreCFun boolOnly pname structName asG index as bexpr =
+createSecreCFun :: Bool -> PName -> String -> [Term] -> Int -> [Term] -> Formula -> (DomainType, String, [String])
+createSecreCFun boolOnly pname structName asG index as bexpr' =
 
     --if not(isGround bexpr) then [] else
     let funName = goalPrefix ++ pname ++ "_" ++ show index in
@@ -220,16 +221,16 @@ createSecreCFun boolOnly pname structName asG index as bexpr =
     let (freeArgs,boundedArgs) = partition (\(b,_,_,_,_) -> b) allArgs in
 
     -- if predicate contains a constant argument, a bound variable in the goal should be compared to that constant
-    let argInit = concat $ map (\(_,a,d,t,i) -> if isConstTerm a then
+    let argInit = concat $ map (\(_,a,d,t,i) -> if isConstAexpr a then
                                                     let ai = argPrefix ++ show i in
-                                                    [domainToDecl d ++ typeToString False d t i ++ dimPar (typeToDim False d t i) ++ ai ++ "(m); " ++ ai ++ " = " ++ aexprToString (evalAexpr a) ++ ";"]
+                                                    [domainToDecl d ++ typeToString False d t i ++ dimPar (typeToDim False d t i) ++ ai ++ "(m); " ++ ai ++ " = " ++ aexprToString show (evalAexpr a) ++ ";"]
                                                 else []) freeArgs in
-    let argCmp  = concat $ map (\(_,a,d,t,i) -> if isConstTerm a then
-                                                    ["(" ++ argPrefix ++ show i ++ " == " ++ aexprToString (evalAexpr a) ++ ")"]
+    let argCmp  = concat $ map (\(_,a,d,t,i) -> if isConstAexpr a then
+                                                    ["(" ++ argPrefix ++ show i ++ " == " ++ aexprToString show (evalAexpr a) ++ ")"]
                                                 else []) boundedArgs in
 
-    let aexpr = foldBool bexpr in
-    let (varMap,crossProductTable) = createCrossProducTable aexpr in
+    let bexpr = foldBool bexpr' in
+    let (varMap,crossProductTable) = createCrossProducTable bexpr in
     let openDbConn = if length crossProductTable > 0 then
                          ["uint m = 0;",
                           "uint rv;",
@@ -245,7 +246,7 @@ createSecreCFun boolOnly pname structName asG index as bexpr =
     let boundedArgMap = M.fromList $ map (\(_,a,d,t,i) -> (a,(d,t,i))) boundedArgs in
     let freeArgMap    = M.fromList $ map (\(_,a,d,t,i) -> (a,(d,t,i))) freeArgs in
 
-    let (_,b,domain,_,_,body) = aexprToSecreC S.empty boundedArgMap freeArgMap varMap 0 aexpr in
+    let (_,b,domain,_,body) = bexprToSecreC S.empty boundedArgMap freeArgMap varMap 0 bexpr in
     let finalChoice = [domainToDecl domain ++ "bool [[1]] b = (" ++ intercalate " & " (b:argCmp) ++ ");"] in
 
     let structDomain = generateTemplateUse (domain == Private) freeArgs in
@@ -265,9 +266,9 @@ createSecreCFun boolOnly pname structName asG index as bexpr =
 
 -- create a big cross product table with a map from 
 -- TODO can be much more efficient if we take into account Primary / Foreign keys
-createCrossProducTable :: AExpr Var -> (M.Map Term [String], [String])
-createCrossProducTable aexpr =
-    let zs = extractAllPredicates aexpr in
+createCrossProducTable :: Formula -> (M.Map Term [String], [String])
+createCrossProducTable bexpr =
+    let zs = extractAllPredicates bexpr in
     if length zs == 0 then (M.empty, []) else
     let fs = zipWith (\(f,_) i -> f ++ "_" ++ show i) zs [0..length zs - 1] in
 
@@ -381,79 +382,77 @@ meet2 x y  = if (x == y) then x else error $ error_typeOp "argument matching" x 
 
 -- TODO let us pass the data type not as a string, but as DataType object
 -- this assumes that the expression is "folded", i.e. is in DNF form with grouped AND / OR
-aexprToSecreC :: S.Set VName -> (M.Map Term (DomainType,DataType,Int)) -> (M.Map Term (DomainType,DataType,Int)) -> (M.Map Term [String]) -> Int -> AExpr Var
-                 -> (Int,String,DomainType,String,S.Set VName,[String])
-aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c' aexpr =
-    let b = boolPrefix ++ show c' in
+bexprToSecreC :: S.Set VName -> (M.Map Term (DomainType,DataType,Int)) -> (M.Map Term (DomainType,DataType,Int)) -> (M.Map Term [String]) -> Int -> Formula -> (Int,String,DomainType,S.Set VName,[String])
+bexprToSecreC dv' boundedArgMap freeArgMap varMap c' bexpr =
+    let b = bexprPrefix ++ show c' in
     let c = c' + 1 in
-    case aexpr of
+    case bexpr of
 
-        ANary (AMember pred) as -> let c'' = c + length as in
-                                   let bs = map (\z -> boolPrefix ++ show z) [c..c''-1] in
-                                   let (dt,dv,s2) = foldl (\(t0,dv0,ys0) (a,b,i) ->
-                                                               let (t1,dv1,ys1) = processArg pred dv0 a b i in
-                                                               (join t0 t1,dv1,ys0 ++ ys1)
-                                                          ) (Public,declaredVars, []) $ zip3 as bs [0..] in
+        BNary BAnds xs -> processRecNary " & " c b xs
+        BNary BOrs  xs -> processRecNary " | " c b xs
 
-                                   let s3 = [domainToDecl dt ++ "bool [[1]] " ++ b ++ " = (" ++ intercalate " & " bs ++ ");"] in
-                                   (c'',b, dt,"bool",dv, s2 ++ s3)
+        BBinary BAnd x1 x2 -> processRecBinary " & " c b x1 x2
+        BBinary BOr  x1 x2 -> processRecBinary " | " c b x1 x2
 
-        ANary AAnds xs -> processRecNary " & " c b xs
-        ANary AOrs  xs -> processRecNary " | " c b xs
-        ANary ASum xs  -> processRecNary " + " c b xs
-        ANary AProd xs -> processRecNary " * " c b xs
+        BUnary BNot x -> processRecUnary "!" c b x
 
-        AUnary ANot x -> processRecUnary "!" c b x
-        AUnary ANeg x -> processRecUnary "-" c b x
+        BListPred (BPredName pred) as ->
+            let c'' = c + length as in
+            let bs = map (\z -> bexprPrefix ++ show z) [c..c''-1] in
+            let (dt,dv,s2) = foldl (\(t0,dv0,ys0) (a,b,i) ->
+                                              let (t1,dv1,ys1) = processArg pred dv0 a b i in
+                                              (join t0 t1,dv1,ys0 ++ ys1)
+                                   ) (Public, dv', []) $ zip3 as bs [0..] in
 
-        ABinary ADiv x1 x2  -> processRecBinary False "" " / " c b x1 x2
-        ABinary AMult x1 x2 -> processRecBinary False "" " * " c b x1 x2
-        ABinary AAdd x1 x2  -> processRecBinary False "" " + " c b x1 x2
-        ABinary ASub x1 x2  -> processRecBinary False "" " - " c b x1 x2
-        ABinary AMin x1 x2  -> processRecBinary True  "" "min" c b x1 x2
-        ABinary AMax x1 x2  -> processRecBinary True  "" "max" c b x1 x2
+            let s3 = [domainToDecl dt ++ "bool [[1]] " ++ b ++ " = (" ++ intercalate " & " bs ++ ");"] in
+            (c'',b, dt, dv, s2 ++ s3)
 
-        ABinary AAnd x1 x2 -> processRecBinary False "" " & " c b x1 x2
-        ABinary AOr  x1 x2 -> processRecBinary False "" " | " c b x1 x2
-        ABinary ALT x1 x2  -> processRecBinary False "bool" " < " c b x1 x2
-        ABinary ALE x1 x2  -> processRecBinary False "bool" " <= " c b x1 x2
-        ABinary AEQ x1 x2  -> processRecBinary False "bool" " == " c b x1 x2
-        ABinary AGE x1 x2  -> processRecBinary False "bool" " >= " c b x1 x2
-        ABinary AGT x1 x2  -> processRecBinary False "bool" " > " c b x1 x2
+        BBinPred BLT x1 x2  -> processRecBinPred " < " c b x1 x2
+        BBinPred BLE x1 x2  -> processRecBinPred " <= " c b x1 x2
+        BBinPred BEQ x1 x2  -> processRecBinPred " == " c b x1 x2
+        BBinPred BGE x1 x2  -> processRecBinPred " >= " c b x1 x2
+        BBinPred BGT x1 x2  -> processRecBinPred " > " c b x1 x2
 
-        ABinary AAsgn (AVar (Free v)) x  -> let (c'',b', ptype, dtype, dv', ys') = aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c x in
-                                            let (dv'', ys'') = if S.member v dv' then
-                                                         (dv', [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = (" ++ v ++ " == " ++ b' ++ ");"])
-                                                     else
-                                                         (S.insert v dv', [domainToDecl ptype ++ dtype ++ " [[1]] " ++ v ++ " = " ++ b' ++ ";",
-                                                                           domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = " ++ "true;"])
-                                            in
-                                            (c'',v,  ptype, "bool", dv'', ys' ++ ys'')
+        BBinPred BAsgn (AVar (Free v)) x  ->
+            let (c'',b', ptype, dtype, ys') = aexprToSecreC boundedArgMap c x in
+            let (dv, ys) = if S.member v dv' then
+                               (dv', [domainToDecl ptype ++ " bool [[1]] " ++ b ++ " = (" ++ v ++ " == " ++ b' ++ ");"])
+                           else
+                               (S.insert v dv', [domainToDecl ptype ++ dtype ++ " [[1]] " ++ v ++ " = " ++ b' ++ ";",
+                                                 domainToDecl ptype ++ " bool [[1]] " ++ b ++ " = " ++ "true;"])
+            in (c'',v,  ptype, dv, ys' ++ ys)
 
-        _                  -> let (_, domain, dtype, x) = getTypeVar False boundedArgMap freeArgMap aexpr in
-                              (c', x, domain, dtype, declaredVars,[])
-
+        BConstBool v -> let x = case v of {True -> "true"; False -> "false"}
+                        in (c', x, Public, dv',[])
 
     where
-          processRecUnary op c b x      = let (c'',b', ptype, dtype, declaredVars', ys) = aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c x in
-                                              (c'',b,  ptype, dtype, declaredVars', ys ++ [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = " ++ op ++ "(" ++ b' ++ ");"])
+          processRecUnary op c b x =
+              let (c'',b', ptype, dv, ys) = bexprToSecreC dv' boundedArgMap freeArgMap varMap c x in
+              (c'',b,  ptype, dv, ys ++ [domainToDecl ptype ++ " bool [[1]] " ++ b ++ " = " ++ op ++ "(" ++ b' ++ ");"])
 
-          processRecBinary isPrefixOp dtype0 op c b x1 x2 = let (c1,b1,ptype1,dtype1,dv1,ys1) = aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c x1 in
-                                          let (c2,b2,ptype2,dtype2,dv2,ys2) = aexprToSecreC dv1 boundedArgMap freeArgMap varMap c1 x2 in
-                                          let ptype = join ptype1 ptype2 in
-                                          let dtype = if dtype0 /= "" then dtype0 else join2 op dtype1 dtype2 in
-                                          let rhs = if isPrefixOp then op ++ "(" ++ b1 ++ "," ++ b2 ++ ")" else b1 ++ op ++ b2 in
-                                          (c2, b, ptype, dtype, dv2, ys1 ++ ys2 ++ [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = " ++ rhs ++ ";"])
+          processRecBinPred op c b x1 x2 =
+              let (c1,b1,ptype1,dtype1,ys1) = aexprToSecreC boundedArgMap c  x1 in
+              let (c2,b2,ptype2,dtype2,ys2) = aexprToSecreC boundedArgMap c1 x2 in
+              -- TODO we could check 'dtype1 == dtype2' here
+              let ptype = join ptype1 ptype2 in
+              let rhs = b1 ++ op ++ b2 in
+              (c2, b, ptype, dv', ys1 ++ ys2 ++ [domainToDecl ptype ++ " bool [[1]] " ++ b ++ " = " ++ rhs ++ ";"])
 
-          processRecNary op c b xs  = let (c'',bs, ptype, dtype, dv, ys) = foldl (\(c0, bs0, ptype0, dtype0, dv0, ys0) x ->
-                                                                                 let (c1, b1, ptype1, dtype1, dv1, ys1) = aexprToSecreC dv0 boundedArgMap freeArgMap varMap c0 x in
-                                                                                 let ptype = join ptype1 ptype0 in
-                                                                                 let dtype = if dtype0 == "" || (dtype1 == dtype0) then dtype1
-                                                                                             else error $ error_typeOp op dtype1 dtype0 in
-                                                                                 (c1, bs0 ++ [b1], ptype, dtype, dv1, ys0 ++ ys1)
-                                                                             ) (c,[],Public,"",S.empty,[]) xs in
+          processRecBinary op c b x1 x2 =
+              let (c1,b1,ptype1,dv1,ys1) = bexprToSecreC dv' boundedArgMap freeArgMap varMap c x1 in
+              let (c2,b2,ptype2,dv2,ys2) = bexprToSecreC dv' boundedArgMap freeArgMap varMap c1 x2 in
+              let ptype = join ptype1 ptype2 in
+              let rhs = b1 ++ op ++ b2 in
+              (c2, b, ptype, dv2, ys1 ++ ys2 ++ [domainToDecl ptype ++ " bool [[1]] " ++ b ++ " = " ++ rhs ++ ";"])
 
-                                      (c'',b, ptype, dtype, dv, ys ++ [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = (" ++ intercalate op bs ++ ");"])
+          processRecNary op c b xs =
+              let (c'',bs, ptype, dv, ys) =
+                      foldl (\(c0, bs0, ptype0, dv0, ys0) x ->
+                              let (c1, b1, ptype1, dv1, ys1) = bexprToSecreC dv0 boundedArgMap freeArgMap varMap c0 x in
+                              let ptype = join ptype1 ptype0 in
+                              (c1, bs0 ++ [b1], ptype, dv1, ys0 ++ ys1)
+                            ) (c,[],Public, dv',[]) xs in
+              (c'',b, ptype, dv, ys ++ [domainToDecl ptype ++ " bool [[1]] " ++ b ++ " = (" ++ intercalate op bs ++ ");"])
 
           processArg pred dv arg b' i =
               let (isConst, domain,varType,x) = getTypeVar True boundedArgMap freeArgMap arg in
@@ -484,6 +483,52 @@ aexprToSecreC declaredVars boundedArgMap freeArgMap varMap c' aexpr =
               let matchInputTables = [domainToDecl domain ++ "bool [[1]] " ++ b' ++ " = " ++ (if length comp > 0 then  intercalate " & " comp  else "reshape(true,m)") ++ ";"] in
               (domain, dv1, decl0 ++ decl1 ++ matchInputTables)
 
+
+aexprToSecreC :: (M.Map Term (DomainType,DataType,Int)) -> Int -> Term -> (Int,String,DomainType,String,[String])
+aexprToSecreC boundedArgMap c' aexpr =
+    let b = aexprPrefix ++ show c' in
+    let c = c' + 1 in
+    case aexpr of
+
+        ANary ASum xs  -> processRecNary " + " c b xs
+        ANary AProd xs -> processRecNary " * " c b xs
+        AUnary ANeg x  -> processRecUnary "-" c b x
+
+        ABinary ADiv x1 x2  -> processRecBinary False " / " c b x1 x2
+        ABinary AMult x1 x2 -> processRecBinary False " * " c b x1 x2
+        ABinary AAdd x1 x2  -> processRecBinary False " + " c b x1 x2
+        ABinary ASub x1 x2  -> processRecBinary False " - " c b x1 x2
+        ABinary AMin x1 x2  -> processRecBinary True  "min" c b x1 x2
+        ABinary AMax x1 x2  -> processRecBinary True  "max" c b x1 x2
+
+        _                  -> let (_, domain, dtype, x) = getTypeVar False boundedArgMap M.empty aexpr in
+                              (c', x, domain, dtype, [])
+    where
+        processRecUnary op c b x =
+            let (c'',b', ptype, dtype, ys) = aexprToSecreC boundedArgMap c x in
+            (c'',b,  ptype, dtype, ys ++ [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = " ++ op ++ "(" ++ b' ++ ");"])
+
+        processRecBinary isPrefixOp op c b x1 x2 =
+            let (c1,b1,ptype1,dtype1,ys1) = aexprToSecreC boundedArgMap c x1 in
+            let (c2,b2,ptype2,dtype2,ys2) = aexprToSecreC boundedArgMap c1 x2 in
+            let ptype = join     ptype1 ptype2 in
+            let dtype = join2 op dtype1 dtype2 in
+            let rhs = if isPrefixOp then op ++ "(" ++ b1 ++ "," ++ b2 ++ ")" else b1 ++ op ++ b2 in
+            (c2, b, ptype, dtype, ys1 ++ ys2 ++ [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = " ++ rhs ++ ";"])
+
+        processRecNary op c b xs =
+            let (c'',bs, ptype, dtype, ys) =
+                    foldl (\(c0, bs0, ptype0, dtype0, ys0) x ->
+                               let (c1, b1, ptype1, dtype1, ys1) = aexprToSecreC boundedArgMap c0 x in
+                               let ptype = join ptype1 ptype0 in
+                               let dtype = if dtype0 == "" || (dtype1 == dtype0) then dtype1
+                                           else error $ error_typeOp op dtype1 dtype0
+                               in (c1, bs0 ++ [b1], ptype, dtype, ys0 ++ ys1)
+                          ) (c,[],Public,"",[]) xs in
+
+            (c'',b, ptype, dtype, ys ++ [domainToDecl ptype ++ dtype ++ " [[1]] " ++ b ++ " = (" ++ intercalate op bs ++ ");"])
+
+
 getFreeVarCmp :: Term -> String -> String -> String
 getFreeVarCmp arg x z =
     case arg of
@@ -492,7 +537,6 @@ getFreeVarCmp arg x z =
         AVar (Bound Public VarNum   _) -> "(" ++ x ++ " == " ++ z ++ ");"
         AVar (Bound Public VarText  _) -> "(" ++ x ++ " == " ++ strColumn z ++ ");"
 
-        AConstBool _ -> "(" ++ x ++ " == " ++ z ++ ");"
         AConstNum  _ -> "(" ++ x ++ " == " ++ z ++ ");"
         AConstStr  _ -> "(" ++ x ++ " == " ++ strColumn z ++ ");"
 
@@ -506,7 +550,6 @@ getFreeVarAsgn arg x z =
         AVar (Bound Public VarNum   _) -> domainToDecl Public  ++ "int32"     ++ " [[1]] " ++ x ++ " = " ++ z ++ ";"
         AVar (Bound Public VarText  _) -> domainToDecl Public  ++ "uint8"     ++ " [[2]] " ++ x ++ " = " ++ strColumn z ++ ";"
 
-        AConstBool _ -> domainToDecl Public ++ "bool"  ++ " [[1]] " ++ x ++ " = " ++ z ++ ";"
         AConstNum  _ -> domainToDecl Public ++ "int32" ++ " [[1]] " ++ x ++ " = " ++ z ++ ";"
         AConstStr  _ -> domainToDecl Public ++ "uint8" ++ " [[2]] " ++ x ++ " = " ++ strColumn z ++ ";"
 
@@ -530,7 +573,6 @@ getTypeVar allowFreeArg boundedArgMap freeArgMap arg =
                                     --else error $ error_argNotFound arg
                                     else (False, Private, "", z)
 
-        AConstBool v -> (True, Public, "bool",   case v of {True -> "true"; False -> "false"})
         AConstNum  v -> (True, Public, "int32",  show v)
         AConstStr  v -> (True, Public, "uint32", "CRC32(" ++ show v ++ ")")
 
@@ -566,7 +608,6 @@ isGround aexpr =
                       Free _ -> False
                       _      -> True
 
-        AConstBool _ -> True
         AConstNum  _ -> True
         AConstStr  _ -> True
 
@@ -584,7 +625,6 @@ deriveDomain aexpr =
                       -- if the type is not known in advance, it is always safe to take public
                       Free _           -> Private
 
-        AConstBool _ -> Public
         AConstNum  _ -> Public
         AConstStr  _ -> Public
 
@@ -601,16 +641,12 @@ deriveType aexpr =
                       Bound _ dtype _ -> dtype
                       Free _          -> Unknown
 
-        AConstBool _ -> VarBool
         AConstNum  _ -> VarNum
         AConstStr  _ -> VarText
 
-        ANary AAnds xs -> VarBool
-        ANary AOrs  xs -> VarBool
         ANary ASum xs  -> VarNum
         ANary AProd xs -> VarNum
 
-        AUnary ANot x -> VarBool
         AUnary ANeg x -> VarNum
 
         ABinary ADiv x1 x2  -> VarNum
@@ -619,15 +655,6 @@ deriveType aexpr =
         ABinary ASub x1 x2  -> VarNum
         ABinary AMin x1 x2  -> VarNum
         ABinary AMax x1 x2  -> VarNum
-
-        ABinary AAnd x1 x2 -> VarBool
-        ABinary AOr  x1 x2 -> VarBool
-        ABinary ALT x1 x2  -> VarBool
-        ABinary ALE x1 x2  -> VarBool
-        ABinary AEQ x1 x2  -> VarBool
-        ABinary AGE x1 x2  -> VarBool
-        ABinary AGT x1 x2  -> VarBool
-        _                  -> Unknown
 
 deriveConditionalDomain :: [Term] -> [Term] -> [DomainType]
 deriveConditionalDomain asF [] = map deriveDomain asF
