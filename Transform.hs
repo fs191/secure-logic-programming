@@ -50,11 +50,11 @@ applyRule facts rules (p:ps) =
 -- use a rule to generate new ground rules from the existing ground rules
 -- p(a1,..,am) :- b1 ... bn
 processRule :: PName -> M.Map PName PMap -> Rule -> [([Term], Formula)]
-processRule p groundRuleMap (Rule as bs) =
+processRule p groundRuleMap (Rule as bexpr) =
 
     -- derive a list of possible new ground rules for the fact p
     -- TODO we can remove the counter if we implement Subst using a state monad
-    let newGroundRules = foldl (\th b -> processRulePremise groundRuleMap th b) [(emptyTheta, BConstBool True, 0)] bs in
+    let newGroundRules = processRulePremise groundRuleMap [(emptyTheta, BConstBool True, 0)] bexpr in
 
     -- For each generated ground rule, apply the substitution to rule head p as well, getting newArgs
     map (\ (theta,newBody,_) ->
@@ -68,44 +68,48 @@ processRule p groundRuleMap (Rule as bs) =
 -- assume that we already have some possible solutions that make previous b1...bi-1 true
 -- we now extend each of these solutions to a solution for bi, possibly generating even more branches
 processRulePremise :: (M.Map PName PMap) -> [(Subst, Formula, Int)] -> Formula -> [(Subst, Formula, Int)]
-processRulePremise groundRuleMap thetas bexpr =
-
-    case bexpr of
-        -- if b is a fact, we take all existing solutions that make this fact true
-        BListPred (BPredName pName) argsB ->
-            if not (M.member pName groundRuleMap) then []
-            else concat $ map (processFactPremise (groundRuleMap M.! pName) argsB) thetas
-
-        -- if is an arithmetic-black-box expression, we try to evaluate it if we can, or postpone the evaluation
-        _ ->
-            concat $ map (processABBPremise bexpr) thetas
+processRulePremise groundRuleMap thetas bexpr = concat $ map (processFormula groundRuleMap bexpr) thetas
 
 
-processABBPremise :: Formula -> (Subst, Formula, Int) -> [(Subst, Formula, Int)]
-processABBPremise bexpr' (theta',constr,cnt) =
+processFormula :: (M.Map PName PMap) -> Formula -> (Subst, Formula, Int) -> [(Subst, Formula, Int)]
+processFormula groundRuleMap bexpr' (theta', constr, cnt) =
 
     let bexpr''        = applyToFormula theta' bexpr' in
     let (bexpr, theta) = assignmentsToTheta bexpr'' theta' in
+    let solution       = (theta, constr, cnt) in
 
-    let allTypes = getBExprVars (\x -> case x of {Free _ -> 0; _ -> 1}) bexpr in
+    case bexpr of
 
-    -- TODO we can apply constant folding already here and see if it is computable without private variables
-    let isConst = (S.size allTypes == 0) in
+        -- True does not modify the solution
+        BConstBool True   -> [solution]
+        -- False nullifies the solution
+        BConstBool False  -> []
 
-    if isConst then
+        -- satisfiability of an (in)equality predicate is added to solution constraints
+        BBinPred  _ _ _   -> [(theta, BBinary BAnd constr bexpr,cnt)]
 
-        --if all arguments are constants, we can evaluate them immediately
-        let BConstBool val = evalBexpr bexpr in
-        if val == True then [(theta,constr,cnt)] else []
-    else
-        --otherwise, we delegate computation to SecreC
-        [(theta, BBinary BAnd constr bexpr,cnt)]
+        -- TODO we can only apply negation to terms without predicate calls for now
+        BUnary BNot x     ->  [(theta, BBinary BAnd constr (BUnary BNot bexpr),cnt)]
 
-processFactPremise :: PMap -> [Term] -> (Subst, Formula, Int) -> [(Subst, Formula, Int)]
-processFactPremise factPredMap argsB (theta,constr,cnt) =
+        BBinary BOr x1 x2  -> let solutions1 = processFormula groundRuleMap x1 solution in
+                              let solutions2 = processFormula groundRuleMap x2 solution in
+                              solutions1 ++ solutions2
 
-    -- here theta starts branching into several new thetas, by considering different possible matchings
-    concat $ map (unifyPredicate factPredMap theta constr cnt argsB) (M.keys factPredMap)
+        BBinary BAnd x1 x2 -> let solutions1 = processFormula groundRuleMap x1 solution in
+                              let solutions2 = concat $ map (processFormula groundRuleMap x2) solutions1 in
+                              solutions2
+
+        -- n-ary And and Or are analogous to binary
+        BNary BOrs xs      -> concat $ map (\x -> processFormula groundRuleMap x solution) xs
+        BNary BAnds xs     -> foldr (\x solutions -> concat $ map (processFormula groundRuleMap x) solutions) [solution] xs
+
+        -- if b is a fact, we take all existing solutions that make this fact true
+        BListPred (BPredName pName) argsB ->
+            if not (M.member pName groundRuleMap) then []
+            else
+               let factPredMap = groundRuleMap M.! pName in
+               concat $ map (unifyPredicate factPredMap theta constr cnt argsB) (M.keys factPredMap)
+
 
 -- try to unify a predicate with a ground instance of this predicate
 unifyPredicate :: PMap -> Subst -> Formula -> Int -> [Term] -> [Term] -> [(Subst, Formula, Int)]

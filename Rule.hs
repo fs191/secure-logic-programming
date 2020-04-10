@@ -25,13 +25,8 @@ data Var  = Bound DomainType DataType AName | Free VName deriving (Ord,Eq,Show)
 type Term    = AExpr Var
 type Formula = BExpr Var
 
--- a rule has a list of arguments and a list of formulae that comprise rule premise
--- TODO a single premise would be sufficent, as it can be an AND of other formulae
-data Rule = Rule [Term] [Formula] deriving Show
-
--- a formula can be either boolean arithetic blackbox operation (like "=") or a fact defined in LP
--- TODO the current approach allows formulae to be non-boolean expressions
--- data Formula = Fact PName [Term] | ABB Term deriving Show
+-- a rule has a list of arguments and a formula that represents rule premise
+data Rule = Rule [Term] Formula deriving Show
 
 -- a predicate map is a mapping from a list of arguments of a predicate
 -- to a boolean expresion desrribing the condtions on with those arguments satisfy the predicate

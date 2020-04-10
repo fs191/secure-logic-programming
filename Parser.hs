@@ -94,20 +94,20 @@ eqOpSymbol5 = do
 eqOpSymbol6 = do
   symbol ">"
   return BGT
+eqOpSymbol7 = do
+  symbol "is"
+  return BEQ
 
 acompExpr :: Parser Formula
 acompExpr = do
   x1 <- aExpr
-  f <- eqOpSymbol1 <|> eqOpSymbol2 <|> eqOpSymbol3 <|> eqOpSymbol4 <|> eqOpSymbol5 <|> eqOpSymbol6
+  f <- eqOpSymbol1 <|> eqOpSymbol2 <|> eqOpSymbol3 <|> eqOpSymbol4 <|> eqOpSymbol5 <|> eqOpSymbol6 <|> eqOpSymbol7
   x2 <- aExpr
   return $ BBinPred f x1 x2
 
 bpredExpr :: Parser Formula
 bpredExpr = do
-  pname  <- varName
-  symbol "("
-  args <- sepBy aTerm (symbol ",")
-  symbol ")"
+  (pname,args) <- ruleHead
   return $ BListPred (BPredName pname) args
 
 bOperators :: [[Operator Parser Formula]]
@@ -116,14 +116,14 @@ bOperators =
     [ Prefix notBExpr]
 
   --TODO we will need to use LP notation here
-  , [ InfixL (BBinary BAnd <$ caseInsensKeyWord "and")]
-  , [ InfixL (BBinary BOr  <$ caseInsensKeyWord "or")]
+  , [ InfixL (BBinary BAnd <$ caseInsensKeyWord ",")]
+  , [ InfixL (BBinary BOr  <$ caseInsensKeyWord ";")]
 
   ]
 
 bTerm :: Parser Formula
 bTerm = parens bExpr
-  <|> acompExpr
+  <|> try acompExpr
   <|> bpredExpr
 
 ------------------------------------------------------------
@@ -189,8 +189,8 @@ ruleOrFactClause = do
 
 ruleClause pname args = do
     void (impliedBy)
-    rs <- ruleTail
-    return $ Right (pname, [Rule args rs])
+    rhs <- ruleTail
+    return $ Right (pname, [Rule args rhs])
 
 factClause pname args = do
   void(delimRules)
@@ -213,11 +213,14 @@ ruleHead = do
   symbol ")"
   return (pname, args)
 
-ruleTail :: Parser [Formula]
+ruleTail :: Parser Formula
 ruleTail = do
-  bs <- sepBy1 ruleBlock delimRows
+  --bs <- sepBy1 ruleBlock delimRows
+  --void(delimRules)
+  --return $ BNary BAnds bs
+  bexpr <- bExpr
   void(delimRules)
-  return bs
+  return $ bexpr
 
 -- a rule may contain a reference to a database fact, another rule, or a boolean expression
 ruleBlock :: Parser Formula
