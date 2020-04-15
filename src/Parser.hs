@@ -6,12 +6,12 @@ module Parser where
 
 -- some Megaparsec-specific modules
 import Text.Megaparsec
-import Text.Megaparsec.Expr
 import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
 import qualified Control.Exception as Exc
 import Control.Monad (void)
+import Control.Monad.Combinators.Expr
 
 import Data.Either
 import Data.Void
@@ -336,7 +336,7 @@ text = lexeme (C.char '\'' >> manyTill L.charLiteral (C.char '\''))
 
 -- this thing eats all spaces and comments
 spaceConsumer :: Parser ()
-spaceConsumer = 
+spaceConsumer =
         L.space C.space1 lineCmnt blockCmnt
     where
         lineCmnt  = L.skipLineComment lineComment
@@ -382,10 +382,10 @@ readInput path = do
 
 -- this is to extract the actual parsed data
 parseData :: (Parser a) -> (String -> String) -> String -> a
-parseData p err s = 
+parseData p err s =
     let res = parse p "" s in
     case res of
-        Left  x -> error $ err (parseErrorPretty x)
+        Left  x -> error $ err (errorBundlePretty x)
         Right x -> x
 
 parseFromFile :: (Parser a) -> (String -> String -> String) -> String -> IO a
