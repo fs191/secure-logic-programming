@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b77c645d5a3b377aad62168e71a37183c22145242e33b589484dc266c5f3fc8b
+-- hash: 3d2da4035b8ce8816efa83d0882ed277211666221a07223f24324f43e901920f
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -44,7 +44,8 @@ library
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
+      Cabal
+    , base >=4.7 && <5
     , containers
     , hashable
     , megaparsec
@@ -69,7 +70,8 @@ executable lpsec
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      Cabal
+    , base >=4.7 && <5
     , containers
     , hashable
     , megaparsec
@@ -96,7 +98,8 @@ test-suite test
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      Cabal
+    , base >=4.7 && <5
     , containers
     , hashable
     , megaparsec
