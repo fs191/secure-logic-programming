@@ -1,4 +1,15 @@
-module Rule where
+module Rule
+  ( Term, Formula
+  , AName, VName, PName
+  , Var(..)  --TODO Refactor so that we don't have to export constructors
+  , Rule(..) -- Same here
+  , DataType(..)   -- < This should be OK, since it's a simple datatype
+  , DomainType(..)
+  , PMap
+  , predToString
+  , ruleHeadToString
+  , termToString
+  ) where
 
 ---------------------------------------------------------
 ---- Data structures for LP facts and rules

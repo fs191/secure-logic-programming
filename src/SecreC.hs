@@ -1,4 +1,6 @@
-module SecreC where
+module SecreC
+  ( generateSecreCscript
+  ) where
 
 ---------------------------------------------------------
 ---- Transformation of intermediate representation
@@ -10,12 +12,14 @@ import Data.Hashable
 import Data.List
 import Data.Maybe
 import Debug.Trace
+import Control.Monad (guard)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
 import Aexpr
 import ErrorMsg
 import Rule
+import DatalogProgram
 
 indent = "    "
 bexprPrefix = "b_"
@@ -146,51 +150,54 @@ generateTemplateUse cond args =
 
 -- a SecreC program is a list of code lines
 -- if no particular goal is given, then we do not create a main statement
-generateSecreCscript :: Bool -> (M.Map PName PMap) -> ([Term],[Term],[Formula]) -> String
-generateSecreCscript boolOnly predMap (xs,ys,goals) =
+generateSecreCscript :: Bool -> DatalogProgram -> String
+generateSecreCscript boolOnly program =
+    let predMap = facts program
 
     -- TODO think whether we want to support more expressions in a goal
     -- TODO we currently treat all inputs as strings, we need to genralize it (also in plain prolog)
-    let goal = if length goals > 0 then
-                      case head goals of
-                          BListPred (BPredName gn) ga ->
-                                        let xs' = intercalate "," (map termToString xs) in
-                                        let ys' = intercalate "," (map termToString ys) in
-                                        trace ("goal([" ++ xs' ++ "],[" ++ ys' ++ "]) :- " ++ ruleHeadToString "" gn ga) $
-                                        let goalArgs = map (\x -> if elem x xs then
-                                                                      case x of
-                                                                          AVar (Free z) -> AVar (Bound Private VarText z)
-                                                                          _             -> x
-                                                                  else x
-                                                           ) ga in
-                                        Just (gn, goalArgs)
-                          _          -> Nothing
-               else
-                      Nothing
+        goal_ :: Maybe (String, [AExpr Var])
+        goal_ =
+          do
+            g <- goal program
+            let xs = inputs g
+                ys = outputs g
+                goals = formulae g
+            guard $ length goals > 0
+            case head goals of
+                BListPred (BPredName gn) ga ->
+                              let xs' = intercalate "," (map termToString xs) in
+                              let ys' = intercalate "," (map termToString ys) in
+                              trace ("goal([" ++ xs' ++ "],[" ++ ys' ++ "]) :- " ++ ruleHeadToString "" gn ga) $
+                              let goalArgs = map (\x -> if elem x xs then
+                                                            case x of
+                                                                AVar (Free z) -> AVar (Bound Private VarText z)
+                                                                _             -> x
+                                                        else x
+                                                 ) ga in
+                              Just (gn, goalArgs)
+                _          -> Nothing
     in
     let header = defaultHeader in
 
     -- if the goal exists, generate a 'struct' for its outputs
-    let (structDef,structName) = case goal of
-                         Just (pname, as) ->
-                             if boolOnly then ([],"") else
-                             let structName = resPrefix ++ pname in
-                             let fvars = map isFreeVar as in
-                             let ds = map deriveDomain as in
-                             let ts = map deriveType as in
-                             let is = [0..length as - 1] in
-
-                             let allArgs  = zip5 fvars as ds ts is in
-                             let freeArgs = filter (\(b,_,_,_,_) -> b) allArgs in
-
-                             let structDef = generateStruct freeArgs structName in
-
-                             (structDef,structName)
-                         _ -> ([],"")
+    let (structDef,structName) = fromMaybe ([], "") $
+          do
+            (pname, as) <- goal_
+            guard boolOnly
+            let structName = resPrefix ++ pname
+                fvars = map isFreeVar as
+                ds = map deriveDomain as
+                ts = map deriveType as
+                is = [0..length as - 1]
+                allArgs  = zip5 fvars as ds ts is
+                freeArgs = filter (\(b,_,_,_,_) -> b) allArgs
+                structDef = generateStruct freeArgs structName
+            return (structDef,structName)
     in
 
-    let (ds,structTypes,body) = unzip3 $ concat $ M.mapWithKey (createSecreCFuns boolOnly goal structName) predMap in
-    let mainFun = generateGoal boolOnly structTypes ds goal in
+    let (ds,structTypes,body) = unzip3 $ concat $ M.mapWithKey (createSecreCFuns boolOnly goal_ structName) predMap in
+    let mainFun = generateGoal boolOnly structTypes ds goal_ in
 
     intercalate "\n" $ header ++ structDef ++ concat body ++ mainFun
 
@@ -264,7 +271,7 @@ createSecreCFun boolOnly pname structName asG index as bexpr' =
 
     (domain, structType, declaration ++ map (indent ++) (openDbConn ++ crossProductTable ++ argInit ++body ++ closeDbConn ++ finalChoice ++ funReturn) ++ footer)
 
--- create a big cross product table with a map from 
+-- create a big cross product table with a map from
 -- TODO can be much more efficient if we take into account Primary / Foreign keys
 createCrossProducTable :: Formula -> (M.Map Term [String], [String])
 createCrossProducTable bexpr =

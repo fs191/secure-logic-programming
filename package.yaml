@@ -35,6 +35,9 @@ dependencies:
 - split
 - hashable
 - parser-combinators
+- optics
+# Testing only
+- hspec
 
 library:
   source-dirs: src
@@ -60,3 +63,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - secure-logic-programming
+    - HUnit
+    - hspec

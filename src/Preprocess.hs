@@ -1,4 +1,4 @@
-module Preprocess where
+module Preprocess (preprocess) where
 
 ---------------------------------------------------------
 ---- Preprocessing (such as Magic Sets algorithm)
@@ -10,7 +10,7 @@ import qualified Data.Set as S
 import Aexpr
 import ErrorMsg
 import Rule
+import DatalogProgram
 
-preprocess facts rules goal =
-    --TODO implement preprocessing algorithm here
-    (facts,rules,goal)
+preprocess :: DatalogProgram -> DatalogProgram
+preprocess = id --TODO implement preprocessing algorithm here

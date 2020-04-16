@@ -1,5 +1,6 @@
 import ProgramOptions
 import Parser
+import DatalogProgram
 
 import Optimize(optimize)
 import Preprocess(preprocess)
@@ -25,7 +26,8 @@ main = do
   let outFilePath = outFile args
 
   -- parse the input datalog program
-  (facts,rules,goal) <- parseDatalogFromFile inFileName
+  program <- parseDatalogFromFile inFileName
+
 
   -- Verify that parser works correctly
   --traceIO $ (show facts)
@@ -36,7 +38,7 @@ main = do
   -- create a Sharemind script that can be used to upload the tables used in given program
   -- WARNING: this is used for testing only, do not apply it to actual private data!
   when (dbCreateTables args) $ do
-      createdb <- generateDataToDBscript facts
+      createdb <- generateDataToDBscript $ facts program
       let outFileDir  = reverse $ dropWhile (/= '/') (reverse outFilePath)
       let outFileName = reverse $ takeWhile (/= '/') (reverse outFilePath)
 
@@ -44,7 +46,10 @@ main = do
       writeFile createdbPath createdb
 
   -- apply Magic Sets or some alternative preprocessing here
-  let (facts', rules', goal') = preprocess facts rules goal
+  let program' = preprocess program
+      facts' = facts program'
+      rules' = rules program'
+      goal'  = goal program'
 
   -- using rules, generate all facts that we get in up to 'n' steps of rule application
   -- since we are working with symbolic data, our "facts" are actually "ground rules", i.e. rules without free variables,

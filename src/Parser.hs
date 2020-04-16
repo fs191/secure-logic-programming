@@ -1,4 +1,6 @@
-module Parser where
+module Parser
+  ( parseDatalogFromFile
+  ) where
 
 ---------------------------------------------------------
 ---- Parser for DataLog programs (based on megaparsec)
@@ -16,6 +18,7 @@ import Control.Monad.Combinators.Expr
 import Data.Either
 import Data.Void
 import Data.Char
+import Data.Maybe (fromMaybe)
 import Debug.Trace
 
 import qualified Data.Map as M
@@ -23,12 +26,12 @@ import qualified Data.Set as S
 import Aexpr
 import ErrorMsg
 import Rule
+import DatalogProgram
 
 -- Define the parser type
 -- 'Void' means 'no custom error messages'
 -- 'String' means 'input comes in form of a String'
 type Parser = Parsec Void String
-
 
 ---------------------------------------------------------------------------------------------
 -- keywords
@@ -131,21 +134,13 @@ bTerm = parens bExpr
 ------------------------------------------------------------
 
 --                        facts(database)   rules               goal: inputs, outputs, formulae to satisfy
-datalogProgram :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Term],[Term],[Formula]))
-datalogProgram = try datalogProgramWithGoal <|> datalogProgramWithoutGoal
-
-datalogProgramWithGoal :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Term],[Term],[Formula]))
-datalogProgramWithGoal = do
+datalogProgram :: Parser DatalogProgram
+datalogProgram = do
     (database,rules) <- manyRules <|> oneRule
-    goal <- datalogGoal
-    return $ (database,rules,goal)
+    goal <- optional datalogGoal
+    return $ makeProgram database rules goal
 
-datalogProgramWithoutGoal :: Parser (M.Map PName PMap, M.Map PName [Rule], ([Term],[Term],[Formula]))
-datalogProgramWithoutGoal = do
-    (database,rules) <- manyRules <|> oneRule
-    return $ (database,rules,([],[],[]))
-
-datalogGoal :: Parser ([Term],[Term],[Formula])
+datalogGoal :: Parser Goal
 datalogGoal = do
     keyWord "goal"
     symbol "("
@@ -156,7 +151,7 @@ datalogGoal = do
     symbol ":-"
     formula <- sepBy1 ruleBlock (symbol ",")
     symbol "."
-    return (xs,ys,formula)
+    return $ makeGoal xs ys formula
 
 list :: Parser [Term]
 list = do

@@ -1,4 +1,7 @@
-module Transform where
+module Transform
+  ( deriveAllGroundRules
+  , showAllRules
+  ) where
 
 ---------------------------------------------------------
 ---- Transformation of a Datalog script

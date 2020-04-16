@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3d2da4035b8ce8816efa83d0882ed277211666221a07223f24324f43e901920f
+-- hash: 4b9a28abb644c9e0d6b02f486badcd27dce4aa53679a23be399544b0fefb2f88
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -29,6 +29,7 @@ library
   exposed-modules:
       Aexpr
       CSVImport
+      DatalogProgram
       ErrorMsg
       Lib
       Optimize
@@ -48,8 +49,10 @@ library
     , base >=4.7 && <5
     , containers
     , hashable
+    , hspec
     , megaparsec
     , mtl
+    , optics
     , optparse-applicative
     , parsec
     , parser-combinators
@@ -74,8 +77,10 @@ executable lpsec
     , base >=4.7 && <5
     , containers
     , hashable
+    , hspec
     , megaparsec
     , mtl
+    , optics
     , optparse-applicative
     , parsec
     , parser-combinators
@@ -93,17 +98,21 @@ test-suite test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      ParserSpec
       Paths_secure_logic_programming
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Cabal
+    , HUnit
     , base >=4.7 && <5
     , containers
     , hashable
+    , hspec
     , megaparsec
     , mtl
+    , optics
     , optparse-applicative
     , parsec
     , parser-combinators
