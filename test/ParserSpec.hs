@@ -10,7 +10,7 @@ import Parser
 import DatalogProgram
 
 spec :: Spec
-spec = describe "Parser" $ do
+spec = describe "Parser.parseDatalogFromFile" $ do
     canParse "examples/prolog/auction.pl"
     canParse "examples/prolog/fib.pl"
     canParse "examples/prolog/market.pl"
