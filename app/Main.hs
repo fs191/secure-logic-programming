@@ -67,7 +67,8 @@ main = do
 
   -- we can output either only yes/no answer, or also valuations of free variables
   let boolOnly = (outputOnlyBool args)
-  let secrec = generateSecreCscript boolOnly optimizedGroundRules goal'
+  let optimizedProgram = makeProgram optimizedGroundRules rules' goal'
+  let secrec = generateSecreCscript boolOnly optimizedProgram
 
   -- Output the results
   if outFilePath /= ""
