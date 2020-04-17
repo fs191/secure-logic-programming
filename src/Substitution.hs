@@ -1,4 +1,12 @@
-module Substitution where
+module Substitution
+  ( Subst
+  , applyToFormula
+  , refreshVarNames
+  , applyToTerm
+  , emptyTheta
+  , assignmentsToTheta
+  , updateTheta
+  ) where
 
 ---------------------------------------------------------
 ---- Substitution map and related operations
