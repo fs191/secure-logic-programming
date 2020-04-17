@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4b9a28abb644c9e0d6b02f486badcd27dce4aa53679a23be399544b0fefb2f88
+-- hash: e37c0882450cba633238856a2833c8f1d21df540057adbb12ae1c02d69d9c4fc
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -35,7 +35,6 @@ library
       Optimize
       Parser
       Preprocess
-      ProgramOptions
       Rule
       SecreC
       Substitution
@@ -46,6 +45,7 @@ library
       src
   build-depends:
       Cabal
+    , HUnit
     , base >=4.7 && <5
     , containers
     , hashable
@@ -68,12 +68,14 @@ library
 executable lpsec
   main-is: Main.hs
   other-modules:
+      ProgramOptions
       Paths_secure_logic_programming
   hs-source-dirs:
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Cabal
+    , HUnit
     , base >=4.7 && <5
     , containers
     , hashable

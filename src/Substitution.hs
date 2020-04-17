@@ -17,7 +17,6 @@ import qualified Data.Set as S
 
 import Aexpr
 import ErrorMsg
-import ProgramOptions
 import Rule
 
 data Subst = Th (M.Map Var Term)

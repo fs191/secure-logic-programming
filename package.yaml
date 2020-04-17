@@ -38,6 +38,7 @@ dependencies:
 - optics
 # Testing only
 - hspec
+- HUnit
 
 library:
   source-dirs: src

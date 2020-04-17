@@ -21,12 +21,14 @@ data Goal = Goal
   , _gOutputs  :: [Term]
   , _gFormulae :: [Formula]
   }
+  deriving (Show)
 
 data DatalogProgram = DatalogProgram
   { _dpFacts :: M.Map PName PMap
   , _dpRules :: M.Map PName [Rule]
   , _dpGoal  :: Maybe Goal
   }
+  deriving (Show)
 
 makeProgram ::
      M.Map PName PMap

@@ -1,5 +1,6 @@
 module Parser
   ( parseDatalogFromFile
+  , parseDatalog
   ) where
 
 ---------------------------------------------------------
@@ -134,8 +135,8 @@ bTerm = parens bExpr
 ------------------------------------------------------------
 
 --                        facts(database)   rules               goal: inputs, outputs, formulae to satisfy
-datalogProgram :: Parser DatalogProgram
-datalogProgram = do
+datalogParser :: Parser DatalogProgram
+datalogParser = do
     (database,rules) <- manyRules <|> oneRule
     goal <- optional datalogGoal
     return $ makeProgram database rules goal
@@ -361,30 +362,17 @@ signedInt = L.signed spaceConsumer integer
 signedFloat :: Parser Double
 signedFloat = try (L.signed spaceConsumer float) <|> fmap fromIntegral (L.signed spaceConsumer integer)
 
-
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
---------------------------
----- Parser embedding ----
---------------------------
+parseDatalog :: String -> String -> Either (ParseErrorBundle String Void) DatalogProgram
+parseDatalog filepath source = runParser datalogParser filepath source
 
--- read the file line by line -- no special parsing, assume that the delimiters are whitespaces
-readInput :: String -> IO String
-readInput path = do
-   content <- readFile path
-   return content
-
--- this is to extract the actual parsed data
-parseData :: (Parser a) -> (String -> String) -> String -> a
-parseData p err s =
-    let res = parse p "" s in
-    case res of
-        Left  x -> error $ err (errorBundlePretty x)
-        Right x -> x
-
-parseFromFile :: (Parser a) -> (String -> String -> String) -> String -> IO a
-parseFromFile p err s = fmap (parseData p (err s)) (readInput s)
-parseDatalogFromFile fileName = parseFromFile datalogProgram error_parseProgram fileName
-
+parseDatalogFromFile :: String -> IO DatalogProgram
+parseDatalogFromFile filepath =
+  do
+    file <- readFile filepath
+    let res = parse datalogParser filepath file
+    -- TODO use exception instead
+    return $ either (error . errorBundlePretty) id res
 

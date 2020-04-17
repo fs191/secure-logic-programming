@@ -6,13 +6,12 @@ module ProgramOptions
 import Options.Applicative
 import Data.Semigroup ((<>))
 
-data ProgramOptions
-  = ProgramOptions {
-    inFile     :: FilePath,
-    outFile     :: FilePath,
-    iterations :: Int,
-    dbCreateTables :: Bool,
-    outputOnlyBool :: Bool
+data ProgramOptions = ProgramOptions
+  { inFile     :: FilePath
+  , outFile     :: FilePath
+  , iterations :: Int
+  , dbCreateTables :: Bool
+  , outputOnlyBool :: Bool
   }
 
 
@@ -35,5 +34,5 @@ getProgramOptions = execParser opts
     opts = info (programArgs <**> helper)
       (fullDesc
       <> progDesc "Transforms a Datalog program to a privacy-preserving SecreC program.\n \
-                  \ WARNING: the program is under development yet."
+                  \ WARNING: the program is still under development."
       <> header "Privacy-preserving logic programming")

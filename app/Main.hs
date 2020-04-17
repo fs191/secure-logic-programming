@@ -15,13 +15,10 @@ main :: IO ()
 main = do
   -- command line arguments
   args <- getProgramOptions
-
   -- the upper bound on the number of search steps
   let n = iterations args
-
   -- text file containing input Datalog program
   let inFileName = inFile args
-
   -- text file containing output SecreC program
   let outFilePath = outFile args
 
