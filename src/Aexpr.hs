@@ -1,4 +1,17 @@
-module Aexpr where
+module Aexpr
+  ( AExpr(..)
+  , ABinOp(..), AUnOp(..), AListOp(..)
+  , BExpr(..)
+  , BBinOp(..), BUnOp(..), BListOp(..)
+  , BBinPredOp(..), BListPredOp(..)
+  , extractAllPredicates
+  , foldBool
+  , evalAexpr, evalBexpr
+  , aexprToString, bexprToString
+  , isConstAexpr, isConstBexpr
+  , simplifyBool
+  , ruleIndent
+  ) where
 
 ---------------------------------------------------------
 ---- Arithmetic and Boolean expressions
@@ -93,7 +106,7 @@ toCNF = toCNF' . toNNF
     toCNF' (BBinary BAnd exp1 exp2) = toCNF' exp1 `conj` toCNF' exp2
     toCNF' (BBinary BOr  exp1 exp2) = toCNF' exp1 `dist` toCNF' exp2
     toCNF' expr                    = expr
-    
+
     dist :: BExpr a -> BExpr a -> BExpr a
     dist (BBinary BAnd e11 e12) e2 = (e11 `dist` e2) `conj` (e12 `dist` e2)
     dist e1 (BBinary BAnd e21 e22) = (e1 `dist` e21) `conj` (e1 `dist` e22)

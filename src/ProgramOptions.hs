@@ -1,6 +1,7 @@
 module ProgramOptions
-  (ProgramOptions(..), getProgramOptions)
-  where
+  ( ProgramOptions(..)
+  , getProgramOptions
+  ) where
 
 import Options.Applicative
 import Data.Semigroup ((<>))

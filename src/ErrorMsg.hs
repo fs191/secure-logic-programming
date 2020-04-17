@@ -52,7 +52,7 @@ error_nonConstantTerm x  = errorTag ++ "A non-constant term " ++ show x ++ " was
 error_nonGroundTableVar t x i  = inErrTag ++ "Table " ++ show t ++ " is called with a free variable " ++ show x ++ " on argument " ++ show i ++ " after unfolding."
 
 -- secrec code generation errors
-error_complexExpression x  = errorTag ++ "Could not process " ++ show x ++ ", olny variables are supported as predicate arguments."
+error_complexExpression x  = errorTag ++ "Could not process " ++ show x ++ ", only variables are supported as predicate arguments."
 error_tableArgNotFound t x i = inErrTag ++ show i ++ "-th arg of " ++ show t ++ ", " ++ show x ++ " has not been included into cross product table."
 error_argNotFound x          = inErrTag ++ " var " ++ show x ++ " has no matching in the argument list."
 

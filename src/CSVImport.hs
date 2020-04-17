@@ -1,4 +1,6 @@
-module CSVImport where
+module CSVImport
+  ( generateDataToDBscript
+  ) where
 
 ---------------------------------------------------------
 ---- Uploads table data to Sharemind servers
@@ -84,7 +86,7 @@ extractDataFromTable (pname,argMap) = do
                   AVar v@(Bound _ _ z) -> (z,v)
 
 -- a SecreC program is a list of code lines
--- if no particular goal is given, we just 
+-- if no particular goal is given, we just
 createCSVImport :: M.Map PName (M.Map AName Var, [AName], [[String]]) -> [String]
 createCSVImport dataMap =
     let header = createHeader in
@@ -153,5 +155,5 @@ createRow pname typeMap (x:xs) (y:ys) =
                 _                       ->  error $ error_unsupportedColumnType x
 
     in s ++ createRow pname typeMap xs ys
-                
+
 

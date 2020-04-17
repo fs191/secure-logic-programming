@@ -1,4 +1,6 @@
-module Preprocess (preprocess) where
+module Preprocess
+  ( preprocess
+  ) where
 
 ---------------------------------------------------------
 ---- Preprocessing (such as Magic Sets algorithm)

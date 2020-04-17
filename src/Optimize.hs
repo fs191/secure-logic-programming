@@ -1,4 +1,6 @@
-module Optimize where
+module Optimize
+  ( optimize
+  ) where
 
 ---------------------------------------------------------
 ---- Optimization of intermediate representation
