@@ -1,4 +1,5 @@
 import ProgramOptions
+import OptParse
 import Parser
 import DatalogProgram
 
@@ -16,11 +17,11 @@ main = do
   -- command line arguments
   args <- getProgramOptions
   -- the upper bound on the number of search steps
-  let n = iterations args
+  let n = _iterations args
   -- text file containing input Datalog program
-  let inFileName = inFile args
+  let inFileName = _inFile args
   -- text file containing output SecreC program
-  let outFilePath = outFile args
+  let outFilePath = _outFile args
 
   -- parse the input datalog program
   program <- parseDatalogFromFile inFileName
@@ -34,7 +35,7 @@ main = do
 
   -- create a Sharemind script that can be used to upload the tables used in given program
   -- WARNING: this is used for testing only, do not apply it to actual private data!
-  when (dbCreateTables args) $ do
+  when (_dbCreateTables args) $ do
       createdb <- generateDataToDBscript $ facts program
       let outFileDir  = reverse $ dropWhile (/= '/') (reverse outFilePath)
       let outFileName = reverse $ takeWhile (/= '/') (reverse outFilePath)
@@ -63,7 +64,7 @@ main = do
   traceIO $ showAllRules optimizedGroundRules
 
   -- we can output either only yes/no answer, or also valuations of free variables
-  let boolOnly = (outputOnlyBool args)
+  let boolOnly = (_outputOnlyBool args)
   let optimizedProgram = makeProgram optimizedGroundRules rules' goal'
   let secrec = generateSecreCscript boolOnly optimizedProgram
 

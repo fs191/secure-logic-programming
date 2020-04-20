@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e37c0882450cba633238856a2833c8f1d21df540057adbb12ae1c02d69d9c4fc
+-- hash: cce66d3dd41afd3122cc7dfb9cebe637a8e4426c10cfaeeaf393de0effc9baf5
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -39,6 +39,7 @@ library
       SecreC
       Substitution
       Transform
+      Translator
   other-modules:
       Paths_secure_logic_programming
   hs-source-dirs:
@@ -68,6 +69,7 @@ library
 executable lpsec
   main-is: Main.hs
   other-modules:
+      OptParse
       ProgramOptions
       Paths_secure_logic_programming
   hs-source-dirs:
