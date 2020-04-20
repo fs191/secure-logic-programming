@@ -33,7 +33,15 @@ data AExpr a
   | AUnary  AUnOp   (AExpr a)
   | ABinary ABinOp  (AExpr a) (AExpr a)
   | ANary   AListOp [AExpr a]
-  deriving (Ord,Eq,Show)
+  deriving (Ord,Eq)
+
+instance (Show a) => Show (AExpr a) where
+  show (AVar x) = show x
+  show (AConstNum x) = show x
+  show (AConstStr x) = show x
+  show (AUnary op x) = (show op) ++ (show x)
+  show (ABinary op x y) = (show x) ++ (show op) ++ (show y)
+  show (ANary op l) = (show op) ++ (show l)
 
 data AUnOp
   = ANeg
@@ -56,23 +64,49 @@ data BExpr a
   | BUnary  BUnOp   (BExpr a)
   | BBinary BBinOp  (BExpr a) (BExpr a)
   | BNary   BListOp [BExpr a]
-  deriving (Ord,Eq,Show)
+  deriving (Ord,Eq)
+
+instance (Show a) => Show (BExpr a) where
+  show (BConstBool x) = show x
+  show (BBinPred op x y) = (show x) ++ (show op) ++ (show y)
+  show (BListPred op l) = (show op) ++ (show l)
+  show (BUnary op x) = (show op) ++ (show x)
+  show (BBinary op x y) = (show x) ++ (show op) ++ (show y)
+  show (BNary op l) = (show op) ++ (show l)
 
 data BUnOp
   = BNot
-  deriving (Ord,Eq,Show)
+  deriving (Ord,Eq)
+
+instance Show BUnOp where
+  show BNot = "-"
 
 data BBinOp
   = BAnd | BOr
-  deriving (Ord,Eq,Show)
+  deriving (Ord,Eq)
+
+instance Show BBinOp where
+  show BAnd = " AND "
+  show BOr  = " OR "
 
 data BBinPredOp
   = BLT | BLE | BEQ | BGE | BGT | BAsgn
-  deriving (Ord,Eq,Show)
+  deriving (Ord,Eq)
+
+instance Show BBinPredOp where
+  show BLT   = " < "
+  show BLE   = " <= "
+  show BEQ   = " == "
+  show BGE   = " >= "
+  show BGT   = " > "
+  show BAsgn = " := "
 
 data BListPredOp
   = BPredName String
-  deriving (Ord,Eq,Show)
+  deriving (Ord,Eq)
+
+instance Show BListPredOp where
+  show (BPredName n) = n
 
 data BListOp
   = BAnds | BOrs

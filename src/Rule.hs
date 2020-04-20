@@ -26,18 +26,28 @@ type VName = String
 type PName = String
 
 -- possible (classes of) types of database attributes
-data DataType   = VarBool | VarNum | VarText | Unknown deriving (Ord,Eq,Show)
-data DomainType = Public  | Private                    deriving (Ord,Eq,Show)
+data DataType   = VarBool | VarNum | VarText | Unknown
+  deriving (Ord,Eq,Show)
+data DomainType = Public  | Private
+  deriving (Ord,Eq,Show)
 
 -- predicate argument, together with the privacy/data type
 -- here var is a database variable (not a free LP variable)
-data Var  = Bound DomainType DataType AName | Free VName deriving (Ord,Eq,Show)
+data Var  = Bound DomainType DataType AName | Free VName
+  deriving (Ord,Eq)
+
+instance Show Var where
+  show (Free n) = n
+  show (Bound t d n) = n ++ "<bound: " ++ (show t) ++ ", " ++ (show d) ++ ">"
 
 type Term    = AExpr Var
 type Formula = BExpr Var
 
 -- a rule has a list of arguments and a formula that represents rule premise
-data Rule = Rule [Term] Formula deriving Show
+data Rule = Rule [Term] Formula
+
+instance Show Rule where
+  show (Rule terms formula) = "\t(" ++ (intercalate ", " $ show <$> terms) ++ ") :- " ++ (show formula) ++ "\n"
 
 -- a predicate map is a mapping from a list of arguments of a predicate
 -- to a boolean expresion desrribing the condtions on with those arguments satisfy the predicate
