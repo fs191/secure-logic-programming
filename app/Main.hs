@@ -2,6 +2,7 @@ import ProgramOptions
 import OptParse
 import Parser
 import DatalogProgram
+import Translator
 
 import Optimize(optimize)
 import Preprocess(preprocess)
@@ -43,30 +44,10 @@ main = do
       let createdbPath = outFileDir ++ "createdb_" ++ outFileName
       writeFile createdbPath createdb
 
-  -- apply Magic Sets or some alternative preprocessing here
-  let program' = preprocess program
-      facts' = facts program'
-      rules' = rules program'
-      goal'  = goal program'
-
-  -- using rules, generate all facts that we get in up to 'n' steps of rule application
-  -- since we are working with symbolic data, our "facts" are actually "ground rules", i.e. rules without free variables,
-  -- but they may have bounded variables that will be taken from the datbase
-  -- the output is if type 'M.Map PName PMap' where:
-  -- - PName is the predicate name, e.g. 'buys'
-  -- - PMap maps 'arguments of the predicate' to 'RHS of the corresponding ground rule'
-  let groundRules = deriveAllGroundRules facts' rules' n
-
-  -- we do all optimizations of computation (like constant propagation) here
-  let optimizedGroundRules = optimize groundRules
-
-  -- show the transformation result
-  traceIO $ showAllRules optimizedGroundRules
 
   -- we can output either only yes/no answer, or also valuations of free variables
   let boolOnly = (_outputOnlyBool args)
-  let optimizedProgram = makeProgram optimizedGroundRules rules' goal'
-  let secrec = generateSecreCscript boolOnly optimizedProgram
+      secrec = evalTranslator $ translate program
 
   -- Output the results
   if outFilePath /= ""
