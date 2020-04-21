@@ -5,6 +5,7 @@ module Translator
   ( TranslatorOptions
   , Translator
   , withIterations
+  , withBoolOnly
   , translate
   , evalTranslator
   ) where
@@ -15,7 +16,7 @@ import Control.Applicative
 import Optics.TH
 import Optics
 
-import Debug.Trace (traceIO)
+import Debug.Trace (traceM)
 
 import Preprocess
 import DatalogProgram
@@ -43,11 +44,11 @@ defaultOptions = TranslatorOptions
   , _boolOnly   = False
   }
 
-withIterations :: Translator a -> Int -> Translator a
-withIterations t n = local (& iterations .~ n) t
+withIterations :: Int -> Translator a -> Translator a
+withIterations n = local (& iterations .~ n)
 
-withBoolOnly :: Translator a -> Translator a
-withBoolOnly = local (& boolOnly .~ True)
+withBoolOnly :: Bool -> Translator a -> Translator a
+withBoolOnly b = local (& boolOnly .~ b)
 
 evalTranslator :: Translator a -> a
 evalTranslator (Translator r) = runReader r defaultOptions
@@ -76,7 +77,8 @@ translate program =
     let optimizedGroundRules = optimize groundRules
 
     -- show the transformation result
-    --traceIO $ showAllRules optimizedGroundRules
+    --traceM $ showAllRules optimizedGroundRules
+
     let optimizedProgram = makeProgram optimizedGroundRules rules' goal'
     return $ generateSecreCscript bool optimizedProgram
 

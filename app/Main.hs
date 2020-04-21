@@ -17,8 +17,6 @@ main :: IO ()
 main = do
   -- command line arguments
   args <- getProgramOptions
-  -- the upper bound on the number of search steps
-  let n = _iterations args
   -- text file containing input Datalog program
   let inFileName = _inFile args
   -- text file containing output SecreC program
@@ -26,7 +24,6 @@ main = do
 
   -- parse the input datalog program
   program <- parseDatalogFromFile inFileName
-
 
   -- Verify that parser works correctly
   --traceIO $ (show facts)
@@ -46,8 +43,10 @@ main = do
 
 
   -- we can output either only yes/no answer, or also valuations of free variables
-  let boolOnly = (_outputOnlyBool args)
-      secrec = evalTranslator $ translate program
+  let secrec = evalTranslator
+        $ withBoolOnly (_outputOnlyBool args)
+        $ withIterations (_iterations args)
+        $ translate program
 
   -- Output the results
   if outFilePath /= ""
