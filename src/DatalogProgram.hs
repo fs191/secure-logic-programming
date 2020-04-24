@@ -3,22 +3,32 @@
 
 module DatalogProgram
   ( DatalogProgram
+  , PPDatalogProgram
   , Goal
-  , makeProgram
+  , DBClause
+  , LogicProgram
   , makeGoal
-  , facts, rules, goal
+  , facts, goal
   , inputs, outputs, formulae
+  , toDatalogSource
+  , fromRulesAndGoal
   ) where
 
 import qualified Data.Map as M
 
 import           Data.List (intercalate)
-import           Data.Maybe (fromMaybe)
+import           Data.Maybe (fromMaybe, catMaybes)
 
 import           Optics.Optic
 import           Optics.TH
 
 import           Rule
+
+class LogicProgram a where
+  rules :: a -> [Rule]
+  facts :: a -> [Fact]
+
+  facts = catMaybes . map toFact . rules
 
 data Goal = Goal
   { _gInputs   :: [Term]
@@ -33,41 +43,25 @@ instance Show Goal where
     "\n\tFormulae:\t" ++ (show $ _gFormulae g)
 
 data DatalogProgram = DatalogProgram
-  { _dpFacts :: M.Map PName PMap
-  , _dpRules :: M.Map PName [Rule]
+  { _dpRules :: M.Map PName [Rule]
   , _dpGoal  :: Maybe Goal
   }
+  deriving (Show)
 
-instance Show DatalogProgram where
-  show dp = concat
-    [ "Facts:\n"
-    , showFacts $ _dpFacts dp
-    , "Rules:\n"
-    , showRules $ _dpRules dp
-    , showGoal $ _dpGoal dp
-    ]
+data PPDatalogProgram = PPDatalogProgram
+  { _ppProgram   :: DatalogProgram
+  , _ppDBClauses :: [DBClause]
+  }
+  deriving (Show)
 
-showFacts :: M.Map PName PMap -> String
-showFacts m = concat $ f <$> M.toList m
-  where f (k, v) = "\t" ++ k ++ "\n" ++ (showPMap v)
+data DBClause = DBClause
+  deriving (Show)
 
-showPMap :: M.Map [Term] Formula -> String
-showPMap m = concat $ f <$> M.toList m
-  where f (k, v) = "\t\t(" ++ (show k) ++ ") :- " ++ (show v) ++ "\n"
+instance LogicProgram DatalogProgram where
+  rules = concat . M.elems . _dpRules
 
-showRules :: M.Map PName [Rule] -> String
-showRules m = concat $ f <$> M.toList m
-  where f (k, v) = "\t" ++ k ++ ":\n\t" ++ (intercalate "\n\t" $ show <$> v)
-
-showGoal :: Maybe Goal -> String
-showGoal g = fromMaybe "" $ show <$> g
-
-makeProgram ::
-     M.Map PName PMap
-  -> M.Map PName [Rule]
-  -> Maybe Goal
-  -> DatalogProgram
-makeProgram = DatalogProgram
+instance LogicProgram PPDatalogProgram where
+  rules = rules . _ppProgram
 
 makeGoal ::
      [Term]
@@ -75,12 +69,6 @@ makeGoal ::
   -> [Formula]
   -> Goal
 makeGoal = Goal
-
-facts :: DatalogProgram -> M.Map PName PMap
-facts = _dpFacts
-
-rules :: DatalogProgram -> M.Map PName [Rule]
-rules = _dpRules
 
 goal :: DatalogProgram -> Maybe Goal
 goal = _dpGoal
@@ -93,3 +81,13 @@ outputs = _gOutputs
 
 formulae :: Goal -> [Formula]
 formulae = _gFormulae
+
+toDatalogSource :: DatalogProgram -> String
+toDatalogSource  = undefined
+
+fromRulesAndGoal :: [Rule] -> Maybe Goal -> DatalogProgram
+fromRulesAndGoal = undefined
+
+ppDatalogProgram :: DatalogProgram -> [DBClause] -> PPDatalogProgram
+ppDatalogProgram = undefined
+

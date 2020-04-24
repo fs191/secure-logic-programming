@@ -8,6 +8,7 @@ module Translator
   , withBoolOnly
   , translate
   , evalTranslator
+  , process
   ) where
 
 import Control.Monad.Reader
@@ -16,7 +17,7 @@ import Control.Applicative
 import Optics.TH
 import Optics
 
-import Debug.Trace (traceM)
+import Debug.Trace
 
 import Preprocess
 import DatalogProgram
@@ -53,12 +54,11 @@ withBoolOnly b = local (& boolOnly .~ b)
 evalTranslator :: Translator a -> a
 evalTranslator (Translator r) = runReader r defaultOptions
 
-translate :: DatalogProgram -> Translator String
-translate program =
+process :: DatalogProgram -> Translator DatalogProgram
+process program =
   do
     cfg <- ask
     let iter = _iterations cfg
-    let bool = _boolOnly cfg
     -- apply Magic Sets or some alternative preprocessing here
     let program' = preprocess program
         facts' = facts program'
@@ -77,8 +77,12 @@ translate program =
     let optimizedGroundRules = optimize groundRules
 
     -- show the transformation result
-    --traceM $ showAllRules optimizedGroundRules
+    return $ makeProgram optimizedGroundRules rules' goal'
 
-    let optimizedProgram = makeProgram optimizedGroundRules rules' goal'
-    return $ generateSecreCscript bool optimizedProgram
+translate :: DatalogProgram -> Translator String
+translate program =
+  do
+    cfg <- ask
+    let bool = _boolOnly cfg
+    return $ generateSecreCscript bool program
 

@@ -19,12 +19,13 @@ import Aexpr
 import ErrorMsg
 import Rule
 
-data Subst = Th (M.Map Var Term)
+newtype Subst = Th (M.Map Var Term)
 
 instance Show Subst where
     show (Th theta) = concat $ map (\(k,v) -> show k ++ " -> " ++ show v ++ "\n") (M.toList theta)
 
 -- a prefix of all fresh variables
+nv :: String
 nv = "_X"
 
 emptyTheta :: Subst
@@ -113,6 +114,7 @@ applyToTerm theta aexpr =
 refreshVarNames :: Int -> Formula -> (Int, Subst, Formula)
 refreshVarNames = refreshVarNamesRec emptyTheta
 
+refreshVarNamesRec :: Subst -> Int -> BExpr Var -> (Int, Subst, Formula)
 refreshVarNamesRec theta c bexpr =
     case bexpr of
 
@@ -138,10 +140,7 @@ refreshVarNamesRecTerm theta c aexpr =
 
         AVar x      -> if memberTheta x theta then (c, theta, evalTheta theta x)
                        else
-                           let freshVar = case x of
-                                   Bound domain vt z -> AVar (Bound domain vt (nv ++ show c))
-                                   Free z       -> AVar (Free (nv ++ show c))
-                           in
+                           let freshVar = AVar $ rename (nv ++ show c) x in
                            (c+1, updateTheta x freshVar theta, freshVar)
         AConstNum  x -> (c, theta, AConstNum x)
         AConstStr  x -> (c, theta, AConstStr x)

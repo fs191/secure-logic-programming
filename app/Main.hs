@@ -6,7 +6,7 @@ import Translator
 
 import Optimize(optimize)
 import Preprocess(preprocess)
-import Transform(deriveAllGroundRules, showAllRules)
+import Transform(deriveAllGroundRules)
 import CSVImport(generateDataToDBscript)
 import SecreC(generateSecreCscript)
 
@@ -46,7 +46,7 @@ main = do
   let secrec = evalTranslator
         $ withBoolOnly (_outputOnlyBool args)
         $ withIterations (_iterations args)
-        $ translate program
+        $ translate =<< process program
 
   -- Output the results
   if outFilePath /= ""

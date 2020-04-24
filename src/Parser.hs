@@ -20,19 +20,28 @@ import Data.Either
 import Data.Void
 import Data.Char
 import Data.Maybe (fromMaybe)
+import Data.String
 import Debug.Trace
 
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Rule (DomainType(..), Var, DataType(..), free, bound)
 import Aexpr
 import ErrorMsg
-import Rule
 import DatalogProgram
 
 -- Define the parser type
 -- 'Void' means 'no custom error messages'
 -- 'String' means 'input comes in form of a String'
 type Parser = Parsec Void String
+
+type Term = AExpr Var
+type Formula = BExpr Var
+
+data Clause
+  = RuleClause Term Term
+  | FactClause Term
+  | DBClause
 
 ---------------------------------------------------------------------------------------------
 -- keywords
@@ -68,7 +77,7 @@ aOperators =
 
 aTerm :: Parser Term
 aTerm = parens aExpr
-  <|> AVar <$> var
+  <|> var
   <|> AConstNum <$> signedInt
   <|> aString
 
@@ -80,39 +89,19 @@ notBExpr = do
   caseInsensKeyWord "\\+"
   return $ BUnary BNot
 
-eqOpSymbol1 = do
-  symbol "=<"
-  return BLT
-eqOpSymbol2 = do
-  symbol "<"
-  return BLE
-eqOpSymbol3 = do
-  symbol "=="
-  return BEQ
-eqOpSymbol4 = do
-  symbol "="
-  return BEQ
-eqOpSymbol5 = do
-  symbol ">="
-  return BGE
-eqOpSymbol6 = do
-  symbol ">"
-  return BGT
-eqOpSymbol7 = do
-  symbol "is"
-  return BEQ
+eqOpSymbol :: Parser BBinPredOp
+eqOpSymbol = (symbol "<=" >> return BLE)
+         <|> (symbol "<"  >> return BLT)
+         <|> (symbol ">=" >> return BGE)
+         <|> (symbol ">"  >> return BGT)
+         <|> (symbol "==" >> return BEQ)
 
 acompExpr :: Parser Formula
 acompExpr = do
   x1 <- aExpr
-  f <- eqOpSymbol1 <|> eqOpSymbol2 <|> eqOpSymbol3 <|> eqOpSymbol4 <|> eqOpSymbol5 <|> eqOpSymbol6 <|> eqOpSymbol7
   x2 <- aExpr
+  f <- eqOpSymbol
   return $ BBinPred f x1 x2
-
-bpredExpr :: Parser Formula
-bpredExpr = do
-  (pname,args) <- ruleHead
-  return $ BListPred (BPredName pname) args
 
 bOperators :: [[Operator Parser Formula]]
 bOperators =
@@ -128,18 +117,17 @@ bOperators =
 bTerm :: Parser Formula
 bTerm = parens bExpr
   <|> try acompExpr
-  <|> bpredExpr
 
 ------------------------------------------------------------
 ---- Parsing DataLog program
 ------------------------------------------------------------
 
 --                        facts(database)   rules               goal: inputs, outputs, formulae to satisfy
-datalogParser :: Parser DatalogProgram
+datalogParser :: Parser PPDatalogProgram
 datalogParser = do
-    (database,rules) <- manyRules <|> oneRule
+    clauses <- some clause
     goal <- optional datalogGoal
-    return $ makeProgram database rules goal
+    undefined
 
 datalogGoal :: Parser Goal
 datalogGoal = do
@@ -149,10 +137,10 @@ datalogGoal = do
     symbol ","
     ys <- list
     symbol ")"
-    symbol ":-"
+    impliedBy
     formula <- sepBy1 ruleBlock (symbol ",")
     symbol "."
-    return $ makeGoal xs ys formula
+    undefined
 
 list :: Parser [Term]
 list = do
@@ -161,62 +149,49 @@ list = do
     symbol "]"
     return xs
 
-manyRules :: Parser (M.Map PName PMap, M.Map PName [Rule])
-manyRules = do
-    xs <- many clause
-    let xs1 = lefts xs  --database facts
-    let xs2 = rights xs --rules
-    return (M.fromListWith (M.union) xs1, M.fromListWith (++) xs2)
+clause :: Parser Clause
+clause =
+      dbClause
+  <|> factClause
+  <|> ruleClause
 
-oneRule :: Parser (M.Map PName PMap, M.Map PName [Rule])
-oneRule = do
-    x <- clause
-    let xs1 = case x of {Left  z -> [z]; _ -> []}  --database facts
-    let xs2 = case x of {Right z -> [z]; _ -> []}  --rule
-    return (M.fromList xs1, M.fromList xs2)
+ruleClause :: Parser Clause
+ruleClause = do
+  rHead <- ruleHead
+  rTail <- ruleTail
+  undefined
 
-clause :: Parser (Either (PName, PMap) (PName, [Rule]))
-clause = do
-    dbClause <|> ruleOrFactClause
-
-ruleOrFactClause = do
-    (pname,args) <- ruleHead
-    ruleClause pname args <|> factClause pname args
-
-ruleClause pname args = do
-    void (impliedBy)
-    rhs <- ruleTail
-    return $ Right (pname, [Rule args rhs])
-
-factClause pname args = do
+factClause :: Parser Clause
+factClause = do
   void(delimRules)
-  return $ Left (pname, M.singleton args (BConstBool True))
+  undefined
 
+dbClause :: Parser Clause
 dbClause = do
-  symbol ":-"
+  impliedBy
   keyWord "type"
   symbol "("
-  (pname,args) <- ruleHead
+  rh <- ruleHead
   symbol ")"
   void(delimRules)
-  return $ Left (pname, M.singleton args (BListPred (BPredName pname) args))
+  undefined
 
-ruleHead :: Parser (PName, [Term])
+ruleHead :: Parser Term
 ruleHead = do
   pname  <- varName
   symbol "("
   args <- sepBy aTerm (symbol ",")
   symbol ")"
-  return (pname, args)
+  undefined
 
-ruleTail :: Parser Formula
+ruleTail :: Parser Term
 ruleTail = do
   --bs <- sepBy1 ruleBlock delimRows
   --void(delimRules)
   --return $ BNary BAnds bs
   bexpr <- bExpr
   void(delimRules)
-  return $ bexpr
+  undefined
 
 -- a rule may contain a reference to a database fact, another rule, or a boolean expression
 ruleBlock :: Parser Formula
@@ -224,46 +199,36 @@ ruleBlock = try ruleBlockPred <|> ruleBlockBexpr
 
 ruleBlockPred :: Parser Formula
 ruleBlockPred = do
-  (pname,args) <- ruleHead
-  return $ BListPred (BPredName pname) args
+  rh <- ruleHead
+  undefined
 
 ruleBlockBexpr :: Parser Formula
 ruleBlockBexpr = do
   bexpr <- bExpr
   return $ bexpr
 
-var :: Parser Var
-var = try dbVar <|> freeVar
+var :: Parser (AExpr Var)
+var = AVar <$> (try dbVar <|> freeVar)
 
+freeVar :: Parser Var
 freeVar = do
     x <- varName
-    return $ Free x
+    return $ free x
 
+dbVar :: Parser Var
 dbVar = do
   vName <- varName
   symbol ":"
   pType <- privacyType
-  vType <- numType <|> strType
-  return $ Bound pType vType vName
-
-numType = do
-    keyWord "int"
-    return VarNum
-
-strType = do
-    keyWord "string"
-    return VarText
+  vType <-
+        (keyWord "int"    >> return VarNum)
+    <|> (keyWord "string" >> return VarText)
+  return $ bound pType vType vName
 
 privacyType :: Parser DomainType
-privacyType = privateType <|> publicType
-
-privateType = do
-  keyWord "private"
-  return Private
-
-publicType = do
-  keyWord "public"
-  return Public
+privacyType =
+      (keyWord "private" >> return Private)
+  <|> (keyWord "public"  >> return Public)
 
 ------------------------------
 ---- Symbols and keywords ----
@@ -323,7 +288,7 @@ alphaNumCharAndSubscript = C.char '_'
     <|> C.alphaNumChar
 
 -- we need to read string identifiers and afterwards map them to integers
-varName :: Parser VName
+varName :: Parser String
 varName = identifier
 
 --reads an arbitrary string, all characters up to the first space
@@ -365,10 +330,10 @@ signedFloat = try (L.signed spaceConsumer float) <|> fmap fromIntegral (L.signed
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
-parseDatalog :: String -> String -> Either (ParseErrorBundle String Void) DatalogProgram
+parseDatalog :: String -> String -> Either (ParseErrorBundle String Void) PPDatalogProgram
 parseDatalog filepath source = runParser datalogParser filepath source
 
-parseDatalogFromFile :: String -> IO DatalogProgram
+parseDatalogFromFile :: String -> IO PPDatalogProgram
 parseDatalogFromFile filepath =
   do
     file <- readFile filepath

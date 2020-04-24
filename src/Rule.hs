@@ -1,21 +1,30 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Rule
   ( Term, Formula
   , AName, VName, PName
-  , Var(..)  --TODO Refactor so that we don't have to export constructors
-  , Rule(..) -- Same here
-  , DataType(..)   -- < This should be OK, since it's a simple datatype
+  , Var(..) -- TODO try not to export constructor
+  , Rule, Fact
+  , DataType(..)
   , DomainType(..)
-  , PMap
   , predToString
   , ruleHeadToString
   , termToString
-  ) where
+  , rule
+  , free, bound
+  , isFree, dataType
+  , rename
+  , toFact
+  , name
+  , premise, functor, args
+) where
 
 ---------------------------------------------------------
 ---- Data structures for LP facts and rules
 ---------------------------------------------------------
 
 import Data.List
+import Data.String
 import qualified Data.Map as M
 
 import Aexpr
@@ -33,7 +42,9 @@ data DomainType = Public  | Private
 
 -- predicate argument, together with the privacy/data type
 -- here var is a database variable (not a free LP variable)
-data Var  = Bound DomainType DataType AName | Free VName
+data Var
+  = Bound DomainType DataType AName
+  | Free VName
   deriving (Ord,Eq)
 
 instance Show Var where
@@ -44,15 +55,35 @@ type Term    = AExpr Var
 type Formula = BExpr Var
 
 -- a rule has a list of arguments and a formula that represents rule premise
-data Rule = Rule [Term] Formula
+type Atom = String
 
-instance Show Rule where
-  show (Rule terms formula) = "\t(" ++ (intercalate ", " $ show <$> terms) ++ ") :- " ++ (show formula) ++ "\n"
+class IsRule a where
+  toRule  :: a -> Rule
+  premise :: a -> Formula
+  functor :: a -> Atom
+  args    :: a -> [Term]
 
--- a predicate map is a mapping from a list of arguments of a predicate
--- to a boolean expresion desrribing the condtions on with those arguments satisfy the predicate
--- e.g. 'p(0). p(x) :- x < 1000.' would be expressed as a map {[0] -> True, [x] -> {x < 1000}}
-type PMap = M.Map [Term] Formula
+  premise = premise . toRule
+  functor = functor . toRule
+  args    = args . toRule
+
+data Rule = Rule
+  { _arguments :: [Term]
+  , _fact      :: Fact
+  }
+  deriving (Show)
+
+data Fact = Fact
+  { _functor :: Atom
+  , _premise :: Formula
+  }
+  deriving (Show)
+
+instance IsRule Rule where
+  toRule = id
+
+instance IsRule Fact where
+  toRule = Rule []
 
 predToString :: String -> PName -> [Term] -> Formula -> String
 predToString prefix pname args bexpr =
@@ -84,13 +115,32 @@ termToString aexpr =
                     (Bound domainType dataType vName) -> ruleDomainToString domainType ++ " " ++ ruleTypeToString dataType ++ " " ++ vName
                     (Free vName) -> vName
 
---------------------------------
--- this is for debugging only
-showFactMap :: (M.Map PName PMap) -> String
-showFactMap facts =
-  let res = map (\p ->
-                     "%% [[ " ++ p ++ "]] %% \n"
-                     ++ intercalate "\n\n" (map (\key -> predToString "" p key ((facts M.! p) M.! key) ++ "\n") (M.keys (facts M.! p)))
-                ) (M.keys facts)
-  in
-  intercalate "\n" res
+rule :: Atom -> [Term] -> Formula -> Rule
+rule a t f = Rule t fact
+  where fact = Fact a f
+
+free :: VName -> Var
+free = Free
+
+bound :: DomainType -> DataType -> VName -> Var
+bound = Bound
+
+rename :: String -> Var -> Var
+rename n (Free _) = Free n
+rename n (Bound x y _) = Bound x y n
+
+isFree :: Var -> Bool
+isFree (Free _) = True
+isFree _        = False
+
+dataType :: Var -> Maybe DataType
+dataType (Bound _ dt _) = Just dt
+dataType _              = Nothing
+
+toFact :: Rule -> Maybe Fact
+toFact (Rule [] f) = Just f
+toFact _           = Nothing
+
+name :: Rule -> Atom
+name = _functor . _fact
+

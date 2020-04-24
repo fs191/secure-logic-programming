@@ -15,6 +15,7 @@ import Data.Char
 import Data.List.Split
 import qualified Data.Map as M
 import Debug.Trace
+import DatalogProgram
 
 import Aexpr
 import Rule
@@ -64,10 +65,11 @@ createHeader = [
     indent ++ "pd_shared3p bool _temp_D_bool;",
     indent ++ "pd_shared3p xor_uint8 _temp_D_string;"]
 
-generateDataToDBscript :: M.Map PName PMap -> IO (String)
+generateDataToDBscript :: DatalogProgram -> IO (String)
 generateDataToDBscript database = do
     dataMap <- extractDataFromTables database
-    return $ intercalate "\n" $ createCSVImport dataMap
+    --return $ intercalate "\n" $ createCSVImport dataMap
+    return undefined
 
 extractDataFromTables :: M.Map PName PMap -> IO (M.Map PName (M.Map AName Var, [AName], [[String]]))
 extractDataFromTables database = do

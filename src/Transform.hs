@@ -1,6 +1,5 @@
 module Transform
   ( deriveAllGroundRules
-  , showAllRules
   ) where
 
 ---------------------------------------------------------
@@ -19,10 +18,16 @@ import Aexpr
 import ErrorMsg
 import Rule
 import Substitution
+import DatalogProgram
+
+type PMap = M.Map [Term] Formula
 
 -- generate all possible ground rules for n iterations
-deriveAllGroundRules :: (M.Map PName PMap) -> (M.Map PName [Rule]) -> Int -> (M.Map PName PMap)
-deriveAllGroundRules facts rules n = runIteration facts rules 0 n
+deriveAllGroundRules :: DatalogProgram -> Int -> DatalogProgram
+deriveAllGroundRules program n = undefined
+  where f = undefined
+        rules = undefined
+        res = runIteration f rules 0 n
 
 -- generate all possible ground rules for a single iteration
 runIteration :: (M.Map PName PMap) -> (M.Map PName [Rule]) -> Int -> Int -> (M.Map PName PMap)
@@ -52,11 +57,13 @@ applyRule facts rules (p:ps) =
 -- use a rule to generate new ground rules from the existing ground rules
 -- p(a1,..,am) :- b1 ... bn
 processRule :: PName -> M.Map PName PMap -> Rule -> [([Term], Formula)]
-processRule p groundRuleMap (Rule as bexpr) =
+processRule p groundRuleMap rule =
 
     -- derive a list of possible new ground rules for the fact p
     -- TODO we can remove the counter if we implement Subst using a state monad
-    let newGroundRules = processRulePremise groundRuleMap [(emptyTheta, BConstBool True, 0)] bexpr in
+    let bexpr = premise rule
+        as = args rule
+        newGroundRules = processRulePremise groundRuleMap [(emptyTheta, BConstBool True, 0)] bexpr in
 
     -- For each generated ground rule, apply the substitution to rule head p as well, getting newArgs
     map (\ (theta,newBody,_) ->
@@ -159,18 +166,4 @@ unifyArgs thetaB thetaF unifiable constr (argB':argsB') (argF':argsF') =
                 _  -> (thetaB, thetaF, unifiable, BBinary BAnd constr (BBinPred BEQ argB argF))
 
     in unifyArgs thetaB' thetaF' unifiable' constr' argsB' argsF'
-
-
-
---------------------------------
--- this is for debugging only
-showAllRules :: (M.Map PName PMap) -> String
-showAllRules rules =
-  let res = map (\p ->
-                     "%% [[ " ++ p ++ "]] %% \n"
-                     ++ intercalate "\n\n" (map (\key -> predToString "" p key ((rules M.! p) M.! key) ++ "\n") (M.keys (rules M.! p)))
-                ) (M.keys rules)
-  in
-  intercalate "\n" res
-
 

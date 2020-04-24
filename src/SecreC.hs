@@ -21,6 +21,8 @@ import ErrorMsg
 import Rule
 import DatalogProgram
 
+type PMap = M.Map [Term] Formula
+
 indent = "    "
 bexprPrefix = "b_"
 aexprPrefix = "x_"
@@ -152,7 +154,7 @@ generateTemplateUse cond args =
 -- if no particular goal is given, then we do not create a main statement
 generateSecreCscript :: Bool -> DatalogProgram -> String
 generateSecreCscript boolOnly program =
-    let predMap = facts program
+    let predMap = toPMapMap $ facts program :: M.Map PName PMap
 
     -- TODO think whether we want to support more expressions in a goal
     -- TODO we currently treat all inputs as strings, we need to genralize it (also in plain prolog)
@@ -208,8 +210,6 @@ createSecreCFuns boolOnly goal structName pname pmap =
     let (keys,values) = unzip (M.toList pmap) in
     let is = [0..length keys - 1] in
     let as = case goal of {Just (_, goalArgs) -> goalArgs; _ -> []} in
-
-
     zipWith3 (createSecreCFun boolOnly pname structName as) is keys values
 
 createSecreCFun :: Bool -> PName -> String -> [Term] -> Int -> [Term] -> Formula -> (DomainType, String, [String])
@@ -644,18 +644,12 @@ deriveDomain aexpr =
 deriveType :: AExpr Var -> DataType
 deriveType aexpr =
     case aexpr of
-        AVar x -> case x of
-                      Bound _ dtype _ -> dtype
-                      Free _          -> Unknown
-
+        AVar x -> fromMaybe Unknown $ dataType x
         AConstNum  _ -> VarNum
         AConstStr  _ -> VarText
-
         ANary ASum xs  -> VarNum
         ANary AProd xs -> VarNum
-
         AUnary ANeg x -> VarNum
-
         ABinary ADiv x1 x2  -> VarNum
         ABinary AMult x1 x2 -> VarNum
         ABinary AAdd x1 x2  -> VarNum
@@ -681,8 +675,15 @@ deriveConditionalType (aF:asF) (aG:asG) =
 isFreeVar :: AExpr Var -> Bool
 isFreeVar aexpr =
     case aexpr of
-        AVar x -> case x of
-                      Free _ -> True
-                      _      -> False
+        AVar x -> isFree x
         _      -> False
 
+toPMapMap :: [Fact] -> M.Map PName PMap
+toPMapMap facts = M.unions $
+  do
+    f <- facts
+    let n = functor f
+        p = premise f
+        a = args f
+        pmap = M.singleton a p
+    return $ M.singleton n pmap
