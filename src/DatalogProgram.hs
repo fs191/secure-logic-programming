@@ -27,6 +27,7 @@ import           Rule
 class LogicProgram a where
   rules :: a -> [Rule]
   facts :: a -> [Fact]
+  goal  :: a -> Maybe Goal
 
   facts = catMaybes . map toFact . rules
 
@@ -59,9 +60,11 @@ data DBClause = DBClause
 
 instance LogicProgram DatalogProgram where
   rules = concat . M.elems . _dpRules
+  goal  = _dpGoal
 
 instance LogicProgram PPDatalogProgram where
   rules = rules . _ppProgram
+  goal = goal . _ppProgram
 
 makeGoal ::
      [Term]
@@ -69,9 +72,6 @@ makeGoal ::
   -> [Formula]
   -> Goal
 makeGoal = Goal
-
-goal :: DatalogProgram -> Maybe Goal
-goal = _dpGoal
 
 inputs :: Goal -> [Term]
 inputs = _gInputs

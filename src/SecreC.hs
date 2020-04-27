@@ -152,7 +152,7 @@ generateTemplateUse cond args =
 
 -- a SecreC program is a list of code lines
 -- if no particular goal is given, then we do not create a main statement
-generateSecreCscript :: Bool -> DatalogProgram -> String
+generateSecreCscript :: Bool -> PPDatalogProgram -> String
 generateSecreCscript boolOnly program =
     let predMap = toPMapMap $ facts program :: M.Map PName PMap
 

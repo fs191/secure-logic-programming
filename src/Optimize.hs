@@ -12,8 +12,9 @@ import qualified Data.Set as S
 import Aexpr
 import ErrorMsg
 import Rule
+import DatalogProgram
 
-optimize :: (M.Map PName PMap) -> (M.Map PName PMap)
+optimize :: a -> a
 optimize factMap =
     --TODO implement optimization here
     factMap

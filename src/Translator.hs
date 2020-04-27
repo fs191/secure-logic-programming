@@ -54,16 +54,13 @@ withBoolOnly b = local (& boolOnly .~ b)
 evalTranslator :: Translator a -> a
 evalTranslator (Translator r) = runReader r defaultOptions
 
-process :: DatalogProgram -> Translator DatalogProgram
+process :: PPDatalogProgram -> Translator PPDatalogProgram
 process program =
   do
     cfg <- ask
     let iter = _iterations cfg
     -- apply Magic Sets or some alternative preprocessing here
     let program' = preprocess program
-        facts' = facts program'
-        rules' = rules program'
-        goal'  = goal program'
 
     -- using rules, generate all facts that we get in up to 'n' steps of rule application
     -- since we are working with symbolic data, our "facts" are actually "ground rules", i.e. rules without free variables,
@@ -71,15 +68,13 @@ process program =
     -- the output is if type 'M.Map PName PMap' where:
     -- - PName is the predicate name, e.g. 'buys'
     -- - PMap maps 'arguments of the predicate' to 'RHS of the corresponding ground rule'
-    let groundRules = deriveAllGroundRules facts' rules' iter
+    let groundRules = deriveAllGroundRules program' iter
 
     -- we do all optimizations of computation (like constant propagation) here
-    let optimizedGroundRules = optimize groundRules
-
     -- show the transformation result
-    return $ makeProgram optimizedGroundRules rules' goal'
+    return $ optimize groundRules
 
-translate :: DatalogProgram -> Translator String
+translate :: PPDatalogProgram -> Translator String
 translate program =
   do
     cfg <- ask

@@ -23,7 +23,7 @@ import DatalogProgram
 type PMap = M.Map [Term] Formula
 
 -- generate all possible ground rules for n iterations
-deriveAllGroundRules :: DatalogProgram -> Int -> DatalogProgram
+deriveAllGroundRules :: PPDatalogProgram -> Int -> PPDatalogProgram
 deriveAllGroundRules program n = undefined
   where f = undefined
         rules = undefined

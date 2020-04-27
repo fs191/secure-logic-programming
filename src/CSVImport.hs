@@ -23,6 +23,8 @@ import ErrorMsg
 
 indent = "    "
 
+type PMap = M.Map [Term] Formula
+
 splitBySeparator :: String -> String -> [String]
 splitBySeparator sep s =
    if last s == last sep then endBy sep s else splitOn sep s
@@ -65,9 +67,9 @@ createHeader = [
     indent ++ "pd_shared3p bool _temp_D_bool;",
     indent ++ "pd_shared3p xor_uint8 _temp_D_string;"]
 
-generateDataToDBscript :: DatalogProgram -> IO (String)
+generateDataToDBscript :: PPDatalogProgram -> IO (String)
 generateDataToDBscript database = do
-    dataMap <- extractDataFromTables database
+    dataMap <- extractDataFromTables undefined
     --return $ intercalate "\n" $ createCSVImport dataMap
     return undefined
 

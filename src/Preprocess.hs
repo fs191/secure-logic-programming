@@ -14,5 +14,5 @@ import ErrorMsg
 import Rule
 import DatalogProgram
 
-preprocess :: DatalogProgram -> DatalogProgram
+preprocess :: PPDatalogProgram -> PPDatalogProgram
 preprocess = id --TODO implement preprocessing algorithm here
