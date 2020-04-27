@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module DatalogProgram
   ( DatalogProgram
@@ -9,9 +10,11 @@ module DatalogProgram
   , LogicProgram
   , makeGoal
   , facts, goal
-  , inputs, outputs, formulae
+  , inputs, outputs, formula
   , toDatalogSource
   , fromRulesAndGoal
+  , ppDatalogProgram
+  , dbClause
   ) where
 
 import qualified Data.Map as M
@@ -34,14 +37,14 @@ class LogicProgram a where
 data Goal = Goal
   { _gInputs   :: [Term]
   , _gOutputs  :: [Term]
-  , _gFormulae :: [Formula]
+  , _gFormula :: Formula
   }
 
 instance Show Goal where
   show g =
     "Goal:\n\tInputs: \t"     ++ (show $ _gInputs g) ++
     "\n\tOutputs:\t"  ++ (show $ _gOutputs g) ++
-    "\n\tFormulae:\t" ++ (show $ _gFormulae g)
+    "\n\tFormulae:\t" ++ (show $ _gFormula g)
 
 data DatalogProgram = DatalogProgram
   { _dpRules :: M.Map PName [Rule]
@@ -55,7 +58,7 @@ data PPDatalogProgram = PPDatalogProgram
   }
   deriving (Show)
 
-data DBClause = DBClause
+data DBClause = DBClause String [DBVar]
   deriving (Show)
 
 instance LogicProgram DatalogProgram where
@@ -69,7 +72,7 @@ instance LogicProgram PPDatalogProgram where
 makeGoal ::
      [Term]
   -> [Term]
-  -> [Formula]
+  -> Formula
   -> Goal
 makeGoal = Goal
 
@@ -79,15 +82,20 @@ inputs = _gInputs
 outputs :: Goal -> [Term]
 outputs = _gOutputs
 
-formulae :: Goal -> [Formula]
-formulae = _gFormulae
+formula :: Goal -> Formula
+formula = _gFormula
 
 toDatalogSource :: DatalogProgram -> String
 toDatalogSource  = undefined
 
 fromRulesAndGoal :: [Rule] -> Maybe Goal -> DatalogProgram
-fromRulesAndGoal = undefined
+fromRulesAndGoal rules = DatalogProgram (M.unionsWith (<>) $ f <$> rules)
+  where
+    f x = M.singleton (show $ functor x) [x]
 
 ppDatalogProgram :: DatalogProgram -> [DBClause] -> PPDatalogProgram
-ppDatalogProgram = undefined
+ppDatalogProgram = PPDatalogProgram
+
+dbClause :: String -> [DBVar] -> DBClause
+dbClause = DBClause
 

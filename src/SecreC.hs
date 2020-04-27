@@ -158,13 +158,13 @@ generateSecreCscript boolOnly program =
 
     -- TODO think whether we want to support more expressions in a goal
     -- TODO we currently treat all inputs as strings, we need to genralize it (also in plain prolog)
-        goal_ :: Maybe (String, [AExpr Var])
+        goal_ :: Maybe (String, [AExpr DBVar])
         goal_ =
           do
             g <- goal program
             let xs = inputs g
                 ys = outputs g
-                goals = formulae g
+                goals = [formula g]
             guard $ length goals > 0
             case head goals of
                 BListPred (BPredName gn) ga ->
@@ -608,7 +608,7 @@ typeToDim isCRC domain dtype i =
 
 --------------------------
 -- is the term ground (i.e. does not contain any free variables)?
-isGround :: AExpr Var -> Bool
+isGround :: AExpr DBVar -> Bool
 isGround aexpr =
     case aexpr of
         AVar x -> case x of
@@ -624,7 +624,7 @@ isGround aexpr =
 
     where processRec x = isGround x
 
-deriveDomain :: AExpr Var -> DomainType
+deriveDomain :: AExpr DBVar -> DomainType
 deriveDomain aexpr =
     case aexpr of
         AVar x -> case x of
@@ -641,7 +641,7 @@ deriveDomain aexpr =
 
     where processRec x = deriveDomain x
 
-deriveType :: AExpr Var -> DataType
+deriveType :: AExpr DBVar -> DataType
 deriveType aexpr =
     case aexpr of
         AVar x -> fromMaybe Unknown $ dataType x
@@ -672,7 +672,7 @@ deriveConditionalType (aF:asF) (aG:asG) =
     (meet2 dF dG) : (deriveConditionalType asF asG)
 
 ------------------------------------------------------------------------------------
-isFreeVar :: AExpr Var -> Bool
+isFreeVar :: AExpr DBVar -> Bool
 isFreeVar aexpr =
     case aexpr of
         AVar x -> isFree x

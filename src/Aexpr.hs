@@ -9,6 +9,7 @@ module Aexpr
   , evalAexpr, evalBexpr
   , aexprToString, bexprToString
   , isConstAexpr, isConstBexpr
+  , bBin, bPred
   , simplifyBool
   , ruleIndent
   ) where
@@ -398,4 +399,10 @@ extractAllPredicates bexpr =
         _               -> []
 
     where processRec x = extractAllPredicates x
+
+bBin :: BBinOp -> BExpr a -> BExpr a -> BExpr a
+bBin = BBinary
+
+bPred :: String -> [AExpr a] -> BExpr a
+bPred n ts = BListPred (BPredName n) ts
 

@@ -73,14 +73,14 @@ generateDataToDBscript database = do
     --return $ intercalate "\n" $ createCSVImport dataMap
     return undefined
 
-extractDataFromTables :: M.Map PName PMap -> IO (M.Map PName (M.Map AName Var, [AName], [[String]]))
+extractDataFromTables :: M.Map PName PMap -> IO (M.Map PName (M.Map AName DBVar, [AName], [[String]]))
 extractDataFromTables database = do
     -- mapM is a standard function [IO a] -> IO [a]
     res <- mapM extractDataFromTable (M.toList database)
     return $ M.fromList res
 
 -- TODO generalize the separator
-extractDataFromTable :: (PName,PMap) -> IO (PName, (M.Map AName Var, [AName], [[String]]))
+extractDataFromTable :: (PName,PMap) -> IO (PName, (M.Map AName DBVar, [AName], [[String]]))
 extractDataFromTable (pname,argMap) = do
     (xs,yss) <- readDBString ("examples/database/" ++ pname ++ ".csv") ";"
     let typeMap = M.fromList $ map processArg $ head (M.keys argMap)
@@ -91,14 +91,14 @@ extractDataFromTable (pname,argMap) = do
 
 -- a SecreC program is a list of code lines
 -- if no particular goal is given, we just
-createCSVImport :: M.Map PName (M.Map AName Var, [AName], [[String]]) -> [String]
+createCSVImport :: M.Map PName (M.Map AName DBVar, [AName], [[String]]) -> [String]
 createCSVImport dataMap =
     let header = createHeader in
     let body   = map (indent ++ ) $ concat $ (M.elems (M.mapWithKey createTable dataMap)) in
     let footer = [indent ++ "tdbCloseConnection(_ds);", "}\n"] in
     header ++ body ++ footer
 
-createTable :: PName -> (M.Map AName Var, [AName], [[String]]) -> [String]
+createTable :: PName -> (M.Map AName DBVar, [AName], [[String]]) -> [String]
 createTable pname (typeMap, xs, yss) =
 
     let header1 = ["_tableName  = \"" ++ pname ++ "\";",
@@ -117,7 +117,7 @@ createTable pname (typeMap, xs, yss) =
 
     in header1 ++ header2 ++ header3 ++ createTableRec pname typeMap xs yss
 
-createTableHeader :: PName -> M.Map AName Var -> AName -> [String]
+createTableHeader :: PName -> M.Map AName DBVar -> AName -> [String]
 createTableHeader pname typeMap x =
     let dtype = (if M.member x typeMap then typeMap ! x else error $ error_unknownColumn x pname) in
     let (isVlen,dvar,var) = case dtype of
@@ -132,14 +132,14 @@ createTableHeader pname typeMap x =
         "tdbVmapAddString(_params, \"names\", \"" ++ var ++ "\");"]
 
 
-createTableRec :: PName -> M.Map AName Var -> [AName] -> [[String]] -> [String]
+createTableRec :: PName -> M.Map AName DBVar -> [AName] -> [[String]] -> [String]
 createTableRec _ _ _ [] = []
 createTableRec pname typeMap xs (ys:yss) =
     let s0 = ["tdbInsertRow(_ds," ++ show pname ++ ", _params);", "tdbVmapClear(_params);\n"] in
     let s = createRow pname typeMap xs ys in
     s ++ s0 ++ createTableRec pname typeMap xs yss
 
-createRow :: PName -> M.Map AName Var -> [AName] -> [String] -> [String]
+createRow :: PName -> M.Map AName DBVar -> [AName] -> [String] -> [String]
 createRow _ _ [] [] = []
 createRow pname _ [] ys  = error $ error_dbFileLengthsTooMany pname ys
 createRow pname _ xs  [] = error $ error_dbFileLengthsTooFew pname xs

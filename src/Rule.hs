@@ -3,18 +3,19 @@
 module Rule
   ( Term, Formula
   , AName, VName, PName
-  , Var(..) -- TODO try not to export constructor
+  , DBVar(..) -- TODO try not to export constructor
   , Rule, Fact
+  , IsRule
   , DataType(..)
   , DomainType(..)
   , predToString
   , ruleHeadToString
   , termToString
-  , rule
+  , rule, fact
   , free, bound
   , isFree, dataType
   , rename
-  , toFact
+  , toFact, toRule
   , name
   , premise, functor, args
 ) where
@@ -42,17 +43,17 @@ data DomainType = Public  | Private
 
 -- predicate argument, together with the privacy/data type
 -- here var is a database variable (not a free LP variable)
-data Var
+data DBVar
   = Bound DomainType DataType AName
   | Free VName
   deriving (Ord,Eq)
 
-instance Show Var where
+instance Show DBVar where
   show (Free n) = n
   show (Bound t d n) = n ++ "<bound: " ++ (show t) ++ ", " ++ (show d) ++ ">"
 
-type Term    = AExpr Var
-type Formula = BExpr Var
+type Term    = AExpr DBVar
+type Formula = BExpr DBVar
 
 -- a rule has a list of arguments and a formula that represents rule premise
 type Atom = String
@@ -68,14 +69,14 @@ class IsRule a where
   args    = args . toRule
 
 data Rule = Rule
-  { _arguments :: [Term]
+  { _premise   :: Formula
   , _fact      :: Fact
   }
   deriving (Show)
 
 data Fact = Fact
-  { _functor :: Atom
-  , _premise :: Formula
+  { _functor   :: Atom
+  , _arguments :: [Term]
   }
   deriving (Show)
 
@@ -83,7 +84,7 @@ instance IsRule Rule where
   toRule = id
 
 instance IsRule Fact where
-  toRule = Rule []
+  toRule = Rule (BConstBool True)
 
 predToString :: String -> PName -> [Term] -> Formula -> String
 predToString prefix pname args bexpr =
@@ -116,30 +117,32 @@ termToString aexpr =
                     (Free vName) -> vName
 
 rule :: Atom -> [Term] -> Formula -> Rule
-rule a t f = Rule t fact
-  where fact = Fact a f
+rule a t f = Rule f $ fact a t
 
-free :: VName -> Var
+fact :: Atom -> [Term] -> Fact
+fact = Fact
+
+free :: VName -> DBVar
 free = Free
 
-bound :: DomainType -> DataType -> VName -> Var
+bound :: DomainType -> DataType -> VName -> DBVar
 bound = Bound
 
-rename :: String -> Var -> Var
+rename :: String -> DBVar -> DBVar
 rename n (Free _) = Free n
 rename n (Bound x y _) = Bound x y n
 
-isFree :: Var -> Bool
+isFree :: DBVar -> Bool
 isFree (Free _) = True
 isFree _        = False
 
-dataType :: Var -> Maybe DataType
+dataType :: DBVar -> Maybe DataType
 dataType (Bound _ dt _) = Just dt
 dataType _              = Nothing
 
 toFact :: Rule -> Maybe Fact
-toFact (Rule [] f) = Just f
-toFact _           = Nothing
+toFact (Rule (BConstBool True) f) = Just f
+toFact _                          = Nothing
 
 name :: Rule -> Atom
 name = _functor . _fact

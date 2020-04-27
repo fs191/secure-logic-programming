@@ -25,7 +25,7 @@ import Debug.Trace
 
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Rule (DomainType(..), Var, DataType(..), free, bound)
+import Rule (DomainType(..), DBVar, DataType(..), free, bound, rule, fact, toRule)
 import Aexpr
 import ErrorMsg
 import DatalogProgram
@@ -35,13 +35,14 @@ import DatalogProgram
 -- 'String' means 'input comes in form of a String'
 type Parser = Parsec Void String
 
-type Term = AExpr Var
-type Formula = BExpr Var
+type Term = AExpr DBVar
+type Formula = BExpr DBVar
+type FName = String
 
 data Clause
-  = RuleClause Term Term
-  | FactClause Term
-  | DBClause
+  = RuleClause FName [Term] Formula
+  | FactClause FName [Term]
+  | DBClause FName [DBVar]
 
 ---------------------------------------------------------------------------------------------
 -- keywords
@@ -122,25 +123,32 @@ bTerm = parens bExpr
 ---- Parsing DataLog program
 ------------------------------------------------------------
 
---                        facts(database)   rules               goal: inputs, outputs, formulae to satisfy
 datalogParser :: Parser PPDatalogProgram
 datalogParser = do
     clauses <- some clause
     goal <- optional datalogGoal
-    undefined
+    let f c = case c of
+                  RuleClause n par cond -> return $ rule n par cond
+                  FactClause n par     -> return . toRule $ fact n par
+                  _                    -> []
+    let rules = f =<< clauses
+    let dp = fromRulesAndGoal rules goal
+        db = [DatalogProgram.dbClause n x | (DBClause n x) <- clauses]
+    return $ ppDatalogProgram dp db
 
 datalogGoal :: Parser Goal
 datalogGoal = do
     keyWord "goal"
-    symbol "("
+    void $ symbol "("
     xs <- list
-    symbol ","
+    void $ symbol ","
     ys <- list
-    symbol ")"
-    impliedBy
-    formula <- sepBy1 ruleBlock (symbol ",")
-    symbol "."
-    undefined
+    void $ symbol ")"
+    void impliedBy
+    formulae <- sepBy1 ruleBlock (symbol ",")
+    void delimRules
+    let formula = foldl1 (bBin BAnd) formulae
+    return $ makeGoal xs ys formula
 
 list :: Parser [Term]
 list = do
@@ -151,47 +159,52 @@ list = do
 
 clause :: Parser Clause
 clause =
-      dbClause
+      Parser.dbClause
   <|> factClause
   <|> ruleClause
 
+params :: Parser [Term]
+params = parens $ sepBy aTerm (symbol ",")
+
 ruleClause :: Parser Clause
 ruleClause = do
-  rHead <- ruleHead
-  rTail <- ruleTail
-  undefined
+  fun    <- identifier
+  p <- params
+  void impliedBy
+  body   <- ruleBody
+  return $ RuleClause fun p body
+
+ruleBody :: Parser Formula
+ruleBody =
+  do
+    preds <- sepBy1 ruleBlockPred (symbol ",")
+    void delimRules
+    -- The comma is essentially an AND operator
+    return $ foldl1 (bBin BAnd) preds
 
 factClause :: Parser Clause
 factClause = do
-  void(delimRules)
-  undefined
+  fun <- identifier
+  p <- params
+  void delimRules
+  return $ FactClause fun p
 
 dbClause :: Parser Clause
 dbClause = do
   impliedBy
   keyWord "type"
   symbol "("
-  rh <- ruleHead
+  rh <- dbFact
   symbol ")"
   void(delimRules)
-  undefined
+  return rh
 
-ruleHead :: Parser Term
-ruleHead = do
-  pname  <- varName
-  symbol "("
-  args <- sepBy aTerm (symbol ",")
-  symbol ")"
-  undefined
-
-ruleTail :: Parser Term
-ruleTail = do
-  --bs <- sepBy1 ruleBlock delimRows
-  --void(delimRules)
-  --return $ BNary BAnds bs
-  bexpr <- bExpr
-  void(delimRules)
-  undefined
+dbFact :: Parser Clause
+dbFact =
+  do
+    fun <- identifier
+    args <- parens $ sepBy1 dbVar (symbol ",")
+    return $ DBClause fun args
 
 -- a rule may contain a reference to a database fact, another rule, or a boolean expression
 ruleBlock :: Parser Formula
@@ -199,23 +212,23 @@ ruleBlock = try ruleBlockPred <|> ruleBlockBexpr
 
 ruleBlockPred :: Parser Formula
 ruleBlockPred = do
-  rh <- ruleHead
-  undefined
+  (FactClause n ts) <- factClause
+  return $ bPred n ts
 
 ruleBlockBexpr :: Parser Formula
 ruleBlockBexpr = do
   bexpr <- bExpr
   return $ bexpr
 
-var :: Parser (AExpr Var)
+var :: Parser (AExpr DBVar)
 var = AVar <$> (try dbVar <|> freeVar)
 
-freeVar :: Parser Var
+freeVar :: Parser DBVar
 freeVar = do
     x <- varName
     return $ free x
 
-dbVar :: Parser Var
+dbVar :: Parser DBVar
 dbVar = do
   vName <- varName
   symbol ":"
@@ -331,7 +344,7 @@ parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
 parseDatalog :: String -> String -> Either (ParseErrorBundle String Void) PPDatalogProgram
-parseDatalog filepath source = runParser datalogParser filepath source
+parseDatalog = runParser datalogParser
 
 parseDatalogFromFile :: String -> IO PPDatalogProgram
 parseDatalogFromFile filepath =

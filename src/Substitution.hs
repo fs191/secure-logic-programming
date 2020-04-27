@@ -19,7 +19,7 @@ import Aexpr
 import ErrorMsg
 import Rule
 
-newtype Subst = Th (M.Map Var Term)
+newtype Subst = Th (M.Map DBVar Term)
 
 instance Show Subst where
     show (Th theta) = concat $ map (\(k,v) -> show k ++ " -> " ++ show v ++ "\n") (M.toList theta)
@@ -31,14 +31,14 @@ nv = "_X"
 emptyTheta :: Subst
 emptyTheta = Th $ M.empty
 
-evalTheta :: Subst -> Var -> Term
+evalTheta :: Subst -> DBVar -> Term
 evalTheta (Th theta) x = if M.member x theta then theta M.! x else AVar x
 
-memberTheta :: Var -> Subst -> Bool
+memberTheta :: DBVar -> Subst -> Bool
 memberTheta x (Th theta) = M.member x theta
 
 -- update the substitution
-updateTheta :: Var -> Term -> Subst -> Subst
+updateTheta :: DBVar -> Term -> Subst -> Subst
 updateTheta a b (Th theta) =
 
     let theta' = M.insert a b theta in
@@ -114,7 +114,7 @@ applyToTerm theta aexpr =
 refreshVarNames :: Int -> Formula -> (Int, Subst, Formula)
 refreshVarNames = refreshVarNamesRec emptyTheta
 
-refreshVarNamesRec :: Subst -> Int -> BExpr Var -> (Int, Subst, Formula)
+refreshVarNamesRec :: Subst -> Int -> BExpr DBVar -> (Int, Subst, Formula)
 refreshVarNamesRec theta c bexpr =
     case bexpr of
 
