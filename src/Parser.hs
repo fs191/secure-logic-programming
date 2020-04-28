@@ -158,12 +158,11 @@ list = do
     return xs
 
 clause :: Parser Clause
-clause = p
-  where p =
-              try (Parser.dbClause <* delimRules)
-          <|> try (factClause <* delimRules)
-          <|> try (ruleClause <* delimRules)
-          <|> fail "expected a clause"
+clause =
+      try (Parser.dbClause <* delimRules)
+  <|> try (factClause <* delimRules)
+  <|> try (ruleClause <* delimRules)
+  <|> fail "expected a clause"
 
 params :: Parser [Term]
 params = parens $ sepBy aTerm delimRows
