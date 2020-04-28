@@ -141,11 +141,11 @@ datalogGoal = do
     keyWord "goal"
     void $ symbol "("
     xs <- list
-    void $ symbol ","
+    void delimRows
     ys <- list
     void $ symbol ")"
     void impliedBy
-    formulae <- sepBy1 ruleBlock (symbol ",")
+    formulae <- sepBy1 ruleBlock delimRows
     void delimRules
     let formula = foldl1 (bBin BAnd) formulae
     return $ makeGoal xs ys formula
@@ -153,32 +153,33 @@ datalogGoal = do
 list :: Parser [Term]
 list = do
     symbol "["
-    xs <- sepBy aTerm (symbol ",")
+    xs <- sepBy aTerm delimRows
     symbol "]"
     return xs
 
 clause :: Parser Clause
-clause =
-      Parser.dbClause
-  <|> factClause
-  <|> ruleClause
+clause = p
+  where p =
+              try (Parser.dbClause <* delimRules)
+          <|> try (factClause <* delimRules)
+          <|> try (ruleClause <* delimRules)
+          <|> fail "expected a clause"
 
 params :: Parser [Term]
-params = parens $ sepBy aTerm (symbol ",")
+params = parens $ sepBy aTerm delimRows
 
 ruleClause :: Parser Clause
 ruleClause = do
-  fun    <- identifier
-  p <- params
+  fun  <- identifier
+  p    <- params
   void impliedBy
-  body   <- ruleBody
+  body <- ruleBody
   return $ RuleClause fun p body
 
 ruleBody :: Parser Formula
 ruleBody =
   do
-    preds <- sepBy1 ruleBlockPred (symbol ",")
-    void delimRules
+    preds <- sepBy1 ruleBlockPred delimRows
     -- The comma is essentially an AND operator
     return $ foldl1 (bBin BAnd) preds
 
@@ -186,7 +187,6 @@ factClause :: Parser Clause
 factClause = do
   fun <- identifier
   p <- params
-  void delimRules
   return $ FactClause fun p
 
 dbClause :: Parser Clause
@@ -196,7 +196,6 @@ dbClause = do
   symbol "("
   rh <- dbFact
   symbol ")"
-  void(delimRules)
   return rh
 
 dbFact :: Parser Clause
@@ -221,7 +220,7 @@ ruleBlockBexpr = do
   return $ bexpr
 
 var :: Parser (AExpr DBVar)
-var = AVar <$> (try dbVar <|> freeVar)
+var = AVar <$> (try dbVar <|> try freeVar <|> fail "expected a variable")
 
 freeVar :: Parser DBVar
 freeVar = do
