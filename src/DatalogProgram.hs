@@ -9,30 +9,45 @@ module DatalogProgram
   , DBClause
   , LogicProgram
   , makeGoal
-  , facts, goal
+  , facts, rules, goal
+  , mapRules, setRules
   , inputs, outputs, formula
   , toDatalogSource
   , fromRulesAndGoal
   , ppDatalogProgram
   , dbClause
+  , ruleNames
+  , rulesByName
   ) where
 
 import qualified Data.Map as M
 
-import           Data.List (intercalate)
+import           Data.List (intercalate, nub)
 import           Data.Maybe (fromMaybe, catMaybes)
 
-import           Optics.Optic
+import           Control.Monad (guard)
+
+import           Optics.Operators
 import           Optics.TH
 
 import           Rule
 
 class LogicProgram a where
-  rules :: a -> [Rule]
-  facts :: a -> [Fact]
-  goal  :: a -> Maybe Goal
+  rules     :: a -> [Rule]
+  facts     :: a -> [Fact]
+  goal      :: a -> Maybe Goal
+  ruleNames :: a -> [String]
+  rulesByName :: a -> String -> [Rule]
+  mapRules :: (Rule -> Rule) -> a -> a
+  setRules :: [Rule] -> a -> a
 
-  facts = catMaybes . map toFact . rules
+  facts = rulesToFacts . rules
+  ruleNames prog = nub $ functor <$> rules prog
+  rulesByName prog n =
+    do
+      f <- rules prog
+      guard $ functor f == n
+      return f
 
 data Goal = Goal
   { _gInputs   :: [Term]
@@ -51,6 +66,7 @@ data DatalogProgram = DatalogProgram
   , _dpGoal  :: Maybe Goal
   }
   deriving (Show)
+makeLenses ''DatalogProgram
 
 data PPDatalogProgram = PPDatalogProgram
   { _ppProgram   :: DatalogProgram
@@ -61,13 +77,19 @@ data PPDatalogProgram = PPDatalogProgram
 data DBClause = DBClause String [DBVar]
   deriving (Show)
 
+makeLenses ''PPDatalogProgram
+
 instance LogicProgram DatalogProgram where
   rules = concat . M.elems . _dpRules
   goal  = _dpGoal
+  mapRules f = dpRules %~ ((f <$>) <$>)
+  setRules r = dpRules .~ genRuleMap r
 
 instance LogicProgram PPDatalogProgram where
   rules = rules . _ppProgram
   goal = goal . _ppProgram
+  mapRules f = ppProgram %~ mapRules f
+  setRules r = ppProgram %~ setRules r
 
 makeGoal ::
      [Term]
@@ -89,13 +111,16 @@ toDatalogSource :: DatalogProgram -> String
 toDatalogSource  = undefined
 
 fromRulesAndGoal :: [Rule] -> Maybe Goal -> DatalogProgram
-fromRulesAndGoal rules = DatalogProgram (M.unionsWith (<>) $ f <$> rules)
-  where
-    f x = M.singleton (show $ functor x) [x]
+fromRulesAndGoal rules = DatalogProgram $ genRuleMap rules
 
 ppDatalogProgram :: DatalogProgram -> [DBClause] -> PPDatalogProgram
 ppDatalogProgram = PPDatalogProgram
 
 dbClause :: String -> [DBVar] -> DBClause
 dbClause = DBClause
+
+genRuleMap :: [Rule] -> M.Map String [Rule]
+genRuleMap rules = (M.unionsWith (<>) $ f <$> rules)
+  where
+    f x = M.singleton (show $ functor x) [x]
 

@@ -24,10 +24,10 @@ type PMap = M.Map [Term] Formula
 
 -- generate all possible ground rules for n iterations
 deriveAllGroundRules :: PPDatalogProgram -> Int -> PPDatalogProgram
-deriveAllGroundRules program n = undefined
-  where f = undefined
-        rules = undefined
-        res = runIteration f rules 0 n
+deriveAllGroundRules program n = setRules res program
+  where f = toPMapMap $ facts program
+        r = toMap $ rules program
+        res = fromPMapMap $ runIteration f r 0 n
 
 -- generate all possible ground rules for a single iteration
 runIteration :: (M.Map PName PMap) -> (M.Map PName [Rule]) -> Int -> Int -> (M.Map PName PMap)
@@ -166,4 +166,24 @@ unifyArgs thetaB thetaF unifiable constr (argB':argsB') (argF':argsF') =
                 _  -> (thetaB, thetaF, unifiable, BBinary BAnd constr (BBinPred BEQ argB argF))
 
     in unifyArgs thetaB' thetaF' unifiable' constr' argsB' argsF'
+
+toPMapMap :: [Fact] -> M.Map PName PMap
+toPMapMap facts = M.unions $
+  do
+    f <- facts
+    let n = functor f
+        p = premise f
+        a = args f
+        pmap = M.singleton a p
+    return $ M.singleton n pmap
+
+fromPMapMap :: M.Map PName PMap -> [Rule]
+fromPMapMap pmap =
+  do
+    (x, y) <- M.toList $ M.toList <$> pmap :: [(PName, [([Term], Formula)])]
+    (n, ts, f) <-
+      do
+        (ts', f') <- y
+        return (x, ts', f')
+    return $ rule n ts f
 

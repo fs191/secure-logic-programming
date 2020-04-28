@@ -18,6 +18,8 @@ module Rule
   , toFact, toRule
   , name
   , premise, functor, args
+  , rulesToFacts
+  , toMap
 ) where
 
 ---------------------------------------------------------
@@ -26,6 +28,7 @@ module Rule
 
 import Data.List
 import Data.String
+import Data.Maybe (isJust, catMaybes)
 import qualified Data.Map as M
 
 import Aexpr
@@ -63,10 +66,16 @@ class IsRule a where
   premise :: a -> Formula
   functor :: a -> Atom
   args    :: a -> [Term]
+  toMap   :: [a] -> M.Map String [a]
 
-  premise = premise . toRule
-  functor = functor . toRule
-  args    = args . toRule
+  premise  = premise . toRule
+  functor  = functor . toRule
+  args     = args . toRule
+  toMap rs = M.unionsWith (<>) $
+    do
+      f <- rs
+      let n = functor f
+      return $ M.singleton n [f]
 
 data Rule = Rule
   { _premise   :: Formula
@@ -144,6 +153,12 @@ toFact :: Rule -> Maybe Fact
 toFact (Rule (BConstBool True) f) = Just f
 toFact _                          = Nothing
 
+isFact :: Rule -> Bool
+isFact = isJust . toFact
+
 name :: Rule -> Atom
 name = _functor . _fact
+
+rulesToFacts :: [Rule] -> [Fact]
+rulesToFacts r = catMaybes $ toFact <$> r
 

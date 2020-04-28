@@ -22,8 +22,8 @@ spec = describe "Parser.parseDatalogFromFile" $ do
 
 canParse :: String -> Spec
 canParse file = it ("can parse " ++ file) $ do
-  res <- parseDatalogFromFile file
-  return ()
+  res <- parseDatalog file <$> readFile file
+  shouldSatisfy res isRight
 
 cannotParse :: String -> Spec
 cannotParse file = it ("does not parse " ++ file) $ do

@@ -34,7 +34,7 @@ main = do
   -- create a Sharemind script that can be used to upload the tables used in given program
   -- WARNING: this is used for testing only, do not apply it to actual private data!
   when (_dbCreateTables args) $ do
-      createdb <- generateDataToDBscript $ program
+      createdb <- generateDataToDBscript program
       let outFileDir  = reverse $ dropWhile (/= '/') (reverse outFilePath)
       let outFileName = reverse $ takeWhile (/= '/') (reverse outFilePath)
 
