@@ -14,7 +14,5 @@ import ErrorMsg
 import Rule
 import DatalogProgram
 
-optimize :: a -> a
-optimize factMap =
-    --TODO implement optimization here
-    factMap
+optimize :: (LogicProgram a) => a -> a
+optimize = id

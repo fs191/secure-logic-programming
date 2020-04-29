@@ -18,10 +18,7 @@ module Aexpr
 ---- Arithmetic and Boolean expressions
 ---------------------------------------------------------
 
-import Data.Hashable
 import Data.List
-import Debug.Trace
-import qualified Data.Map as M
 import qualified Data.Set as S
 
 import ErrorMsg
@@ -40,9 +37,9 @@ instance (Show a) => Show (AExpr a) where
   show (AVar x) = show x
   show (AConstNum x) = show x
   show (AConstStr x) = show x
-  show (AUnary op x) = (show op) ++ (show x)
-  show (ABinary op x y) = (show x) ++ (show op) ++ (show y)
-  show (ANary op l) = (show op) ++ (show l)
+  show (AUnary op x) = show op ++ show x
+  show (ABinary op x y) = show x ++ show op ++ show y
+  show (ANary op l) = show op ++ show l
 
 data AUnOp
   = ANeg

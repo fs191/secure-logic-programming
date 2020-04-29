@@ -60,6 +60,7 @@ process program =
     cfg <- ask
     let iter = _iterations cfg
     -- apply Magic Sets or some alternative preprocessing here
+
     let program' = preprocess program
 
     -- using rules, generate all facts that we get in up to 'n' steps of rule application
@@ -68,6 +69,7 @@ process program =
     -- the output is if type 'M.Map PName PMap' where:
     -- - PName is the predicate name, e.g. 'buys'
     -- - PMap maps 'arguments of the predicate' to 'RHS of the corresponding ground rule'
+
     let groundRules = deriveAllGroundRules program' iter
 
     -- we do all optimizations of computation (like constant propagation) here

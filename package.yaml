@@ -37,6 +37,7 @@ dependencies:
 - parser-combinators
 - optics
 # Testing only
+# For some reason I get errors in ghcide if these are not in the dependencies
 - hspec
 - HUnit
 
@@ -66,3 +67,5 @@ tests:
     - secure-logic-programming
     - HUnit
     - hspec
+    - hspec-expectations
+    - criterion

@@ -677,13 +677,3 @@ isFreeVar aexpr =
     case aexpr of
         AVar x -> isFree x
         _      -> False
-
-toPMapMap :: [Fact] -> M.Map PName PMap
-toPMapMap facts = M.unions $
-  do
-    f <- facts
-    let n = functor f
-        p = premise f
-        a = args f
-        pmap = M.singleton a p
-    return $ M.singleton n pmap

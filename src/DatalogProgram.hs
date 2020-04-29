@@ -22,8 +22,7 @@ module DatalogProgram
 
 import qualified Data.Map as M
 
-import           Data.List (intercalate, nub)
-import           Data.Maybe (fromMaybe, catMaybes)
+import           Data.List (nub)
 
 import           Control.Monad (guard)
 
@@ -57,9 +56,9 @@ data Goal = Goal
 
 instance Show Goal where
   show g =
-    "Goal:\n\tInputs: \t"     ++ (show $ _gInputs g) ++
-    "\n\tOutputs:\t"  ++ (show $ _gOutputs g) ++
-    "\n\tFormulae:\t" ++ (show $ _gFormula g)
+    "Goal:\n\tInputs: \t"     ++ show (_gInputs g) ++
+    "\n\tOutputs:\t"  ++ show (_gOutputs g) ++
+    "\n\tFormulae:\t" ++ show (_gFormula g)
 
 data DatalogProgram = DatalogProgram
   { _dpRules :: M.Map PName [Rule]
@@ -120,7 +119,7 @@ dbClause :: String -> [DBVar] -> DBClause
 dbClause = DBClause
 
 genRuleMap :: [Rule] -> M.Map String [Rule]
-genRuleMap rules = (M.unionsWith (<>) $ f <$> rules)
+genRuleMap rules = M.unionsWith (<>) $ f <$> rules
   where
-    f x = M.singleton (show $ functor x) [x]
+    f x = M.singleton (functor x) [x]
 

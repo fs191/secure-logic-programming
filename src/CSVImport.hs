@@ -70,8 +70,7 @@ createHeader = [
 generateDataToDBscript :: PPDatalogProgram -> IO (String)
 generateDataToDBscript database = do
     dataMap <- extractDataFromTables undefined
-    --return $ intercalate "\n" $ createCSVImport dataMap
-    return undefined
+    return $ intercalate "\n" $ createCSVImport dataMap
 
 extractDataFromTables :: M.Map PName PMap -> IO (M.Map PName (M.Map AName DBVar, [AName], [[String]]))
 extractDataFromTables database = do

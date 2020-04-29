@@ -9,25 +9,20 @@ module Parser
 
 -- some Megaparsec-specific modules
 import Text.Megaparsec
+import Text.Megaparsec.Debug
 import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
-import qualified Control.Exception as Exc
 import Control.Monad (void)
 import Control.Monad.Combinators.Expr
 
-import Data.Either
 import Data.Void
 import Data.Char
-import Data.Maybe (fromMaybe)
-import Data.String
 import Debug.Trace
 
-import qualified Data.Map as M
 import qualified Data.Set as S
 import Rule (DomainType(..), DBVar, DataType(..), free, bound, rule, fact, toRule)
 import Aexpr
-import ErrorMsg
 import DatalogProgram
 
 -- Define the parser type
@@ -43,6 +38,7 @@ data Clause
   = RuleClause FName [Term] Formula
   | FactClause FName [Term]
   | DBClause FName [DBVar]
+  deriving (Show)
 
 ---------------------------------------------------------------------------------------------
 -- keywords
@@ -59,6 +55,7 @@ allKeyWords = S.fromList allKeyWordList
 aExpr :: Parser Term
 aExpr = makeExprParser aTerm aOperators
 
+aString :: Parser Term
 aString = do
   t <- text
   return $ AConstStr ("\'" ++ t ++ "\'")
@@ -83,7 +80,8 @@ aTerm = parens aExpr
   <|> aString
 
 bExpr :: Parser Formula
-bExpr = makeExprParser bTerm bOperators
+bExpr = trace "bExpr"
+  makeExprParser bTerm bOperators
 
 notBExpr :: Parser (Formula -> Formula)
 notBExpr = do
@@ -98,11 +96,12 @@ eqOpSymbol = (symbol "<=" >> return BLE)
          <|> (symbol "==" >> return BEQ)
 
 acompExpr :: Parser Formula
-acompExpr = do
-  x1 <- aExpr
-  x2 <- aExpr
-  f <- eqOpSymbol
-  return $ BBinPred f x1 x2
+acompExpr = traceM "acompExpr" >>
+  do
+    x1 <- aExpr
+    x2 <- aExpr
+    f <- eqOpSymbol
+    return $ BBinPred f x1 x2
 
 bOperators :: [[Operator Parser Formula]]
 bOperators =
@@ -116,7 +115,8 @@ bOperators =
   ]
 
 bTerm :: Parser Formula
-bTerm = parens bExpr
+bTerm =
+      parens bExpr
   <|> try acompExpr
 
 ------------------------------------------------------------
@@ -127,6 +127,7 @@ datalogParser :: Parser PPDatalogProgram
 datalogParser = do
     clauses <- some clause
     goal <- optional datalogGoal
+    eof
     let f c = case c of
                   RuleClause n par cond -> return $ rule n par cond
                   FactClause n par     -> return . toRule $ fact n par
@@ -168,34 +169,37 @@ params :: Parser [Term]
 params = parens $ sepBy aTerm delimRows
 
 ruleClause :: Parser Clause
-ruleClause = do
-  fun  <- identifier
-  p    <- params
-  void impliedBy
-  body <- ruleBody
-  return $ RuleClause fun p body
+ruleClause =
+  do
+    fun  <- identifier
+    p    <- params
+    void impliedBy
+    rb   <- ruleBody
+    return $ RuleClause fun p rb
 
 ruleBody :: Parser Formula
 ruleBody =
   do
-    preds <- sepBy1 ruleBlockPred delimRows
+    preds <- sepBy1 ruleBlock delimRows
     -- The comma is essentially an AND operator
     return $ foldl1 (bBin BAnd) preds
 
 factClause :: Parser Clause
-factClause = do
-  fun <- identifier
-  p <- params
-  return $ FactClause fun p
+factClause =
+  do
+    fun <- identifier
+    p   <- params
+    return $ FactClause fun p
 
 dbClause :: Parser Clause
-dbClause = do
-  impliedBy
-  keyWord "type"
-  symbol "("
-  rh <- dbFact
-  symbol ")"
-  return rh
+dbClause =
+  do
+    impliedBy
+    keyWord "type"
+    symbol "("
+    rh <- dbFact
+    symbol ")"
+    return rh
 
 dbFact :: Parser Clause
 dbFact =
@@ -206,35 +210,35 @@ dbFact =
 
 -- a rule may contain a reference to a database fact, another rule, or a boolean expression
 ruleBlock :: Parser Formula
-ruleBlock = try ruleBlockPred <|> ruleBlockBexpr
+ruleBlock =
+  try ruleBlockPred <|> ruleBlockBexpr
 
 ruleBlockPred :: Parser Formula
-ruleBlockPred = do
-  (FactClause n ts) <- factClause
-  return $ bPred n ts
+ruleBlockPred =
+  do
+    (FactClause n ts) <- factClause
+    return $ bPred n ts
 
 ruleBlockBexpr :: Parser Formula
-ruleBlockBexpr = do
-  bexpr <- bExpr
-  return $ bexpr
+ruleBlockBexpr =
+  bExpr
 
 var :: Parser (AExpr DBVar)
 var = AVar <$> (try dbVar <|> try freeVar <|> fail "expected a variable")
 
 freeVar :: Parser DBVar
-freeVar = do
-    x <- varName
-    return $ free x
+freeVar = free <$> varName
 
 dbVar :: Parser DBVar
-dbVar = do
-  vName <- varName
-  symbol ":"
-  pType <- privacyType
-  vType <-
-        (keyWord "int"    >> return VarNum)
-    <|> (keyWord "string" >> return VarText)
-  return $ bound pType vType vName
+dbVar =
+  do
+    vName <- varName
+    symbol ":"
+    pType <- privacyType
+    vType <-
+          (keyWord "int"    >> return VarNum)
+      <|> (keyWord "string" >> return VarText)
+    return $ bound pType vType vName
 
 privacyType :: Parser DomainType
 privacyType =

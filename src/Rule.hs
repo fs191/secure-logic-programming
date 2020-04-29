@@ -20,6 +20,7 @@ module Rule
   , premise, functor, args
   , rulesToFacts
   , toMap
+  , toPMapMap, fromPMapMap
 ) where
 
 ---------------------------------------------------------
@@ -49,11 +50,7 @@ data DomainType = Public  | Private
 data DBVar
   = Bound DomainType DataType AName
   | Free VName
-  deriving (Ord,Eq)
-
-instance Show DBVar where
-  show (Free n) = n
-  show (Bound t d n) = n ++ "<bound: " ++ (show t) ++ ", " ++ (show d) ++ ">"
+  deriving (Show, Ord, Eq)
 
 type Term    = AExpr DBVar
 type Formula = BExpr DBVar
@@ -162,3 +159,24 @@ name = _functor . _fact
 rulesToFacts :: [Rule] -> [Fact]
 rulesToFacts r = catMaybes $ toFact <$> r
 
+{-# DEPRECATED toPMapMap "Avoid using this function, it will be removed in the future" #-}
+toPMapMap :: [Fact] -> M.Map PName (M.Map [Term] Formula)
+toPMapMap facts = M.unions $
+  do
+    f <- facts
+    let n = functor f
+        p = premise f
+        a = args f
+        pmap = M.singleton a p
+    return $ M.singleton n pmap
+
+{-# DEPRECATED fromPMapMap "Avoid using this function, it will be removed in the future" #-}
+fromPMapMap :: M.Map PName (M.Map [Term] Formula) -> [Rule]
+fromPMapMap pmap =
+  do
+    (x, y) <- M.toList $ M.toList <$> pmap :: [(PName, [([Term], Formula)])]
+    (n, ts, f) <-
+      do
+        (ts', f') <- y
+        return (x, ts', f')
+    return $ rule n ts f

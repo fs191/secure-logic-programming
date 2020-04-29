@@ -167,23 +167,4 @@ unifyArgs thetaB thetaF unifiable constr (argB':argsB') (argF':argsF') =
 
     in unifyArgs thetaB' thetaF' unifiable' constr' argsB' argsF'
 
-toPMapMap :: [Fact] -> M.Map PName PMap
-toPMapMap facts = M.unions $
-  do
-    f <- facts
-    let n = functor f
-        p = premise f
-        a = args f
-        pmap = M.singleton a p
-    return $ M.singleton n pmap
-
-fromPMapMap :: M.Map PName PMap -> [Rule]
-fromPMapMap pmap =
-  do
-    (x, y) <- M.toList $ M.toList <$> pmap :: [(PName, [([Term], Formula)])]
-    (n, ts, f) <-
-      do
-        (ts', f') <- y
-        return (x, ts', f')
-    return $ rule n ts f
 
