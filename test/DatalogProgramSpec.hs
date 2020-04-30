@@ -1,16 +1,12 @@
 
 module DatalogProgramSpec where
 
-import Control.Monad (void)
-
 import System.Timeout
 import System.IO.Unsafe
 
 import Test.Hspec
 
-import Parser
-
-import Debug.Trace
+import Parser.DatalogParser
 
 spec :: Spec
 spec = describe "DatalogProgramSpec.show" $ do

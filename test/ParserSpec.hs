@@ -13,7 +13,7 @@ import Text.Megaparsec.Error (errorBundlePretty)
 
 import Debug.Trace
 
-import Parser
+import Parser.DatalogParser
 import DatalogProgram
 
 spec :: Spec

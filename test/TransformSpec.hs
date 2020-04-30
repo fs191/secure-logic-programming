@@ -2,9 +2,7 @@ module TransformSpec where
 
 import Test.Hspec
 
-import Control.Monad (void)
-
-import Parser
+import Parser.DatalogParser
 import Transform
 
 spec :: Spec

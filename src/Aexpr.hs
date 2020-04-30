@@ -9,7 +9,10 @@ module Aexpr
   , evalAexpr, evalBexpr
   , aexprToString, bexprToString
   , isConstAexpr, isConstBexpr
-  , bBin, bPred
+  , aStrLit, aNumLit, aVar
+  , aUn,  bUn
+  , aBin, bBin, bBinPred
+  , bPred
   , simplifyBool
   , ruleIndent
   ) where
@@ -397,8 +400,29 @@ extractAllPredicates bexpr =
 
     where processRec x = extractAllPredicates x
 
+aNumLit :: Int -> AExpr a
+aNumLit = AConstNum
+
+aStrLit :: String -> AExpr a
+aStrLit = AConstStr
+
+aVar :: a -> AExpr a
+aVar = AVar
+
+aUn :: AUnOp -> AExpr a -> AExpr a
+aUn = AUnary
+
+bUn :: BUnOp -> BExpr a -> BExpr a
+bUn = BUnary
+
+aBin :: ABinOp -> AExpr a -> AExpr a -> AExpr a
+aBin = ABinary
+
 bBin :: BBinOp -> BExpr a -> BExpr a -> BExpr a
 bBin = BBinary
+
+bBinPred :: BBinPredOp -> AExpr a -> AExpr a -> BExpr a
+bBinPred = BBinPred
 
 bPred :: String -> [AExpr a] -> BExpr a
 bPred n ts = BListPred (BPredName n) ts

@@ -1,17 +1,11 @@
 import ProgramOptions
 import OptParse
-import Parser
-import DatalogProgram
+import Parser.DatalogParser
 import Translator
 
-import Optimize(optimize)
-import Preprocess(preprocess)
-import Transform(deriveAllGroundRules)
 import CSVImport(generateDataToDBscript)
-import SecreC(generateSecreCscript)
 
 import Control.Monad
-import Debug.Trace
 
 main :: IO ()
 main = do

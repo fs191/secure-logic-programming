@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d0f59c0e31effbc8280d86baaf3d99b8a218eb1206d06f1d03a16c5ae5048fd4
+-- hash: ea4133b43ddad7053ceb449fbacda42447aafbd0f0c8bdff91ad70693c3b5a69
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -34,7 +34,9 @@ library
       Interpreter
       Lib
       Optimize
-      Parser
+      Parser.DatalogParser
+      Parser.DatalogParser.Expr
+      Parser.DatalogParser.Lexer
       Preprocess
       Rule
       SecreC
@@ -45,6 +47,7 @@ library
       Paths_secure_logic_programming
   hs-source-dirs:
       src
+  ghc-options: -Wall
   build-depends:
       Cabal
     , HUnit
@@ -66,7 +69,6 @@ library
     , text
     , uniplate
   default-language: Haskell2010
-  ghc-options: -Wall -Wno-name-shadowing
 
 executable lpsec
   main-is: Main.hs
