@@ -18,7 +18,6 @@ import Control.Monad.Combinators.Expr
 
 import Data.Void
 import Data.Char
-import Debug.Trace
 
 import qualified Data.Set as S
 import Rule (DomainType(..), DBVar, DataType(..), free, bound, rule, fact, toRule)
@@ -33,6 +32,7 @@ type Parser = Parsec Void String
 type Term = AExpr DBVar
 type Formula = BExpr DBVar
 type FName = String
+type VarName = String
 
 data Clause
   = RuleClause FName [Term] Formula
@@ -40,8 +40,9 @@ data Clause
   | DBClause FName [DBVar]
   deriving (Show)
 
----------------------------------------------------------------------------------------------
--- keywords
+------------------------------------------------ 
+-- Keywords
+------------------------------------------------
 allKeyWordList :: [String]
 allKeyWordList = ["data","int","string","private","public","type","goal"]
 
@@ -74,14 +75,15 @@ aOperators =
   ]
 
 aTerm :: Parser Term
-aTerm = parens aExpr
-  <|> var
-  <|> AConstNum <$> signedInt
-  <|> aString
+aTerm = (try $ parens aExpr)
+  <|> try var
+  <|> (try $ AConstNum <$> signedInt)
+  <|> try aString
+  <|> fail "expected a term"
 
 bExpr :: Parser Formula
-bExpr = trace "bExpr"
-  makeExprParser bTerm bOperators
+bExpr =
+  makeExprParser (dbg "bTerm" bTerm) bOperators
 
 notBExpr :: Parser (Formula -> Formula)
 notBExpr = do
@@ -93,14 +95,15 @@ eqOpSymbol = (symbol "<=" >> return BLE)
          <|> (symbol "<"  >> return BLT)
          <|> (symbol ">=" >> return BGE)
          <|> (symbol ">"  >> return BGT)
-         <|> (symbol "==" >> return BEQ)
+         <|> (symbol "=" >> return BEQ)
+         <|> (symbol "is" >> return BEQ)
 
 acompExpr :: Parser Formula
-acompExpr = traceM "acompExpr" >>
+acompExpr =
   do
     x1 <- aExpr
-    x2 <- aExpr
     f <- eqOpSymbol
+    x2 <- aExpr
     return $ BBinPred f x1 x2
 
 bOperators :: [[Operator Parser Formula]]
@@ -162,7 +165,7 @@ clause :: Parser Clause
 clause =
       try (Parser.dbClause <* delimRules)
   <|> try (factClause <* delimRules)
-  <|> try (ruleClause <* delimRules)
+  <|> try (dbg "ruleClause" ruleClause <* delimRules)
   <|> fail "expected a clause"
 
 params :: Parser [Term]
@@ -174,7 +177,7 @@ ruleClause =
     fun  <- identifier
     p    <- params
     void impliedBy
-    rb   <- ruleBody
+    rb   <- dbg "ruleBody" bTerm
     return $ RuleClause fun p rb
 
 ruleBody :: Parser Formula
@@ -211,7 +214,7 @@ dbFact =
 -- a rule may contain a reference to a database fact, another rule, or a boolean expression
 ruleBlock :: Parser Formula
 ruleBlock =
-  try ruleBlockPred <|> ruleBlockBexpr
+  (try $ dbg "ruleBlockPred" ruleBlockPred) <|> ruleBlockBexpr
 
 ruleBlockPred :: Parser Formula
 ruleBlockPred =
@@ -223,16 +226,23 @@ ruleBlockBexpr :: Parser Formula
 ruleBlockBexpr =
   bExpr
 
+variable :: Parser VarName
+variable = lexeme $
+  do
+    a  <- C.upperChar 
+    as <- many C.alphaNumChar
+    return $ [a] <> as
+
 var :: Parser (AExpr DBVar)
 var = AVar <$> (try dbVar <|> try freeVar <|> fail "expected a variable")
 
 freeVar :: Parser DBVar
-freeVar = free <$> varName
+freeVar = free <$> variable
 
 dbVar :: Parser DBVar
 dbVar =
   do
-    vName <- varName
+    vName <- variable
     symbol ":"
     pType <- privacyType
     vType <-
@@ -277,13 +287,8 @@ blockCommentEnd = "*/"
 -------------------------------------
 
 -- a keyword
-keyWord :: String -> Parser ()
-keyWord w = lexeme (C.string w *> notFollowedBy C.alphaNumChar)
-
-readKeyWord :: String -> Parser String
-readKeyWord w = do
-    lexeme (C.string w *> notFollowedBy C.alphaNumChar)
-    return w
+keyWord :: String -> Parser String
+keyWord w = lexeme (C.string w <* notFollowedBy C.alphaNumChar)
 
 caseInsensKeyWord :: String -> Parser ()
 caseInsensKeyWord w = lexeme (C.string' w *> notFollowedBy C.alphaNumChar)
@@ -301,10 +306,6 @@ identifier = (lexeme . try) (p >>= check)
 alphaNumCharAndSubscript :: Parser Char
 alphaNumCharAndSubscript = C.char '_'
     <|> C.alphaNumChar
-
--- we need to read string identifiers and afterwards map them to integers
-varName :: Parser String
-varName = identifier
 
 --reads an arbitrary string, all characters up to the first space
 text :: Parser String
