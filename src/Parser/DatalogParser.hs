@@ -28,8 +28,8 @@ datalogParser :: Parser DP.PPDatalogProgram
 datalogParser =
   do
     -- TODO Should we parse retractions as well?
-    st <- many $ clause <* period
-    q  <- optional query
+    st <- many     $ try $ clause  <* period
+    q  <- optional $ try $ literal <* (symbol "?")
     undefined st q
 
 literal :: Parser Literal
@@ -48,10 +48,6 @@ clause =
 
 body :: Parser [Literal]
 body = sepBy1 (literal <|> bPredExpr) comma
-
-query :: Parser Literal
-query = literal <* symbol "?"
-
 
 -----------------------
 -- Exports
