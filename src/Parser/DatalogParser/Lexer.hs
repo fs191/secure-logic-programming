@@ -59,7 +59,7 @@ strLike :: Char -> Parser String
 strLike c = lexeme $ char c *> manyTill C.charLiteral (char c)
 
 signedInteger :: Parser Int
-signedInteger = C.signed sc C.decimal
+signedInteger = lexeme $ C.signed sc C.decimal
   
 comma :: Parser ()
 comma = void $ symbol ","
