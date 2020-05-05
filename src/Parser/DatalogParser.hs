@@ -15,7 +15,7 @@ import Parser.DatalogParser.Expr
 
 import qualified DatalogProgram as DP
 import Aexpr
-import Rule
+import qualified Rule as R
 
 type Parser = Parsec Void String
 
@@ -27,20 +27,23 @@ datalogParser =
   do
     -- TODO Should we parse retractions as well?
     st <- many $ try $ clause  <* period
-    q  <- optional $ goal
+    q  <- optional $ goal <* period
     eof
     let dp = DP.fromRulesAndGoal st q
     return $ DP.ppDatalogProgram dp []
 
-clause :: Parser Rule
-clause = 
+clause :: Parser R.Rule
+clause = rule <|> (dbg "dbFact" dbFact)
+
+rule :: Parser R.Rule
+rule = 
   do
     h <- literal
     b <- option [] $ impliedBy *> body
     let expr = joinExprs b
-    return $ rule (functor h) (args h) expr
+    return $ R.rule (R.functor h) (R.args h) expr
 
-body :: Parser [BExpr DBVar]
+body :: Parser [BExpr R.DBVar]
 body = dbg "body" $
   sepBy1 p comma
     where p = bPredExpr
@@ -56,10 +59,32 @@ goal = dbg "goal" $
     void $ symbol ")"
     void impliedBy
     b <- body
-    void period
     return $ DP.makeGoal i o $ joinExprs b
 
-list :: Parser [Term]
+dbFact :: Parser R.Rule
+dbFact =
+  do
+    impliedBy
+    void $ symbol "type"
+    void $ symbol "("
+    n  <- identifier
+    void $ symbol "("
+    vs <- sepBy1 dbVar comma
+    void $ symbol ")"
+    void $ symbol ")"
+    -- TODO Temporary
+    return . R.toRule $ R.fact n []
+
+dbVar :: Parser R.DBVar
+dbVar =
+  do
+    n <- identifier
+    void $ symbol ":"
+    al <- domainType
+    ty <- dataType
+    return $ R.bound al ty n
+
+list :: Parser [R.Term]
 list = dbg "list" $
   do
     void $ symbol "["

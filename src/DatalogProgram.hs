@@ -6,6 +6,7 @@ module DatalogProgram
   ( DatalogProgram
   , PPDatalogProgram
   , Goal
+  , IsGoal, toGoal
   , DBClause
   , LogicProgram
   , makeGoal
@@ -63,6 +64,9 @@ instance Show Goal where
     "\n\tOutputs:\t"  ++ show (_gOutputs g) ++
     "\n\tFormulae:\t" ++ show (_gFormula g)
 
+instance IsGoal Goal where
+  toGoal = id
+
 data DatalogProgram = DatalogProgram
   { _dpRules :: M.Map PName [Rule]
   , _dpGoal  :: Maybe Goal
@@ -74,9 +78,6 @@ data PPDatalogProgram = PPDatalogProgram
   { _ppProgram   :: DatalogProgram
   , _ppDBClauses :: [DBClause]
   }
-  deriving (Show)
-
-data DBClause = DBClause String [DBVar]
   deriving (Show)
 
 makeLenses ''PPDatalogProgram
@@ -113,16 +114,13 @@ toDatalogSource :: DatalogProgram -> String
 toDatalogSource  = undefined
 
 fromRulesAndGoal :: [Rule] -> Maybe Goal -> DatalogProgram
-fromRulesAndGoal rules = DatalogProgram $ genRuleMap rules
+fromRulesAndGoal rs = DatalogProgram $ genRuleMap rs
 
 ppDatalogProgram :: DatalogProgram -> [DBClause] -> PPDatalogProgram
 ppDatalogProgram = PPDatalogProgram
 
-dbClause :: String -> [DBVar] -> DBClause
-dbClause = DBClause
-
 genRuleMap :: [Rule] -> M.Map String [Rule]
-genRuleMap rules = M.unionsWith (<>) $ f <$> rules
+genRuleMap rs = M.unionsWith (<>) $ f <$> rs
   where
     f x = M.singleton (functor x) [x]
 

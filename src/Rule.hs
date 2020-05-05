@@ -4,6 +4,7 @@ module Rule
   ( Term, Formula
   , AName, VName, PName
   , DBVar(..) -- TODO try not to export constructor
+  , DBClause, dbClause
   , Rule, Fact
   , IsRule
   , DataType(..)
@@ -28,8 +29,7 @@ module Rule
 ---------------------------------------------------------
 
 import Data.List
-import Data.String
-import Data.Maybe (isJust, catMaybes)
+import Data.Maybe (catMaybes)
 import qualified Data.Map as M
 
 import Aexpr
@@ -51,6 +51,12 @@ data DBVar
   = Bound DomainType DataType AName
   | Free VName
   deriving (Show, Ord, Eq)
+
+data DBClause = DBClause 
+  { _dcFunctor :: String 
+  , _dcVars    :: [DBVar]
+  }
+  deriving (Show)
 
 type Term    = AExpr DBVar
 type Formula = BExpr DBVar
@@ -96,33 +102,36 @@ instance IsRule Fact where
   toRule = Rule (BConstBool True)
 
 predToString :: String -> PName -> [Term] -> Formula -> String
-predToString prefix pname args bexpr =
-    ruleHeadToString prefix pname args ++ " :-\n" ++ prefix ++ ruleIndent ++ formulaToString prefix bexpr ++ "."
+predToString prefix pname a bexpr =
+    ruleHeadToString prefix pname a ++ " :-\n" ++ prefix ++ ruleIndent ++ formulaToString prefix bexpr ++ "."
 
 ------------------------------------------------------------------------------------
 -- this is currently used only for visual feedback, so the syntax of printed messages is not very important
+ruleDomainToString :: DomainType -> [Char]
 ruleDomainToString Public = ""
 ruleDomainToString Private = "private"
 
+ruleTypeToString :: DataType -> [Char]
 ruleTypeToString VarBool = "bool"
 ruleTypeToString VarNum  = "int"
 ruleTypeToString VarText = "string"
 ruleTypeToString Unknown = "unknown"
 
-ruleHeadToString prefix pname args  = prefix ++ pname ++ "(" ++ intercalate "," (map termToString args) ++ ")"
+ruleHeadToString :: [Char] -> [Char] -> [Term] -> [Char]
+ruleHeadToString prefix pname a  = prefix ++ pname ++ "(" ++ intercalate "," (map termToString a) ++ ")"
 
 formulaToString :: String -> Formula -> String
 formulaToString prefix bexpr =
     bexprToString prefix f bexpr
     where f x = case x of
-                    (Bound domainType dataType vName) -> ruleDomainToString domainType ++ " " ++ ruleTypeToString dataType ++ " " ++ vName
+                    (Bound domainType dt vName) -> ruleDomainToString domainType ++ " " ++ ruleTypeToString dt ++ " " ++ vName
                     (Free vName) -> vName
 
 termToString :: Term -> String
 termToString aexpr =
     aexprToString f aexpr
     where f x = case x of
-                    (Bound domainType dataType vName) -> ruleDomainToString domainType ++ " " ++ ruleTypeToString dataType ++ " " ++ vName
+                    (Bound domainType dt vName) -> ruleDomainToString domainType ++ " " ++ ruleTypeToString dt ++ " " ++ vName
                     (Free vName) -> vName
 
 rule :: Atom -> [Term] -> Formula -> Rule
@@ -153,9 +162,6 @@ toFact :: Rule -> Maybe Fact
 toFact (Rule (BConstBool True) f) = Just f
 toFact _                          = Nothing
 
-isFact :: Rule -> Bool
-isFact = isJust . toFact
-
 name :: Rule -> Atom
 name = _functor . _fact
 
@@ -183,3 +189,6 @@ fromPMapMap pmap =
         (ts', f') <- y
         return (x, ts', f')
     return $ rule n ts f
+
+dbClause :: String -> [DBVar] -> DBClause
+dbClause = DBClause

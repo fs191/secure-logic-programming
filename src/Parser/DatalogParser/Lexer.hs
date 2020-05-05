@@ -7,6 +7,7 @@ module Parser.DatalogParser.Lexer
   , signedInteger
   , comma, period, impliedBy
   , parens
+  , domainType, dataType
   ) where
 
 import Text.Megaparsec
@@ -17,7 +18,7 @@ import Data.Void (Void)
 
 import Control.Monad (void)
 
-import Rule
+import Rule hiding (dataType)
 
 type Parser = Parsec Void String
 
@@ -75,4 +76,15 @@ impliedBy = void $ symbol ":-"
 
 predicateSymbol :: Parser String
 predicateSymbol = (try identifier) <|> stringLiteral
+
+domainType :: Parser DomainType
+domainType =
+      (try $ symbol "public" *> return Public)
+  <|> (try $ symbol "private" *> return Private)
+
+dataType :: Parser DataType
+dataType =
+      (try $ symbol "bool" *> return VarBool)
+  <|> (try $ symbol "int" *> return VarNum)
+  <|> (try $ symbol "string" *> return VarText)
 
