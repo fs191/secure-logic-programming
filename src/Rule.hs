@@ -88,6 +88,9 @@ data Fact = Fact
 
 instance IsRule Rule where
   toRule = id
+  premise = _premise
+  functor = _functor . _fact
+  args = _arguments . _fact
 
 instance IsRule Fact where
   toRule = Rule (BConstBool True)

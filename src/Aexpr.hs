@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveFunctor #-}
+
 module Aexpr
   ( AExpr(..)
   , ABinOp(..), AUnOp(..), AListOp(..)
@@ -10,9 +12,10 @@ module Aexpr
   , aexprToString, bexprToString
   , isConstAexpr, isConstBexpr
   , aStrLit, aNumLit, aVar
+  , bTrue, bFalse
   , aUn,  bUn
   , aBin, bBin, bBinPred
-  , bPred
+  , bPred, bAnd
   , simplifyBool
   , ruleIndent
   ) where
@@ -34,7 +37,7 @@ data AExpr a
   | AUnary  AUnOp   (AExpr a)
   | ABinary ABinOp  (AExpr a) (AExpr a)
   | ANary   AListOp [AExpr a]
-  deriving (Ord,Eq)
+  deriving (Ord,Eq,Functor)
 
 instance (Show a) => Show (AExpr a) where
   show (AVar x) = show x
@@ -65,7 +68,7 @@ data BExpr a
   | BUnary  BUnOp   (BExpr a)
   | BBinary BBinOp  (BExpr a) (BExpr a)
   | BNary   BListOp [BExpr a]
-  deriving (Ord,Eq)
+  deriving (Ord,Eq,Functor)
 
 instance (Show a) => Show (BExpr a) where
   show (BConstBool x) = show x
@@ -400,6 +403,12 @@ extractAllPredicates bexpr =
 
     where processRec x = extractAllPredicates x
 
+bTrue :: BExpr a
+bTrue = BConstBool True
+
+bFalse :: BExpr a
+bFalse = BConstBool False
+
 aNumLit :: Int -> AExpr a
 aNumLit = AConstNum
 
@@ -426,4 +435,7 @@ bBinPred = BBinPred
 
 bPred :: String -> [AExpr a] -> BExpr a
 bPred n ts = BListPred (BPredName n) ts
+
+bAnd :: BExpr a -> BExpr a -> BExpr a
+bAnd = bBin BAnd
 

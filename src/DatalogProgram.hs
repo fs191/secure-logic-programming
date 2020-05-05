@@ -48,6 +48,9 @@ class LogicProgram a where
       guard $ functor f == n
       return f
 
+class IsGoal a where
+  toGoal :: a -> Goal
+
 data Goal = Goal
   { _gInputs   :: [Term]
   , _gOutputs  :: [Term]

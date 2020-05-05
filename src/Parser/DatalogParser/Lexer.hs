@@ -17,6 +17,8 @@ import Data.Void (Void)
 
 import Control.Monad (void)
 
+import Rule
+
 type Parser = Parsec Void String
 
 lexeme :: Parser a -> Parser a
@@ -31,12 +33,12 @@ sc = C.space
   (C.skipLineComment "%")
   empty
 
-variable :: Parser String
+variable :: Parser DBVar
 variable = lexeme $
   do
     h <- upperChar
     t <- many $ alphaNumChar <|> identifierSymbols
-    return $ h:t
+    return . free $ h:t
 
 identifier :: Parser String
 identifier = lexeme $
