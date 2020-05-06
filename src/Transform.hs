@@ -18,15 +18,15 @@ import Aexpr
 import ErrorMsg
 import Rule
 import Substitution
-import DatalogProgram
+import qualified DatalogProgram as DP
 
 type PMap = M.Map [Term] Formula
 
 -- generate all possible ground rules for n iterations
-deriveAllGroundRules :: PPDatalogProgram -> Int -> PPDatalogProgram
-deriveAllGroundRules program n = setRules res program
-  where f = toPMapMap $ facts program
-        r = toMap $ rules program
+deriveAllGroundRules :: DP.PPDatalogProgram -> Int -> DP.PPDatalogProgram
+deriveAllGroundRules program n = DP.setRules res program
+  where f = toPMapMap $ DP.facts program
+        r = toMap $ DP.rules program
         res = fromPMapMap $ runIteration f r 0 n
 
 -- generate all possible ground rules for a single iteration

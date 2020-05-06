@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ea4133b43ddad7053ceb449fbacda42447aafbd0f0c8bdff91ad70693c3b5a69
+-- hash: 6c5122190afe9a454d0a880005a9d42be458ae667cb3c119579b2cf3cfa7eed3
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -106,7 +106,6 @@ test-suite test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      DatalogProgramSpec
       ParserSpec
       TransformSpec
       Paths_secure_logic_programming

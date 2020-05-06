@@ -12,12 +12,9 @@ module Translator
   ) where
 
 import Control.Monad.Reader
-import Control.Applicative
 
 import Optics.TH
 import Optics
-
-import Debug.Trace
 
 import Preprocess
 import DatalogProgram
