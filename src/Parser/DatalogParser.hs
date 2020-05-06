@@ -4,7 +4,6 @@ module Parser.DatalogParser
   ) where
 
 import Text.Megaparsec
-import Text.Megaparsec.Debug
 
 import Data.Void (Void)
 
@@ -19,6 +18,10 @@ import qualified Rule as R
 
 type Parser = Parsec Void String
 
+data Clause
+  = RuleClause R.Rule
+  | DBClause DP.DBClause
+
 -- Based on:
 -- https://www.ccs.neu.edu/home/ramsdell/tools/datalog/datalog.html#index-comment-syntax-13
 
@@ -29,11 +32,15 @@ datalogParser =
     st <- many $ try $ clause  <* period
     q  <- optional $ goal <* period
     eof
-    let dp = DP.fromRulesAndGoal st q
-    return $ DP.ppDatalogProgram dp []
+    let rs   = [x | RuleClause x <- st]
+    let dbcs = [x | DBClause x <- st]
+    let dp = DP.fromRulesAndGoal rs q
+    return $ DP.ppDatalogProgram dp dbcs
 
-clause :: Parser R.Rule
-clause = rule <|> (dbg "dbFact" dbFact)
+clause :: Parser Clause
+clause = 
+      (RuleClause <$> rule) 
+  <|> (DBClause <$> dbFact)
 
 rule :: Parser R.Rule
 rule = 
@@ -44,12 +51,12 @@ rule =
     return $ R.rule (R.functor h) (R.args h) expr
 
 body :: Parser [BExpr R.DBVar]
-body = dbg "body" $
+body = 
   sepBy1 p comma
     where p = bPredExpr
 
 goal :: Parser DP.Goal
-goal = dbg "goal" $
+goal = 
   do
     void $ symbol "goal"
     void $ symbol "("
@@ -61,7 +68,7 @@ goal = dbg "goal" $
     b <- body
     return $ DP.makeGoal i o $ joinExprs b
 
-dbFact :: Parser R.Rule
+dbFact :: Parser DP.DBClause
 dbFact =
   do
     impliedBy
@@ -72,8 +79,7 @@ dbFact =
     vs <- sepBy1 dbVar comma
     void $ symbol ")"
     void $ symbol ")"
-    -- TODO Temporary
-    return . R.toRule $ R.fact n []
+    return $ R.dbClause n vs
 
 dbVar :: Parser R.DBVar
 dbVar =
@@ -85,7 +91,7 @@ dbVar =
     return $ R.bound al ty n
 
 list :: Parser [R.Term]
-list = dbg "list" $
+list = 
   do
     void $ symbol "["
     l <- sepBy variable comma
