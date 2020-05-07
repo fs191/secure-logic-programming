@@ -23,21 +23,20 @@ deriveAllGroundRules :: DP.PPDatalogProgram -> Int -> DP.PPDatalogProgram
 deriveAllGroundRules program n = DP.setRules res program
   where f = toPMapMap $ DP.facts program
         r = toMap $ DP.rules program
-        res = fromPMapMap $ runIteration f r 0 n
+        res = fromPMapMap $ runIteration f r M.empty n
 
 -- generate all possible ground rules for a single iteration
-runIteration :: (M.Map String PMap) -> (M.Map String [Rule]) -> Int -> Int -> (M.Map String PMap)
+runIteration :: (M.Map String PMap) -> (M.Map String [Rule]) -> (M.Map String PMap) -> Int -> (M.Map String PMap)
 runIteration facts _ _ 0 = facts
-runIteration facts rules prevHash n =
+runIteration facts rules prevFacts n =
 
    -- generate rules for the next iteration
    let facts' = applyRule facts rules (M.keys rules) in
 
    -- stop if no more rules can be generated anymore
    -- TODO if hashes are equal, we still need to do term comparison as well, since hashing is not perfect
-   let newHash = hash (show facts') in
-   if (newHash == prevHash) then facts'
-   else runIteration facts' rules newHash (n-1)
+   if (prevFacts == facts') then facts'
+   else runIteration facts' rules facts' (n-1)
 
 -- for each predicate p, generate new ground rules and merge them with existing ones
 -- TODO we should do more simplification and optimization here

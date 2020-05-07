@@ -19,12 +19,6 @@ main = do
   -- parse the input datalog program
   program <- parseDatalogFromFile inFileName
 
-  -- Verify that parser works correctly
-  --traceIO $ (show facts)
-  --traceIO $ (show rules)
-  --traceIO $ (show goal)
-  --traceIO $ "--------------------------------------------------------"
-
   -- create a Sharemind script that can be used to upload the tables used in given program
   -- WARNING: this is used for testing only, do not apply it to actual private data!
   when (_dbCreateTables args) $ do

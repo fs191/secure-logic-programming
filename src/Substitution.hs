@@ -13,10 +13,8 @@ module Substitution
 ---------------------------------------------------------
 
 import qualified Data.Map as M
-import qualified Data.Set as S
 
 import Aexpr
-import ErrorMsg
 import Rule
 import DBClause
 
