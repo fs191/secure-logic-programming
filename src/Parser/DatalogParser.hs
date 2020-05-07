@@ -15,6 +15,7 @@ import Parser.DatalogParser.Expr
 import qualified DatalogProgram as DP
 import Aexpr
 import qualified Rule as R
+import DBClause hiding (dataType)
 
 type Parser = Parsec Void String
 
@@ -50,7 +51,7 @@ rule =
     let expr = joinExprs b
     return $ R.rule (R.functor h) (R.args h) expr
 
-body :: Parser [BExpr R.DBVar]
+body :: Parser [BExpr DBVar]
 body = 
   sepBy1 p comma
     where p = bPredExpr
@@ -79,16 +80,16 @@ dbFact =
     vs <- sepBy1 dbVar comma
     void $ symbol ")"
     void $ symbol ")"
-    return $ R.dbClause n vs
+    return $ dbClause n vs
 
-dbVar :: Parser R.DBVar
+dbVar :: Parser DBVar
 dbVar =
   do
     n <- identifier
     void $ symbol ":"
     al <- domainType
     ty <- dataType
-    return $ R.bound al ty n
+    return $ bound al ty n
 
 list :: Parser [R.Term]
 list = 

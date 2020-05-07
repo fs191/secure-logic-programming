@@ -2,20 +2,9 @@
 
 module Rule
   ( Term, Formula
-  , AName, VName, PName
-  , DBVar(..) -- TODO try not to export constructor
-  , DBClause, dbClause
   , Rule, Fact
   , IsRule
-  , DataType(..)
-  , DomainType(..)
-  , predToString
-  , ruleHeadToString
-  , termToString
   , rule, fact
-  , free, bound
-  , isFree, dataType
-  , rename
   , toFact, toRule
   , name
   , premise, functor, args
@@ -29,34 +18,14 @@ module Rule
 ---------------------------------------------------------
 
 import Data.List
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, maybeToList)
 import qualified Data.Map as M
 
+import Data.Traversable (sequenceA)
+
 import Aexpr
-
--- names of attributes, free variables, and predicates are strings
-type AName = String
-type VName = String
-type PName = String
-
--- possible (classes of) types of database attributes
-data DataType   = VarBool | VarNum | VarText | Unknown
-  deriving (Ord,Eq,Show)
-data DomainType = Public  | Private
-  deriving (Ord,Eq,Show)
-
--- predicate argument, together with the privacy/data type
--- here var is a database variable (not a free LP variable)
-data DBVar
-  = Bound DomainType DataType AName
-  | Free VName
-  deriving (Show, Ord, Eq)
-
-data DBClause = DBClause 
-  { _dcFunctor :: String 
-  , _dcVars    :: [DBVar]
-  }
-  deriving (Show)
+import Table
+import DBClause
 
 type Term    = AExpr DBVar
 type Formula = BExpr DBVar
@@ -101,62 +70,11 @@ instance IsRule Rule where
 instance IsRule Fact where
   toRule = Rule (BConstBool True)
 
-predToString :: String -> PName -> [Term] -> Formula -> String
-predToString prefix pname a bexpr =
-    ruleHeadToString prefix pname a ++ " :-\n" ++ prefix ++ ruleIndent ++ formulaToString prefix bexpr ++ "."
-
-------------------------------------------------------------------------------------
--- this is currently used only for visual feedback, so the syntax of printed messages is not very important
-ruleDomainToString :: DomainType -> [Char]
-ruleDomainToString Public = ""
-ruleDomainToString Private = "private"
-
-ruleTypeToString :: DataType -> [Char]
-ruleTypeToString VarBool = "bool"
-ruleTypeToString VarNum  = "int"
-ruleTypeToString VarText = "string"
-ruleTypeToString Unknown = "unknown"
-
-ruleHeadToString :: [Char] -> [Char] -> [Term] -> [Char]
-ruleHeadToString prefix pname a  = prefix ++ pname ++ "(" ++ intercalate "," (map termToString a) ++ ")"
-
-formulaToString :: String -> Formula -> String
-formulaToString prefix bexpr =
-    bexprToString prefix f bexpr
-    where f x = case x of
-                    (Bound domainType dt vName) -> ruleDomainToString domainType ++ " " ++ ruleTypeToString dt ++ " " ++ vName
-                    (Free vName) -> vName
-
-termToString :: Term -> String
-termToString aexpr =
-    aexprToString f aexpr
-    where f x = case x of
-                    (Bound domainType dt vName) -> ruleDomainToString domainType ++ " " ++ ruleTypeToString dt ++ " " ++ vName
-                    (Free vName) -> vName
-
-rule :: Atom -> [Term] -> Formula -> Rule
-rule a t f = Rule f $ fact a t
-
 fact :: Atom -> [Term] -> Fact
 fact = Fact
 
-free :: VName -> DBVar
-free = Free
-
-bound :: DomainType -> DataType -> VName -> DBVar
-bound = Bound
-
-rename :: String -> DBVar -> DBVar
-rename n (Free _) = Free n
-rename n (Bound x y _) = Bound x y n
-
-isFree :: DBVar -> Bool
-isFree (Free _) = True
-isFree _        = False
-
-dataType :: DBVar -> Maybe DataType
-dataType (Bound _ dt _) = Just dt
-dataType _              = Nothing
+rule :: String -> [Term] -> Formula -> Rule
+rule n a f = Rule f $ fact n a
 
 toFact :: Rule -> Maybe Fact
 toFact (Rule (BConstBool True) f) = Just f
@@ -169,7 +87,7 @@ rulesToFacts :: [Rule] -> [Fact]
 rulesToFacts r = catMaybes $ toFact <$> r
 
 {-# DEPRECATED toPMapMap "Avoid using this function, it will be removed in the future" #-}
-toPMapMap :: [Fact] -> M.Map PName (M.Map [Term] Formula)
+toPMapMap :: [Fact] -> M.Map String (M.Map [Term] Formula)
 toPMapMap facts = M.unions $
   do
     f <- facts
@@ -180,15 +98,13 @@ toPMapMap facts = M.unions $
     return $ M.singleton n pmap
 
 {-# DEPRECATED fromPMapMap "Avoid using this function, it will be removed in the future" #-}
-fromPMapMap :: M.Map PName (M.Map [Term] Formula) -> [Rule]
+fromPMapMap :: M.Map String (M.Map [Term] Formula) -> [Rule]
 fromPMapMap pmap =
   do
-    (x, y) <- M.toList $ M.toList <$> pmap :: [(PName, [([Term], Formula)])]
+    (x, y) <- M.toList $ M.toList <$> pmap :: [(String, [([Term], Formula)])]
     (n, ts, f) <-
       do
         (ts', f') <- y
         return (x, ts', f')
     return $ rule n ts f
 
-dbClause :: String -> [DBVar] -> DBClause
-dbClause = DBClause

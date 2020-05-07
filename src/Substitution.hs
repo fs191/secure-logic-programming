@@ -18,6 +18,7 @@ import qualified Data.Set as S
 import Aexpr
 import ErrorMsg
 import Rule
+import DBClause
 
 newtype Subst = Th (M.Map DBVar Term)
 

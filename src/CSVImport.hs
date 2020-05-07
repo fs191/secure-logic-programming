@@ -1,5 +1,6 @@
 module CSVImport
   ( generateDataToDBscript
+  , readDBString
   ) where
 
 ---------------------------------------------------------
@@ -10,17 +11,17 @@ module CSVImport
 ---------------------------------------------------------
 
 import Data.List
-import Data.Bits
-import Data.Char
 import Data.List.Split
 import qualified Data.Map as M
-import Debug.Trace
 import DatalogProgram
 
 import Aexpr
 import Rule
 import ErrorMsg
+import Table
+import DBClause
 
+indent :: String
 indent = "    "
 
 type PMap = M.Map [Term] Formula
@@ -29,21 +30,16 @@ splitBySeparator :: String -> String -> [String]
 splitBySeparator sep s =
    if last s == last sep then endBy sep s else splitOn sep s
 
--- read the DB line by line -- no speacial parsing, assume that the delimiters are whitespaces
-readInput :: String -> IO String
-readInput path = do
-   content <- readFile path
-   return content
-
 -- read the database from the file as a matrix of strings
 -- read is as a single table row
-readDBString :: String -> String -> IO ([String], [[String]])
+readDBString :: String -> String -> IO (Table String String)
 readDBString dbFileName separator = do
-    (firstLine:ls) <- fmap lines (readInput dbFileName)
+    (firstLine:ls) <- fmap lines (readFile dbFileName)
     let varNames = splitBySeparator separator firstLine
-    let table    = map (splitBySeparator separator) ls
-    return (varNames, table)
+    let t    = map (splitBySeparator separator) ls
+    return $ table varNames t
 
+createHeader :: [String]
 createHeader = [
     -- import essentials
     "import stdlib;",
@@ -69,35 +65,36 @@ createHeader = [
 
 generateDataToDBscript :: PPDatalogProgram -> IO (String)
 generateDataToDBscript database = do
-    dataMap <- extractDataFromTables undefined
+    dataMap <- extractDataFromTables . toPMapMap $ facts database
     return $ intercalate "\n" $ createCSVImport dataMap
 
-extractDataFromTables :: M.Map PName PMap -> IO (M.Map PName (M.Map AName DBVar, [AName], [[String]]))
+extractDataFromTables :: M.Map String PMap -> IO (M.Map String (M.Map String DBVar, [String], [[String]]))
 extractDataFromTables database = do
     -- mapM is a standard function [IO a] -> IO [a]
     res <- mapM extractDataFromTable (M.toList database)
     return $ M.fromList res
 
 -- TODO generalize the separator
-extractDataFromTable :: (PName,PMap) -> IO (PName, (M.Map AName DBVar, [AName], [[String]]))
+extractDataFromTable :: (String,PMap) -> IO (String, (M.Map String DBVar, [String], [[String]]))
 extractDataFromTable (pname,argMap) = do
-    (xs,yss) <- readDBString ("examples/database/" ++ pname ++ ".csv") ";"
+    t <- readDBString ("examples/database/" ++ pname ++ ".csv") ";"
     let typeMap = M.fromList $ map processArg $ head (M.keys argMap)
-    return $ (pname, (typeMap,xs,yss))
+    return $ (pname, (typeMap,header t,values <$> rows t))
     where processArg arg =
               case arg of
                   AVar v@(Bound _ _ z) -> (z,v)
+                  _                    -> undefined
 
 -- a SecreC program is a list of code lines
 -- if no particular goal is given, we just
-createCSVImport :: M.Map PName (M.Map AName DBVar, [AName], [[String]]) -> [String]
+createCSVImport :: M.Map String (M.Map String DBVar, [String], [[String]]) -> [String]
 createCSVImport dataMap =
-    let header = createHeader in
+    let h = createHeader in
     let body   = map (indent ++ ) $ concat $ (M.elems (M.mapWithKey createTable dataMap)) in
     let footer = [indent ++ "tdbCloseConnection(_ds);", "}\n"] in
-    header ++ body ++ footer
+    h ++ body ++ footer
 
-createTable :: PName -> (M.Map AName DBVar, [AName], [[String]]) -> [String]
+createTable :: String -> (M.Map String DBVar, [String], [[String]]) -> [String]
 createTable pname (typeMap, xs, yss) =
 
     let header1 = ["_tableName  = \"" ++ pname ++ "\";",
@@ -116,7 +113,7 @@ createTable pname (typeMap, xs, yss) =
 
     in header1 ++ header2 ++ header3 ++ createTableRec pname typeMap xs yss
 
-createTableHeader :: PName -> M.Map AName DBVar -> AName -> [String]
+createTableHeader :: String -> M.Map String DBVar -> String -> [String]
 createTableHeader pname typeMap x =
     let dtype = (if M.member x typeMap then typeMap ! x else error $ error_unknownColumn x pname) in
     let (isVlen,dvar,var) = case dtype of
@@ -131,14 +128,14 @@ createTableHeader pname typeMap x =
         "tdbVmapAddString(_params, \"names\", \"" ++ var ++ "\");"]
 
 
-createTableRec :: PName -> M.Map AName DBVar -> [AName] -> [[String]] -> [String]
+createTableRec :: String -> M.Map String DBVar -> [String] -> [[String]] -> [String]
 createTableRec _ _ _ [] = []
 createTableRec pname typeMap xs (ys:yss) =
     let s0 = ["tdbInsertRow(_ds," ++ show pname ++ ", _params);", "tdbVmapClear(_params);\n"] in
     let s = createRow pname typeMap xs ys in
     s ++ s0 ++ createTableRec pname typeMap xs yss
 
-createRow :: PName -> M.Map AName DBVar -> [AName] -> [String] -> [String]
+createRow :: String -> M.Map String DBVar -> [String] -> [String] -> [String]
 createRow _ _ [] [] = []
 createRow pname _ [] ys  = error $ error_dbFileLengthsTooMany pname ys
 createRow pname _ xs  [] = error $ error_dbFileLengthsTooFew pname xs

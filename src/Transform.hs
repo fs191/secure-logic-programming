@@ -7,18 +7,14 @@ module Transform
 ----  to intermediate representation
 ---------------------------------------------------------
 
-import Control.Monad
 import Data.Hashable
-import Data.List
-import Debug.Trace
 import qualified Data.Map as M
-import qualified Data.Set as S
 
 import Aexpr
-import ErrorMsg
 import Rule
 import Substitution
 import qualified DatalogProgram as DP
+import DBClause
 
 type PMap = M.Map [Term] Formula
 
@@ -30,7 +26,7 @@ deriveAllGroundRules program n = DP.setRules res program
         res = fromPMapMap $ runIteration f r 0 n
 
 -- generate all possible ground rules for a single iteration
-runIteration :: (M.Map PName PMap) -> (M.Map PName [Rule]) -> Int -> Int -> (M.Map PName PMap)
+runIteration :: (M.Map String PMap) -> (M.Map String [Rule]) -> Int -> Int -> (M.Map String PMap)
 runIteration facts _ _ 0 = facts
 runIteration facts rules prevHash n =
 
@@ -45,7 +41,7 @@ runIteration facts rules prevHash n =
 
 -- for each predicate p, generate new ground rules and merge them with existing ones
 -- TODO we should do more simplification and optimization here
-applyRule :: (M.Map PName PMap) -> (M.Map PName [Rule]) -> [PName] -> (M.Map PName PMap)
+applyRule :: (M.Map String PMap) -> (M.Map String [Rule]) -> [String] -> (M.Map String PMap)
 applyRule facts _ [] = facts
 applyRule facts rules (p:ps) =
     let newFacts' = concat $ map (processRule p facts) (rules M.! p) in
@@ -56,13 +52,13 @@ applyRule facts rules (p:ps) =
 
 -- use a rule to generate new ground rules from the existing ground rules
 -- p(a1,..,am) :- b1 ... bn
-processRule :: PName -> M.Map PName PMap -> Rule -> [([Term], Formula)]
-processRule p groundRuleMap rule =
+processRule :: String -> M.Map String PMap -> Rule -> [([Term], Formula)]
+processRule _ groundRuleMap r =
 
     -- derive a list of possible new ground rules for the fact p
     -- TODO we can remove the counter if we implement Subst using a state monad
-    let bexpr = premise rule
-        as = args rule
+    let bexpr = premise r
+        as = args r
         newGroundRules = processRulePremise groundRuleMap [(emptyTheta, BConstBool True, 0)] bexpr in
 
     -- For each generated ground rule, apply the substitution to rule head p as well, getting newArgs
@@ -76,11 +72,11 @@ processRule p groundRuleMap rule =
 
 -- assume that we already have some possible solutions that make previous b1...bi-1 true
 -- we now extend each of these solutions to a solution for bi, possibly generating even more branches
-processRulePremise :: (M.Map PName PMap) -> [(Subst, Formula, Int)] -> Formula -> [(Subst, Formula, Int)]
+processRulePremise :: (M.Map String PMap) -> [(Subst, Formula, Int)] -> Formula -> [(Subst, Formula, Int)]
 processRulePremise groundRuleMap thetas bexpr = concat $ map (processFormula groundRuleMap bexpr) thetas
 
 
-processFormula :: (M.Map PName PMap) -> Formula -> (Subst, Formula, Int) -> [(Subst, Formula, Int)]
+processFormula :: (M.Map String PMap) -> Formula -> (Subst, Formula, Int) -> [(Subst, Formula, Int)]
 processFormula groundRuleMap bexpr' (theta', constr, cnt) =
 
     let bexpr''        = applyToFormula theta' bexpr' in

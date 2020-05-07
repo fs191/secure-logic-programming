@@ -18,7 +18,7 @@ import Data.Void (Void)
 
 import Control.Monad (void)
 
-import Rule hiding (dataType)
+import DBClause hiding (dataType)
 
 type Parser = Parsec Void String
 

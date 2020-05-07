@@ -13,6 +13,7 @@ import Data.Void (Void)
 import Parser.DatalogParser.Lexer
 import Aexpr
 import Rule
+import DBClause
 
 type Parser = Parsec Void String
 

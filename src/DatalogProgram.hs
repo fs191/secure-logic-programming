@@ -31,6 +31,8 @@ import           Optics.Operators
 import           Optics.TH
 
 import           Rule
+import           Table
+import           DBClause
 
 class LogicProgram a where
   rules     :: a -> [Rule]
@@ -68,7 +70,7 @@ instance IsGoal Goal where
   toGoal = id
 
 data DatalogProgram = DatalogProgram
-  { _dpRules :: M.Map PName [Rule]
+  { _dpRules :: M.Map String [Rule]
   , _dpGoal  :: Maybe Goal
   }
   deriving (Show)

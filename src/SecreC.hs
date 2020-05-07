@@ -8,10 +8,8 @@ module SecreC
 ---------------------------------------------------------
 
 -- TODO this module is very messy and needs thorough refactoring
-import Data.Hashable
 import Data.List
 import Data.Maybe
-import Debug.Trace
 import Control.Monad (guard)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -20,6 +18,7 @@ import Aexpr
 import ErrorMsg
 import Rule
 import DatalogProgram
+import DBClause
 
 type PMap = M.Map [Term] Formula
 
@@ -154,7 +153,7 @@ generateTemplateUse cond args =
 -- if no particular goal is given, then we do not create a main statement
 generateSecreCscript :: Bool -> PPDatalogProgram -> String
 generateSecreCscript boolOnly program =
-    let predMap = toPMapMap $ facts program :: M.Map PName PMap
+    let predMap = toPMapMap $ facts program :: M.Map String PMap
 
     -- TODO think whether we want to support more expressions in a goal
     -- TODO we currently treat all inputs as strings, we need to genralize it (also in plain prolog)
@@ -168,9 +167,9 @@ generateSecreCscript boolOnly program =
             guard $ length goals > 0
             case head goals of
                 BListPred (BPredName gn) ga ->
-                              let xs' = intercalate "," (map termToString xs) in
-                              let ys' = intercalate "," (map termToString ys) in
-                              trace ("goal([" ++ xs' ++ "],[" ++ ys' ++ "]) :- " ++ ruleHeadToString "" gn ga) $
+                              --let xs' = intercalate "," (map termToString xs) in
+                              --let ys' = intercalate "," (map termToString ys) in
+                              --trace ("goal([" ++ xs' ++ "],[" ++ ys' ++ "]) :- " ++ ruleHeadToString "" gn ga) $
                               let goalArgs = map (\x -> if elem x xs then
                                                             case x of
                                                                 AVar (Free z) -> AVar (Bound Private VarText z)
@@ -203,7 +202,7 @@ generateSecreCscript boolOnly program =
 
     intercalate "\n" $ header ++ structDef ++ concat body ++ mainFun
 
-createSecreCFuns :: Bool -> Maybe (PName, [Term]) -> String -> PName -> PMap -> [(DomainType, String, [String])]
+createSecreCFuns :: Bool -> Maybe (String, [Term]) -> String -> String -> PMap -> [(DomainType, String, [String])]
 createSecreCFuns boolOnly goal structName pname pmap =
     let unnecessaryFun = case goal of {Just (goalPname, _) -> pname /= goalPname; _ -> False} in
     if unnecessaryFun then [] else
@@ -212,7 +211,7 @@ createSecreCFuns boolOnly goal structName pname pmap =
     let as = case goal of {Just (_, goalArgs) -> goalArgs; _ -> []} in
     zipWith3 (createSecreCFun boolOnly pname structName as) is keys values
 
-createSecreCFun :: Bool -> PName -> String -> [Term] -> Int -> [Term] -> Formula -> (DomainType, String, [String])
+createSecreCFun :: Bool -> String -> String -> [Term] -> Int -> [Term] -> Formula -> (DomainType, String, [String])
 createSecreCFun boolOnly pname structName asG index as bexpr' =
 
     --if not(isGround bexpr) then [] else
@@ -263,7 +262,7 @@ createSecreCFun boolOnly pname structName asG index as bexpr' =
     let funReturn   = if boolOnly || structType == "" then ["return(any(b));"] else generateReturn freeArgs structType in
 
     let template     = generateTemplateDecl False allArgs in
-    let declaration = [predToString "//" pname as bexpr,
+    let declaration = [--predToString "//" pname as bexpr,
                        template,
                        funType ++ " " ++ funName ++ "(" ++ intercalate ", " (map (\(_,_,d,t,i) -> domainToDecl d ++ typeToString True d t i ++ " " ++ argPrefix ++ show i) boundedArgs) ++ "){"] in
 
@@ -389,7 +388,7 @@ meet2 x y  = if (x == y) then x else error $ error_typeOp "argument matching" x 
 
 -- TODO let us pass the data type not as a string, but as DataType object
 -- this assumes that the expression is "folded", i.e. is in DNF form with grouped AND / OR
-bexprToSecreC :: S.Set VName -> (M.Map Term (DomainType,DataType,Int)) -> (M.Map Term (DomainType,DataType,Int)) -> (M.Map Term [String]) -> Int -> Formula -> (Int,String,DomainType,S.Set VName,[String])
+bexprToSecreC :: S.Set String -> (M.Map Term (DomainType,DataType,Int)) -> (M.Map Term (DomainType,DataType,Int)) -> (M.Map Term [String]) -> Int -> Formula -> (Int,String,DomainType,S.Set String,[String])
 bexprToSecreC dv' boundedArgMap freeArgMap varMap c' bexpr =
     let b = bexprPrefix ++ show c' in
     let c = c' + 1 in
