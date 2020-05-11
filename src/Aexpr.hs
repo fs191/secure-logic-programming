@@ -1,4 +1,8 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable#-}
 
 module Aexpr
   ( AExpr(..)
@@ -24,10 +28,11 @@ module Aexpr
 ---- Arithmetic and Boolean expressions
 ---------------------------------------------------------
 
+import Prelude hiding ((<>))
 import Data.List
-import qualified Data.Set as S
 
 import ErrorMsg
+import Data.Text.Prettyprint.Doc
 
 -- artihmetic expressions
 data AExpr a
@@ -37,15 +42,15 @@ data AExpr a
   | AUnary  AUnOp   (AExpr a)
   | ABinary ABinOp  (AExpr a) (AExpr a)
   | ANary   AListOp [AExpr a]
-  deriving (Ord,Eq,Functor)
+  deriving (Ord,Eq,Functor,Foldable,Show)
 
-instance (Show a) => Show (AExpr a) where
-  show (AVar x) = show x
-  show (AConstNum x) = show x
-  show (AConstStr x) = show x
-  show (AUnary op x) = show op ++ show x
-  show (ABinary op x y) = show x ++ show op ++ show y
-  show (ANary op l) = show op ++ show l
+instance (Pretty a) => Pretty (AExpr a) where
+  pretty (AVar x) = pretty x
+  pretty (AConstNum x) = pretty x
+  pretty (AConstStr x) = pretty x
+  pretty (AUnary op x) = pretty op <> pretty x
+  pretty (ABinary op x y) = pretty x <> pretty op <> pretty y
+  pretty (ANary op l) = pretty op <> pretty l
 
 data AUnOp
   = ANeg
@@ -60,6 +65,15 @@ data AListOp
   = ASum  | AProd
   deriving (Ord,Eq,Show)
 
+instance Pretty AUnOp where
+  pretty = pretty . show
+
+instance Pretty ABinOp where
+  pretty = pretty . show
+
+instance Pretty AListOp where
+  pretty = pretty . show
+
 -- boolean expressions
 data BExpr a
   = BConstBool Bool
@@ -68,15 +82,35 @@ data BExpr a
   | BUnary  BUnOp   (BExpr a)
   | BBinary BBinOp  (BExpr a) (BExpr a)
   | BNary   BListOp [BExpr a]
-  deriving (Ord,Eq,Functor)
+  deriving (Ord,Eq,Functor,Foldable,Show)
 
-instance (Show a) => Show (BExpr a) where
-  show (BConstBool x) = show x
-  show (BBinPred op x y) = (show x) ++ (show op) ++ (show y)
-  show (BListPred op l) = (show op) ++ (show l)
-  show (BUnary op x) = (show op) ++ (show x)
-  show (BBinary op x y) = (show x) ++ (show op) ++ (show y)
-  show (BNary op l) = (show op) ++ (show l)
+instance (Show a, Pretty a) => Pretty (BExpr a) where
+  pretty (BConstBool x)    = pretty $ show x
+  pretty (BBinPred op x y) = bin op x y
+  pretty (BListPred op l)  = listop op l
+  pretty (BUnary op x)     = pretty op <> pretty x
+  pretty (BBinary op x y)  = bin op x y
+  pretty (BNary op l)      = listop op l
+
+instance Pretty BListPredOp where
+  pretty = pretty . show
+
+instance Pretty BUnOp where
+  pretty = pretty . show
+
+instance Pretty BListOp where
+  pretty = pretty . show
+
+
+bin :: (Pretty a1, Pretty a2, Pretty a3) => a2 -> a1 -> a3 -> Doc ann
+bin op x y = 
+  pretty x <> pretty op <> pretty y
+
+listop :: (Pretty a1, Pretty a2) => a1 -> [a2] -> Doc ann
+listop op l =
+  pretty op <> 
+  (parens $ hcat $ punctuate comma $ pretty <$> l)
+            
 
 data BUnOp
   = BNot
@@ -87,23 +121,23 @@ instance Show BUnOp where
 
 data BBinOp
   = BAnd | BOr
-  deriving (Ord,Eq)
+  deriving (Ord,Eq,Show)
 
-instance Show BBinOp where
-  show BAnd = " AND "
-  show BOr  = " OR "
+instance Pretty BBinOp where
+  pretty BAnd = ",\n"
+  pretty BOr  = " OR "
 
 data BBinPredOp
   = BLT | BLE | BEQ | BGE | BGT | BAsgn
-  deriving (Ord,Eq)
+  deriving (Ord,Eq,Show)
 
-instance Show BBinPredOp where
-  show BLT   = " < "
-  show BLE   = " <= "
-  show BEQ   = " == "
-  show BGE   = " >= "
-  show BGT   = " > "
-  show BAsgn = " := "
+instance Pretty BBinPredOp where
+  pretty BLT   = " < "
+  pretty BLE   = " <= "
+  pretty BEQ   = " == "
+  pretty BGE   = " >= "
+  pretty BGT   = " > "
+  pretty BAsgn = " := "
 
 data BListPredOp
   = BPredName String
@@ -136,19 +170,6 @@ toNNF (BBinary BOr exp1 exp2)               = toNNF exp1 `disj` toNNF exp2
 toNNF (BUnary BNot (BBinary BOr exp1 exp2))  = toNNF $ neg exp1 `conj` neg exp2
 
 toNNF expr                                 = expr
-
-toCNF :: BExpr a -> BExpr a
-toCNF = toCNF' . toNNF
-  where
-    toCNF' :: BExpr a -> BExpr a
-    toCNF' (BBinary BAnd exp1 exp2) = toCNF' exp1 `conj` toCNF' exp2
-    toCNF' (BBinary BOr  exp1 exp2) = toCNF' exp1 `dist` toCNF' exp2
-    toCNF' expr                    = expr
-
-    dist :: BExpr a -> BExpr a -> BExpr a
-    dist (BBinary BAnd e11 e12) e2 = (e11 `dist` e2) `conj` (e12 `dist` e2)
-    dist e1 (BBinary BAnd e21 e22) = (e1 `dist` e21) `conj` (e1 `dist` e22)
-    dist e1 e2                    = e1 `disj` e2
 
 toDNF :: BExpr a -> BExpr a
 toDNF = toDNF' . toNNF
@@ -232,6 +253,7 @@ simplifyBool expr =
 
 ------------------------------------------------------------------------------------
 -- this is currently used only for visual feedback
+ruleIndent :: String
 ruleIndent = "  "
 
 aexprToString :: (a -> String) -> AExpr a -> String
@@ -265,7 +287,7 @@ bexprToString prefix f aexpr =
         BBinPred BGT x1 x2 -> "(" ++ aexprToString f x1 ++ " > " ++ aexprToString f x2 ++ ")"
         BBinPred BAsgn x1 x2 -> "(" ++ aexprToString f x1 ++ " is " ++ aexprToString f x2 ++ ")"
 
-        BListPred (BPredName pred) args -> pred ++ "(" ++ intercalate "," (map (aexprToString f) args) ++ ")"
+        BListPred (BPredName p) args -> p ++ "(" ++ intercalate "," (map (aexprToString f) args) ++ ")"
 
         BNary BAnds xs -> ruleIndent ++ intercalate (",\n" ++ prefix ++ ruleIndent) (map (bexprToString prefix f) xs)
         BNary BOrs  xs -> ruleIndent ++ "(" ++ intercalate (";\n\n" ++ prefix ++ ruleIndent) (map (bexprToString prefix f) xs) ++ ")"
@@ -276,35 +298,11 @@ bexprToString prefix f aexpr =
         BBinary BOr  x1 x2 -> bexprToString prefix f x1 ++ ";\n\n" ++ prefix ++ ruleIndent ++ bexprToString prefix f x2
 
 --------------------------
--- get certain data of all variables
-getAExprVars :: Ord b => (a -> b) -> AExpr a -> S.Set b
-getAExprVars f aexpr =
-    case aexpr of
-        AVar x      -> S.singleton $ f x
-        AConstNum _ -> S.empty
-        AConstStr _ -> S.empty
-
-        ANary _ xs      -> foldr S.union S.empty $ map (getAExprVars f) xs
-        AUnary _ x      -> getAExprVars f x
-        ABinary _ x1 x2 -> S.union (getAExprVars f x1) (getAExprVars f x2)
-
-getBExprVars :: Ord b => (a -> b) -> BExpr a -> S.Set b
-getBExprVars f bexpr =
-    case bexpr of
-        BConstBool _      -> S.empty
-        BBinPred  _ x1 x2 -> S.union (getAExprVars f x1) (getAExprVars f x2)
-        BListPred _ xs    -> foldr S.union S.empty $ map (getAExprVars f) xs
-
-        BNary _ xs      -> foldr S.union S.empty $ map (getBExprVars f) xs
-        BUnary _ x      -> getBExprVars f x
-        BBinary _ x1 x2 -> S.union (getBExprVars f x1) (getBExprVars f x2)
-
---------------------------
 -- is the expression constant (i.e. does not contain any variables)?
 isConstAexpr :: AExpr a -> Bool
 isConstAexpr aexpr =
     case aexpr of
-        AVar x -> False
+        AVar _ -> False
 
         AConstNum  _ -> True
         AConstStr  _ -> True
@@ -329,7 +327,7 @@ isConstBexpr bexpr =
 evalAexpr :: (Show a) => AExpr a -> AExpr a
 evalAexpr aexpr =
     case aexpr of
-        AVar x       -> error $ error_nonConstantTerm (aexprToString show aexpr)
+        AVar _       -> error $ error_nonConstantTerm (aexprToString show aexpr)
         AConstNum c  -> AConstNum c
         AConstStr c  -> AConstStr c
 
@@ -377,18 +375,15 @@ evalBexpr bexpr =
         BBinary BAnd x1 x2 -> BConstBool $ (processRecBool x1) && (processRecBool x2)
         BBinary BOr  x1 x2 -> BConstBool $ (processRecBool x1) || (processRecBool x2)
 
-    where processRecAny x  = let y = evalAexpr x in
-                                    case y of
-                                        (AConstNum c)  -> show c
-                                        (AConstStr c)  -> c
-          processRecNum x  = let y = evalAexpr x in
-                                    case y of
-                                        (AConstNum c)  -> c
-                                        _              -> error $ error_typeNum y
-          processRecBool x = let y = evalBexpr x in
-                                    case y of
-                                        (BConstBool c) -> c
-                                        _              -> error $ error_typeBool y
+    where processRecAny x  = case evalAexpr x of
+                               (AConstNum c)  -> show c
+                               (AConstStr c)  -> c
+          processRecNum x  = case evalAexpr x of
+                               (AConstNum c)  -> c
+                               y              -> error $ error_typeNum y
+          processRecBool x = case evalBexpr x of
+                               (BConstBool c) -> c
+                               y              -> error $ error_typeBool y
 ------------------------------------------------------------------------------------
 extractAllPredicates :: BExpr a -> [(String, [AExpr a])]
 extractAllPredicates bexpr =

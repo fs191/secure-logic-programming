@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6c5122190afe9a454d0a880005a9d42be458ae667cb3c119579b2cf3cfa7eed3
+-- hash: 27f0836866a035ead7ff5352a0bf2add03ae1c4323dcbe809455ac34d944100c
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -30,6 +30,7 @@ library
       Aexpr
       CSVImport
       DatalogProgram
+      DBClause
       ErrorMsg
       Interpreter
       Lib
@@ -41,6 +42,7 @@ library
       Rule
       SecreC
       Substitution
+      Table
       Transform
       Translator
   other-modules:
@@ -61,6 +63,7 @@ library
     , optparse-applicative
     , parsec
     , parser-combinators
+    , prettyprinter
     , process
     , semigroups
     , split
@@ -92,6 +95,7 @@ executable lpsec
     , optparse-applicative
     , parsec
     , parser-combinators
+    , prettyprinter
     , process
     , secure-logic-programming
     , semigroups
@@ -127,6 +131,7 @@ test-suite test
     , optparse-applicative
     , parsec
     , parser-combinators
+    , prettyprinter
     , process
     , secure-logic-programming
     , semigroups

@@ -149,8 +149,9 @@ generateTemplateUse cond args =
     let template = s0 ++ s1 ++ s2 in
     if length template > 0 then "<" ++ intercalate ", " template ++ ">" else ""
 
--- a SecreC program is a list of code lines
--- if no particular goal is given, then we do not create a main statement
+-- | a SecreC program is a list of code lines.
+-- If no particular goal is given, then we do not create a main statement.
+-- It can only use facts to generate code, complex rules will not be used.
 generateSecreCscript :: Bool -> PPDatalogProgram -> String
 generateSecreCscript boolOnly program =
     let predMap = toPMapMap $ facts program :: M.Map String PMap

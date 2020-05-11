@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module DBClause 
   ( DBClause, DBVar(..) -- TODO Do not export constructors for DBVar
   , dbClause, free, bound
@@ -7,6 +9,8 @@ module DBClause
   , rename, varName
   ) where
 
+import Data.Text.Prettyprint.Doc
+
 -- predicate argument, together with the privacy/data type
 -- here var is a database variable (not a free LP variable)
 {-# DEPRECATED Bound "Avoid using constructors directly" #-}
@@ -14,7 +18,8 @@ module DBClause
 data DBVar
   = Bound DomainType DataType String
   | Free String
-  deriving (Show, Ord, Eq)
+  deriving (Ord, Eq, Show)
+
 
 -- TODO Remove Unknown constructor and use Maybe instead
 data DataType   = VarBool | VarNum | VarText | Unknown
@@ -27,6 +32,27 @@ data DBClause = DBClause
   , _dcVars    :: [DBVar]
   }
   deriving (Show)
+
+instance Pretty DBClause where
+  pretty c = 
+    ":- type" <>
+    parens (
+      (pretty $ _dcFunctor c) <>
+      (parens $ hsep $ punctuate "," $ pretty <$> _dcVars c)
+    )
+
+instance Pretty DBVar where
+  pretty (Free n)          = pretty n
+  pretty (Bound dom dat n) = pretty n <+> ":" <+> pretty dom <+> pretty dat
+
+instance Pretty DataType where
+  pretty VarBool = "bool"
+  pretty VarText = "string"
+  pretty VarNum  = "int"
+
+instance Pretty DomainType where
+  pretty Private = "private"
+  pretty Public  = "public"
 
 free :: String -> DBVar
 free = Free

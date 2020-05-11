@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -23,7 +24,8 @@ module DatalogProgram
 
 import qualified Data.Map as M
 
-import           Data.List (nub)
+import           Data.List
+import           Data.Maybe
 
 import           Control.Monad (guard)
 
@@ -33,15 +35,16 @@ import           Optics.TH
 import           Rule
 import           Table
 import           DBClause
+import           Data.Text.Prettyprint.Doc
 
 class LogicProgram a where
-  rules     :: a -> [Rule]
-  facts     :: a -> [Fact]
-  goal      :: a -> Maybe Goal
-  ruleNames :: a -> [String]
+  rules       :: a -> [Rule]
+  facts       :: a -> [Fact]
+  goal        :: a -> Maybe Goal
+  ruleNames   :: a -> [String]
   rulesByName :: a -> String -> [Rule]
-  mapRules :: (Rule -> Rule) -> a -> a
-  setRules :: [Rule] -> a -> a
+  mapRules    :: (Rule -> Rule) -> a -> a
+  setRules    :: [Rule] -> a -> a
 
   facts = rulesToFacts . rules
   ruleNames prog = nub $ functor <$> rules prog
@@ -59,12 +62,17 @@ data Goal = Goal
   , _gOutputs  :: [Term]
   , _gFormula :: Formula
   }
+  deriving (Show)
 
-instance Show Goal where
-  show g =
-    "Goal:\n\tInputs: \t"     ++ show (_gInputs g) ++
-    "\n\tOutputs:\t"  ++ show (_gOutputs g) ++
-    "\n\tFormulae:\t" ++ show (_gFormula g)
+instance Pretty Goal where
+  pretty g = 
+       ":- goal(["
+    <> (hsep . punctuate "," $ pretty <$> _gInputs g)
+    <> "],["
+    <> (hsep . punctuate "," $ pretty <$> _gOutputs g)
+    <> "]) :-\n"
+    <> (pretty $ _gFormula g)
+
 
 instance IsGoal Goal where
   toGoal = id
@@ -76,19 +84,33 @@ data DatalogProgram = DatalogProgram
   deriving (Show)
 makeLenses ''DatalogProgram
 
-data PPDatalogProgram = PPDatalogProgram
-  { _ppProgram   :: DatalogProgram
-  , _ppDBClauses :: [DBClause]
-  }
-  deriving (Show)
+instance Pretty DatalogProgram where
+  pretty p =
+    (hcat $ punctuate ";\n\n" $ pretty <$> rules p) <> ";"
 
-makeLenses ''PPDatalogProgram
+genRuleMap :: [Rule] -> M.Map String [Rule]
+genRuleMap rs = M.unionsWith (<>) $ f <$> rs
+  where
+    f x = M.singleton (functor x) [x]
 
 instance LogicProgram DatalogProgram where
   rules = concat . M.elems . _dpRules
   goal  = _dpGoal
   mapRules f = dpRules %~ ((f <$>) <$>)
   setRules r = dpRules .~ genRuleMap r
+
+data PPDatalogProgram = PPDatalogProgram
+  { _ppProgram   :: DatalogProgram
+  , _ppDBClauses :: [DBClause]
+  }
+  deriving (Show)
+makeLenses ''PPDatalogProgram
+
+instance Pretty PPDatalogProgram where
+  pretty p =
+       (hcat . punctuate ";\n" $ pretty <$> _ppDBClauses p)
+    <> ";\n\n"
+    <> (pretty $ _ppProgram p)
 
 instance LogicProgram PPDatalogProgram where
   rules = rules . _ppProgram
@@ -120,9 +142,4 @@ fromRulesAndGoal rs = DatalogProgram $ genRuleMap rs
 
 ppDatalogProgram :: DatalogProgram -> [DBClause] -> PPDatalogProgram
 ppDatalogProgram = PPDatalogProgram
-
-genRuleMap :: [Rule] -> M.Map String [Rule]
-genRuleMap rs = M.unionsWith (<>) $ f <$> rs
-  where
-    f x = M.singleton (functor x) [x]
 

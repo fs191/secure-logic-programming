@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Rule
@@ -6,6 +7,7 @@ module Rule
   , IsRule
   , rule, fact
   , toFact, toRule
+  , args'
   , name
   , premise, functor, args
   , rulesToFacts
@@ -17,15 +19,14 @@ module Rule
 ---- Data structures for LP facts and rules
 ---------------------------------------------------------
 
-import Data.List
-import Data.Maybe (catMaybes, maybeToList)
+import           Data.Foldable
+import           Data.Maybe (catMaybes)
+import           Data.List
 import qualified Data.Map as M
+import           Data.Text.Prettyprint.Doc
 
-import Data.Traversable (sequenceA)
-
-import Aexpr
-import Table
-import DBClause
+import           Aexpr
+import           DBClause
 
 type Term    = AExpr DBVar
 type Formula = BExpr DBVar
@@ -34,15 +35,17 @@ type Formula = BExpr DBVar
 type Atom = String
 
 class IsRule a where
-  toRule  :: a -> Rule
-  premise :: a -> Formula
-  functor :: a -> Atom
-  args    :: a -> [Term]
-  toMap   :: [a] -> M.Map String [a]
+  toRule   :: a -> Rule
+  premise  :: a -> Formula
+  functor  :: a -> Atom
+  args     :: a -> [Term]
+  args'    :: a -> [DBVar]
+  toMap    :: [a] -> M.Map String [a]
 
   premise  = premise . toRule
   functor  = functor . toRule
   args     = args . toRule
+  args' x  = toList =<< (args x)
   toMap rs = M.unionsWith (<>) $
     do
       f <- rs
@@ -60,6 +63,17 @@ data Fact = Fact
   , _arguments :: [Term]
   }
   deriving (Show)
+
+instance Pretty Rule where
+  pretty r =
+    (pretty $ _fact r) <+>
+    ":-\n" <+>  
+    (indent 2 $ pretty $ premise r)
+
+instance Pretty Fact where
+  pretty f =
+       pretty (functor f) 
+    <> (parens $ hsep $ punctuate comma $ pretty <$> args f)
 
 instance IsRule Rule where
   toRule = id
