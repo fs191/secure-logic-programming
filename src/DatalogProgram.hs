@@ -66,12 +66,12 @@ data Goal = Goal
 
 instance Pretty Goal where
   pretty g = 
-       ":- goal(["
+       "goal(["
     <> (hsep . punctuate "," $ pretty <$> _gInputs g)
     <> "],["
     <> (hsep . punctuate "," $ pretty <$> _gOutputs g)
     <> "]) :-\n"
-    <> (pretty $ _gFormula g)
+    <> indent 2 (pretty $ _gFormula g)
 
 
 instance IsGoal Goal where
@@ -86,7 +86,8 @@ makeLenses ''DatalogProgram
 
 instance Pretty DatalogProgram where
   pretty p =
-    (hcat $ punctuate ";\n\n" $ pretty <$> rules p) <> ";"
+    (hcat $ (<>";\n\n") . pretty <$> rules p) <>
+    (fromMaybe emptyDoc (pretty <$> goal p))
 
 genRuleMap :: [Rule] -> M.Map String [Rule]
 genRuleMap rs = M.unionsWith (<>) $ f <$> rs
@@ -108,8 +109,8 @@ makeLenses ''PPDatalogProgram
 
 instance Pretty PPDatalogProgram where
   pretty p =
-       (hcat . punctuate ";\n" $ pretty <$> _ppDBClauses p)
-    <> ";\n\n"
+       (hcat $ (<>";\n") . pretty <$> _ppDBClauses p)
+    <> "\n"
     <> (pretty $ _ppProgram p)
 
 instance LogicProgram PPDatalogProgram where
