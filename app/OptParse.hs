@@ -10,7 +10,7 @@ import ProgramOptions
 programArgs :: Parser ProgramOptions
 programArgs = ProgramOptions
   <$> strArgument (metavar "INPUT_PATH" <> help "input file containing initial datalog program")
-  <*> strArgument (metavar "OUTPUT_PATH" <> help "output file containing resulting SecreC program")
+  <*> strOption (metavar "OUTPUT_PATH" <> value "" <> help "output file containing resulting SecreC program")
   <*> option auto (short 'n' <> long "iterations" <> value 10 <> help "specify the maximum number of iterations")
   <*> switch (long "db-create-tables"
               <> hidden
