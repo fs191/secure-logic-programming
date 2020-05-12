@@ -22,7 +22,7 @@ type PMap = M.Map [Term] Formula
 deriveAllGroundRules :: DP.PPDatalogProgram -> Int -> DP.PPDatalogProgram
 deriveAllGroundRules program n = DP.setRules res program
   where f = toPMapMap $ DP.facts program
-        r = toMap $ DP.rules program
+        r = toMap $ filter hasPremise $ DP.rules  program
         res = fromPMapMap $ runIteration f r M.empty n
 
 -- generate all possible ground rules for a single iteration

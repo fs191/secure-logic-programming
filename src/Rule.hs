@@ -10,6 +10,7 @@ module Rule
   , args'
   , name
   , premise, functor, args
+  , hasPremise
   , rulesToFacts
   , toMap
   , toPMapMap, fromPMapMap
@@ -121,4 +122,7 @@ fromPMapMap pmap =
         (ts', f') <- y
         return (x, ts', f')
     return $ rule n ts f
+
+hasPremise :: Rule -> Bool
+hasPremise r = premise r /= bTrue
 
