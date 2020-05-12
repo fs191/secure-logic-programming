@@ -42,7 +42,7 @@ The parameter n is the upper bound on the number of iterations
     ./dist/build/lpsec/lpsec examples/ppdatalog/auction.pl SecreC/auction.sc -n 2
 
 To create a script that uploads simulated data into Sharemind, use --db-create-tables  
-WARNING: do not use it to upload real private data, as it is done in public!
+**WARNING: do not use it to upload real private data, as it is done in public!**
 
     ./dist/build/lpsec/lpsec examples/ppdatalog/auction.pl SecreC/auction.sc --db-create-tables -n 2
 
