@@ -1,5 +1,11 @@
 # Transforming Datalog program to a privacy-preserving application based on Sharemind
 
+## Stack (recommended)
+
+`stack install`
+
+## Cabal
+
 Building for the first time:
 
 `cabal sandbox init`
@@ -11,9 +17,6 @@ Building for the first time:
 `cabal configure`
 
 `cabal build`
-
-The executable is created in the subdirectory dist/build/lpsec, thus to execute it:
-    dist/build/lpsec/lpsec
 
 Later, only 
 `cabal build`
@@ -30,7 +33,10 @@ If dependencies or project structure has changed then
 may be necessary.
 
 
-##Example run:
+## Example run:
+
+The executable is created in the subdirectory dist/build/lpsec, thus to execute it:
+    dist/build/lpsec/lpsec
 
 The following examples read datalog file auction.pl and create SecreC file auction.sc
 The parameter n is the upper bound on the number of iterations
