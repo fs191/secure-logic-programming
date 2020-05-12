@@ -29,8 +29,9 @@ may be necessary.
 
 ## Example run:
 
-The executable is created in the subdirectory dist/build/lpsec, thus to execute it:
-    dist/build/lpsec/lpsec
+The executable is created in the subdirectory `dist/build/lpsec`, thus to execute it:
+
+    ./dist/build/lpsec/lpsec
 
 The following examples read datalog file auction.pl and create SecreC file auction.sc
 The parameter n is the upper bound on the number of iterations
