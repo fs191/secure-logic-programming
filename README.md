@@ -1,12 +1,14 @@
 # Transforming Datalog program to a privacy-preserving application based on Sharemind
 
-## Stack (recommended)
+## Building
+
+### Stack (recommended)
 
 Simply run
 
     stack install
 
-## Cabal
+### Cabal
 
 Building for the first time:
 
