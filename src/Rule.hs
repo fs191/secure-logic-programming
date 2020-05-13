@@ -92,8 +92,9 @@ rule :: String -> [Term] -> Formula -> Rule
 rule n a f = Rule f $ fact n a
 
 toFact :: Rule -> Maybe Fact
-toFact (Rule (BConstBool True) f) = Just f
-toFact _                          = Nothing
+toFact r
+  | hasPremise r = Nothing
+  | otherwise    = Just $ _fact r
 
 name :: Rule -> Atom
 name = _functor . _fact
