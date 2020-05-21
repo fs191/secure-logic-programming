@@ -10,7 +10,7 @@ module Transform
 import Data.Hashable
 import qualified Data.Map as M
 
-import Aexpr
+import Expr
 import Rule
 import Substitution
 import qualified DatalogProgram as DP
@@ -44,8 +44,8 @@ applyRule :: (M.Map String PMap) -> (M.Map String [Rule]) -> [String] -> (M.Map 
 applyRule facts _ [] = facts
 applyRule facts rules (p:ps) =
     let newFacts' = concat $ map (processRule p facts) (rules M.! p) in
-    let newFacts  = M.fromListWith (\x y -> simplifyBool $ BBinary BOr x y) $ newFacts' in
-    let factsp    = M.unionWith (\x y -> simplifyBool $ BBinary BOr x y) (if M.member p facts then facts M.! p else M.empty) newFacts in
+    let newFacts  = M.fromListWith (\x y -> simplifyBool $ Binary Or x y) $ newFacts' in
+    let factsp    = M.unionWith (\x y -> simplifyBool $ Binary Or x y) (if M.member p facts then facts M.! p else M.empty) newFacts in
     let facts' = M.insert p factsp facts in
     applyRule facts' rules ps
 
@@ -58,7 +58,7 @@ processRule _ groundRuleMap r =
     -- TODO we can remove the counter if we implement Subst using a state monad
     let bexpr = premise r
         as = args r
-        newGroundRules = processRulePremise groundRuleMap [(emptyTheta, BConstBool True, 0)] bexpr in
+        newGroundRules = processRulePremise groundRuleMap [(emptyTheta, ConstBool True, 0)] bexpr in
 
     -- For each generated ground rule, apply the substitution to rule head p as well, getting newArgs
     map (\ (theta,newBody,_) ->
@@ -85,30 +85,25 @@ processFormula groundRuleMap bexpr' (theta', constr, cnt) =
     case bexpr of
 
         -- True does not modify the solution
-        BConstBool True   -> [solution]
+        ConstBool True   -> [solution]
         -- False nullifies the solution
-        BConstBool False  -> []
+        ConstBool False  -> []
 
         -- satisfiability of an (in)equality predicate is added to solution constraints
-        BBinPred  _ _ _   -> [(theta, BBinary BAnd constr bexpr,cnt)]
+        Binary  _ _ _   -> [(theta, Binary And constr bexpr,cnt)]
 
         -- TODO we can only apply negation to terms without predicate calls for now
-        BUnary BNot x     ->  [(theta, BBinary BAnd constr (BUnary BNot bexpr),cnt)]
+        Unary Not _     ->  [(theta, Binary And constr (Unary Not bexpr),cnt)]
 
-        BBinary BOr x1 x2  -> let solutions1 = processFormula groundRuleMap x1 solution in
+        Binary Or x1 x2  -> let solutions1 = processFormula groundRuleMap x1 solution in
                               let solutions2 = processFormula groundRuleMap x2 solution in
                               solutions1 ++ solutions2
 
-        BBinary BAnd x1 x2 -> let solutions1 = processFormula groundRuleMap x1 solution in
+        Binary And x1 x2 -> let solutions1 = processFormula groundRuleMap x1 solution in
                               let solutions2 = concat $ map (processFormula groundRuleMap x2) solutions1 in
                               solutions2
-
-        -- n-ary And and Or are analogous to binary
-        BNary BOrs xs      -> concat $ map (\x -> processFormula groundRuleMap x solution) xs
-        BNary BAnds xs     -> foldr (\x solutions -> concat $ map (processFormula groundRuleMap x) solutions) [solution] xs
-
         -- if b is a fact, we take all existing solutions that make this fact true
-        BListPred (BPredName pName) argsB ->
+        Pred pName argsB ->
             if not (M.member pName groundRuleMap) then []
             else
                let factPredMap = groundRuleMap M.! pName in
@@ -123,11 +118,11 @@ unifyPredicate factPredMap thetaB' constr cnt' argsB argsF =
     let (cnt, thetaF', constrF) = refreshVarNames cnt' $ factPredMap M.! argsF in
 
     -- try to match
-    let (thetaB,thetaF,unifiable,constrUnif) = unifyArgs thetaB' thetaF' True (BConstBool True) argsB argsF in
+    let (thetaB,thetaF,unifiable,constrUnif) = unifyArgs thetaB' thetaF' True (ConstBool True) argsB argsF in
 
     -- we add a potential solution iff the terms are unifiable
     if not unifiable then []
-    else [(thetaB, BBinary BAnd constr $ BBinary BAnd (applyToFormula thetaF constrF) constrUnif, cnt)]
+    else [(thetaB, Binary And constr $ Binary And (applyToFormula thetaF constrF) constrUnif, cnt)]
 
 -- unification of arguments of two predicates (assumes that the predicate symbol is the same)
 unifyArgs :: Subst -> Subst -> Bool -> Formula -> [Term] -> [Term] -> (Subst, Subst, Bool, Formula)
@@ -149,17 +144,16 @@ unifyArgs thetaB thetaF unifiable constr (argB':argsB') (argF':argsF') =
             case (argB,argF) of
 
                 -- if one of the matched variables is free, add its new valuation to the substitution
-                (AVar x@(Free _), _) -> (updateTheta x argF thetaB, thetaF, unifiable, constr)
-                (_, AVar y@(Free _)) -> (thetaB, updateTheta y argB thetaF, unifiable, constr)
+                (Var x@(Free _), _) -> (updateTheta x argF thetaB, thetaF, unifiable, constr)
+                (_, Var y@(Free _)) -> (thetaB, updateTheta y argB thetaF, unifiable, constr)
 
                 -- different constants can never be unifiable
                 -- TODO we need to go deeper and apply constant propagation here
-                (AConstNum _,  AConstNum _)  -> (thetaB, thetaF, False, constr)
-                (AConstStr _,  AConstStr _)  -> (thetaB, thetaF, False, constr)
+                (ConstNum _,  ConstNum _)  -> (thetaB, thetaF, False, constr)
+                (ConstStr _,  ConstStr _)  -> (thetaB, thetaF, False, constr)
 
                 -- if terms are potentially unifiable (depending on private data), we add an equality constraint
-                _  -> (thetaB, thetaF, unifiable, BBinary BAnd constr (BBinPred BEQ argB argF))
-
+                _  -> (thetaB, thetaF, unifiable, Binary And constr (Binary BEQ argB argF))
     in unifyArgs thetaB' thetaF' unifiable' constr' argsB' argsF'
 
 

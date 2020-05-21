@@ -13,7 +13,7 @@ import Parser.DatalogParser.Lexer
 import Parser.DatalogParser.Expr
 
 import qualified DatalogProgram as DP
-import Aexpr
+import Expr
 import qualified Rule as R
 import DBClause hiding (dataType)
 
@@ -51,7 +51,7 @@ rule =
     let expr = joinExprs b
     return $ R.rule (R.functor h) (R.args h) expr
 
-body :: Parser [BExpr DBVar]
+body :: Parser [Expr DBVar]
 body = 
   sepBy1 p comma
     where p = bPredExpr
@@ -97,7 +97,7 @@ list =
     void $ symbol "["
     l <- sepBy variable comma
     void $ symbol "]"
-    return $ aVar <$> l
+    return $ Var <$> l
 
 -----------------------
 -- Exports
@@ -118,7 +118,7 @@ parseDatalogFromFile filepath =
 -- Utils
 -----------------------
 
-joinExprs :: [BExpr a] -> BExpr a
-joinExprs [] = bTrue
-joinExprs b  = foldl1 bAnd b
+joinExprs :: [Expr a] -> Expr a
+joinExprs [] = ConstBool True
+joinExprs b  = foldl1 (Binary And) b
 

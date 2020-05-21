@@ -3,15 +3,12 @@ module OptParse
   ) where
 
 import Options.Applicative
-import Data.Semigroup ((<>))
 
 import ProgramOptions
 
 programArgs :: Parser ProgramOptions
 programArgs = ProgramOptions
-  <$> strArgument (metavar "INPUT_PATH" <> help "input file containing initial datalog program")
-  <*> strOption (metavar "OUTPUT_PATH" <> value "" <> help "output file containing resulting SecreC program")
-  <*> option auto (short 'n' <> long "iterations" <> value 10 <> help "specify the maximum number of iterations")
+  <$> option auto (short 'n' <> long "iterations" <> value 10 <> help "specify the maximum number of iterations")
   <*> switch (long "db-create-tables"
               <> hidden
               <> help "Create the required tables in the database using the data in input files\n \
@@ -19,6 +16,8 @@ programArgs = ProgramOptions
   <*> switch (long "yes-no-only"
               <> hidden
               <> help "Output only a yes/no result, even if the goal contains free variables")
+  <*> strArgument (metavar "INPUT_PATH" <> help "input file containing initial datalog program")
+  <*> strArgument (metavar "OUTPUT_PATH" <> value "" <> help "output file containing resulting SecreC program")
 
 getProgramOptions :: IO ProgramOptions
 getProgramOptions = execParser opts

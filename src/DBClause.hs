@@ -13,15 +13,12 @@ import Data.Text.Prettyprint.Doc
 
 -- predicate argument, together with the privacy/data type
 -- here var is a database variable (not a free LP variable)
-{-# DEPRECATED Bound "Avoid using constructors directly" #-}
-{-# DEPRECATED Free "Avoid using constructors directly" #-}
 data DBVar
   = Bound DomainType DataType String
   | Free String
   deriving (Ord, Eq, Show)
 
 
--- TODO Remove Unknown constructor and use Maybe instead
 data DataType   = VarBool | VarNum | VarText | Unknown
   deriving (Ord,Eq,Show)
 data DomainType = Public  | Private
@@ -49,6 +46,7 @@ instance Pretty DataType where
   pretty VarBool = "bool"
   pretty VarText = "string"
   pretty VarNum  = "int"
+  pretty Unknown = "??"
 
 instance Pretty DomainType where
   pretty Private = "private"

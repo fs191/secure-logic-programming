@@ -13,10 +13,8 @@ module CSVImport
 import Data.List
 import Data.List.Split
 import qualified Data.Map as M
-import DatalogProgram
 
-import Aexpr
-import Rule
+import Expr
 import ErrorMsg
 import Table
 import DBClause
@@ -24,7 +22,7 @@ import DBClause
 indent :: String
 indent = "    "
 
-type PMap = M.Map [Term] Formula
+type PMap = M.Map [Expr DBClause] (Expr DBClause)
 
 splitBySeparator :: String -> String -> [String]
 splitBySeparator sep s =
@@ -63,7 +61,7 @@ createHeader = [
     indent ++ "pd_shared3p bool _temp_D_bool;",
     indent ++ "pd_shared3p xor_uint8 _temp_D_string;"]
 
-generateDataToDBscript :: PPDatalogProgram -> IO (String)
+generateDataToDBscript :: Expr DBClause -> IO (String)
 generateDataToDBscript database = do
     dataMap <- extractDataFromTables . toPMapMap $ facts database
     return $ intercalate "\n" $ createCSVImport dataMap
@@ -82,7 +80,7 @@ extractDataFromTable (pname,argMap) = do
     return $ (pname, (typeMap,header t,values <$> rows t))
     where processArg arg =
               case arg of
-                  AVar v@(Bound _ _ z) -> (z,v)
+                  Var v@(Bound _ _ z) -> (z,v)
                   _                    -> undefined
 
 -- a SecreC program is a list of code lines

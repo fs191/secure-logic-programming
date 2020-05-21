@@ -11,8 +11,7 @@ import Control.Monad.Combinators.Expr
 import Data.Void (Void)
 
 import Parser.DatalogParser.Lexer
-import Aexpr
-import Rule
+import Expr
 import DBClause
 
 type Parser = Parsec Void String
@@ -21,7 +20,7 @@ type Parser = Parsec Void String
 -- Predicate expressions
 -----------------------
 
-bPredExpr :: Parser (BExpr DBVar)
+bPredExpr :: Parser (Expr DBVar)
 bPredExpr = 
       opParse BLE "=<"
   <|> opParse BLT "<"
@@ -29,38 +28,38 @@ bPredExpr =
   <|> opParse BGT ">"
   <|> opParse BEQ "="
   <|> opParse BEQ "is"
-  <|> (try $ factToPred <$> literal)
+  <|> (try $ literal)
 
 -----------------------
 -- Numeric expressions
 -----------------------
 
-aExprTable :: [[Operator Parser (AExpr DBVar)]]
+aExprTable :: [[Operator Parser (Expr DBVar)]]
 aExprTable = 
-  [ [ prefix "-" $ aUn ANeg
+  [ [ prefix "-" $ Unary Neg
     ]
-  , [ binary "\\/" $ aBin AMax
-    , binary "/\\" $ aBin AMin
+  , [ binary "\\/" $ Binary Max
+    , binary "/\\" $ Binary Min
     ]
-  , [ binary "*" $ aBin AMult
-    , binary "/" $ aBin ADiv
+  , [ binary "*" $ Binary Mult
+    , binary "/" $ Binary Div
     ]
-  , [ binary "+" $ aBin AAdd
-    , binary "-" $ aBin ASub
+  , [ binary "+" $ Binary Add
+    , binary "-" $ Binary Sub
     ]
   ]
 
-aExpr :: Parser (AExpr DBVar)
+aExpr :: Parser (Expr DBVar)
 aExpr = makeExprParser aTerm aExprTable
 
-aTerm :: Parser (AExpr DBVar)
+aTerm :: Parser (Expr DBVar)
 aTerm = term <|> parens aExpr
 
-term :: Parser (AExpr DBVar)
+term :: Parser (Expr DBVar)
 term = 
-      (try $ aVar      <$> variable )
-  <|> (try $ aStrLit   <$> predicateSymbol)
-  <|> (try $ aNumLit   <$> signedInteger)
+      (try $ Var      <$> variable )
+  <|> (try $ ConstStr <$> predicateSymbol)
+  <|> (try $ ConstNum <$> signedInteger)
   <|> (fail $ "could not parse term")
 
 -----------------------
@@ -73,20 +72,17 @@ binary n f = InfixL  (f <$ symbol n)
 prefix :: String -> (a -> a) -> Operator Parser a
 prefix n f = Prefix  (f <$ symbol n)
 
-literal :: Parser Fact
+literal :: Parser (Expr DBVar)
 literal = 
   do
     psym <- predicateSymbol
     terms <- option [] . parens $ sepBy1 term comma
     let terms' = terms
-    return $ fact psym terms'
+    return $ Pred psym terms'
 
-opParse :: BBinPredOp -> String -> Parser (BExpr DBVar)
+opParse :: BinOp -> String -> Parser (Expr DBVar)
 opParse op s = 
   do
-    expr <- try $ bBinPred op <$> aExpr <*> (symbol s *> aExpr)
+    expr <- try $ Binary op <$> aExpr <*> (symbol s *> aExpr)
     return $ expr
-
-factToPred :: Fact -> BExpr DBVar
-factToPred f = bPred (functor f) (args f)
 

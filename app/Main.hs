@@ -1,7 +1,6 @@
 import ProgramOptions
 import OptParse
 import Parser.DatalogParser
-import Translator
 
 import CSVImport(generateDataToDBscript)
 
@@ -31,10 +30,7 @@ main = do
 
 
   -- we can output either only yes/no answer, or also valuations of free variables
-  let secrec = evalTranslator
-        $ withBoolOnly (_outputOnlyBool args)
-        $ withIterations (_iterations args)
-        $ translate =<< process program
+  let secrec = undefined
 
   -- Output the results
   if outFilePath /= ""
