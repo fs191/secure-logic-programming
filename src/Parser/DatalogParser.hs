@@ -26,35 +26,34 @@ data Clause
 -- Based on:
 -- https://www.ccs.neu.edu/home/ramsdell/tools/datalog/datalog.html#index-comment-syntax-13
 
-datalogParser :: Parser DP.PPDatalogProgram
+datalogParser :: Parser DP.DatalogProgram
 datalogParser =
   do
     -- TODO Should we parse retractions as well?
-    st <- many $ try $ clause  <* period
+    st <- many $ try clause  <* period
     q  <- optional $ goal <* period
     eof
     let rs   = [x | RuleClause x <- st]
-    let dbcs = [x | DBClause x <- st]
-    let dp = DP.fromRulesAndGoal rs q
-    return $ DP.ppDatalogProgram dp dbcs
+    let dbcs = [x | DBClause   x <- st]
+    return $ DP.ppDatalogProgram rs q dbcs
 
 clause :: Parser Clause
 clause = 
-      (RuleClause <$> rule) 
+      (RuleClause <$> ruleP) 
   <|> (DBClause <$> dbFact)
 
-rule :: Parser R.Rule
-rule = 
+ruleP :: Parser R.Rule
+ruleP = 
   do
-    h <- literal
+    h <- identifier
+    ps <- parens $ sepBy1 term comma
     b <- option [] $ impliedBy *> body
     let expr = joinExprs b
-    return $ R.rule (R.functor h) (R.args h) expr
+    return $ R.rule h ps expr
 
 body :: Parser [Expr DBVar]
 body = 
-  sepBy1 p comma
-    where p = bPredExpr
+  sepBy1 bPredExpr comma
 
 goal :: Parser DP.Goal
 goal = 
@@ -91,22 +90,22 @@ dbVar =
     ty <- dataType
     return $ bound al ty n
 
-list :: Parser [R.Term]
+list :: Parser [Expr DBVar]
 list = 
   do
     void $ symbol "["
     l <- sepBy variable comma
     void $ symbol "]"
-    return $ Var <$> l
+    return $ Var . Free <$> l
 
 -----------------------
 -- Exports
 -----------------------
 
-parseDatalog :: String -> String -> Either (ParseErrorBundle String Void) DP.PPDatalogProgram
+parseDatalog :: String -> String -> Either (ParseErrorBundle String Void) DP.DatalogProgram
 parseDatalog = runParser datalogParser
 
-parseDatalogFromFile :: String -> IO DP.PPDatalogProgram
+parseDatalogFromFile :: String -> IO DP.DatalogProgram
 parseDatalogFromFile filepath =
   do
     file <- readFile filepath

@@ -1,7 +1,7 @@
 module Parser.DatalogParser.Expr
   ( aExpr, bPredExpr
   , term, predicateSymbol
-  , literal
+  , rule
   ) where
 
 import Text.Megaparsec
@@ -9,9 +9,11 @@ import Text.Megaparsec
 import Control.Monad.Combinators.Expr
 
 import Data.Void (Void)
+import Data.Foldable
 
 import Parser.DatalogParser.Lexer
 import Expr
+import qualified Rule as R
 import DBClause
 
 type Parser = Parsec Void String
@@ -28,7 +30,7 @@ bPredExpr =
   <|> opParse BGT ">"
   <|> opParse BEQ "="
   <|> opParse BEQ "is"
-  <|> (try $ literal)
+  <|> predicate
 
 -----------------------
 -- Numeric expressions
@@ -53,14 +55,14 @@ aExpr :: Parser (Expr DBVar)
 aExpr = makeExprParser aTerm aExprTable
 
 aTerm :: Parser (Expr DBVar)
-aTerm = term <|> parens aExpr
+aTerm = try term <|> parens aExpr
 
 term :: Parser (Expr DBVar)
-term = 
-      (try $ Var      <$> variable )
-  <|> (try $ ConstStr <$> predicateSymbol)
-  <|> (try $ ConstNum <$> signedInteger)
-  <|> (fail $ "could not parse term")
+term = asum
+  [ try $ Var . Free <$> variable 
+  , try $ ConstStr   <$> predicateSymbol
+  , try $ ConstNum   <$> signedInteger
+  ]
 
 -----------------------
 -- Helper functions
@@ -72,13 +74,15 @@ binary n f = InfixL  (f <$ symbol n)
 prefix :: String -> (a -> a) -> Operator Parser a
 prefix n f = Prefix  (f <$ symbol n)
 
-literal :: Parser (Expr DBVar)
-literal = 
+predicate :: Parser (Expr DBVar)
+predicate = Pred <$> identifier <*> (parens $ sepBy1 term comma)
+
+rule :: Parser R.Rule
+rule = 
   do
     psym <- predicateSymbol
     terms <- option [] . parens $ sepBy1 term comma
-    let terms' = terms
-    return $ Pred psym terms'
+    return $ R.fact psym terms
 
 opParse :: BinOp -> String -> Parser (Expr DBVar)
 opParse op s = 

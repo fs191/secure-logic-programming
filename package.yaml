@@ -35,7 +35,7 @@ dependencies:
 - split
 - hashable
 - parser-combinators
-- optics
+- lens
 - prettyprinter
 # Testing only
 # For some reason I get errors in ghcide if these are not in the dependencies

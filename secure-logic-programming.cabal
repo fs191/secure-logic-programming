@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 27f0836866a035ead7ff5352a0bf2add03ae1c4323dcbe809455ac34d944100c
+-- hash: dd47ebaf878f9403dccbe5d6a5a5118bbaf6fb0d58d3b66a0073a1f1b5dd0225
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -27,24 +27,19 @@ source-repository head
 
 library
   exposed-modules:
-      Aexpr
-      CSVImport
       DatalogProgram
       DBClause
       ErrorMsg
-      Interpreter
+      Expr
+      Language.SecreC
       Lib
-      Optimize
       Parser.DatalogParser
       Parser.DatalogParser.Expr
       Parser.DatalogParser.Lexer
-      Preprocess
       Rule
-      SecreC
       Substitution
       Table
       Transform
-      Translator
   other-modules:
       Paths_secure_logic_programming
   hs-source-dirs:
@@ -57,9 +52,9 @@ library
     , containers
     , hashable
     , hspec
+    , lens
     , megaparsec
     , mtl
-    , optics
     , optparse-applicative
     , parsec
     , parser-combinators
@@ -89,9 +84,9 @@ executable lpsec
     , containers
     , hashable
     , hspec
+    , lens
     , megaparsec
     , mtl
-    , optics
     , optparse-applicative
     , parsec
     , parser-combinators
@@ -111,6 +106,7 @@ test-suite test
   main-is: Spec.hs
   other-modules:
       ParserSpec
+      SubstSpec
       TransformSpec
       Paths_secure_logic_programming
   hs-source-dirs:
@@ -125,9 +121,9 @@ test-suite test
     , hashable
     , hspec
     , hspec-expectations
+    , lens
     , megaparsec
     , mtl
-    , optics
     , optparse-applicative
     , parsec
     , parser-combinators

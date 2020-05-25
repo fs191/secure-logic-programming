@@ -6,10 +6,15 @@ module DBClause
   , isFree
   , dataType
   , DataType(..), DomainType(..)
-  , rename, varName
+  , varName
+  , Named(..)
   ) where
 
 import Data.Text.Prettyprint.Doc
+
+class Named a where
+  name   :: a -> String
+  rename :: String -> a -> a
 
 -- predicate argument, together with the privacy/data type
 -- here var is a database variable (not a free LP variable)
@@ -38,6 +43,12 @@ instance Pretty DBClause where
       (parens $ hsep $ punctuate "," $ pretty <$> _dcVars c)
     )
 
+instance Named DBVar where
+  name   (Bound _ _ n) = n
+  name   (Free n) = n
+  rename n' (Bound x y _) = Bound x y n'
+  rename n (Free _) = Free n
+
 instance Pretty DBVar where
   pretty (Free n)          = pretty n
   pretty (Bound dom dat n) = pretty n <+> ":" <+> pretty dom <+> pretty dat
@@ -57,10 +68,6 @@ free = Free
 
 bound :: DomainType -> DataType -> String -> DBVar
 bound = Bound
-
-rename :: String -> DBVar -> DBVar
-rename n (Free _) = Free n
-rename n (Bound x y _) = Bound x y n
 
 isFree :: DBVar -> Bool
 isFree (Free _) = True

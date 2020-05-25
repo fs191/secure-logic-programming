@@ -18,6 +18,9 @@ import DatalogProgram
 
 spec :: Spec
 spec = describe "Parser.parseDatalog" $ do
+    canParse "examples/prolog/onlyFacts.pl"
+    canParse "examples/prolog/onlyRules.pl"
+    canParse "examples/prolog/onlyGoal.pl"
     canParse "examples/prolog/auction.pl"
     canParse "examples/prolog/fib.pl"
     canParse "examples/prolog/market.pl"

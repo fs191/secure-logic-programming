@@ -34,12 +34,12 @@ sc = C.space
   (C.skipLineComment "%")
   empty
 
-variable :: Parser DBVar
+variable :: Parser String
 variable = lexeme $
   do
     h <- upperChar
     t <- many $ alphaNumChar <|> identifierSymbols
-    return . free $ h:t
+    return $ h:t
 
 identifier :: Parser String
 identifier = lexeme $
@@ -79,12 +79,12 @@ predicateSymbol = (try identifier) <|> stringLiteral
 
 domainType :: Parser DomainType
 domainType =
-      (try $ symbol "public" *> return Public)
+      (try $ symbol "public"  *> return Public)
   <|> (try $ symbol "private" *> return Private)
 
 dataType :: Parser DataType
 dataType =
-      (try $ symbol "bool" *> return VarBool)
-  <|> (try $ symbol "int" *> return VarNum)
+      (try $ symbol "bool"   *> return VarBool)
+  <|> (try $ symbol "int"    *> return VarNum)
   <|> (try $ symbol "string" *> return VarText)
 

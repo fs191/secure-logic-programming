@@ -2,13 +2,12 @@
 
 module Substitution
   ( Subst
-  , applyToFormula
   , refreshVarNames
-  , applyToTerm
+  , applyToExpr
   , emptyTheta
   , assignmentsToTheta
   , updateTheta
-  , Named(..)
+  , unify
   ) where
 
 ---------------------------------------------------------
@@ -16,13 +15,12 @@ module Substitution
 ---------------------------------------------------------
 
 import qualified Data.Map as M
-import Data.Foldable
+
+import Control.Lens
 
 import Expr
+import DBClause
 
-class Named a where
-  name   :: a -> String
-  rename :: a -> String -> a
 
 newtype Subst a = Th (M.Map a (Expr a))
   deriving (Semigroup, Monoid)
@@ -75,44 +73,62 @@ assignmentsToTheta bexpr theta =
 
     where processRec theta' x = assignmentsToTheta x theta'
 
--- apply a substitution
-applyToFormula :: (Ord a) => Subst a -> (Expr a) -> (Expr a)
-applyToFormula theta bexpr =
+-- | Apply a substitution to an expression
+applyToExpr :: (Ord a) => Subst a -> (Expr a) -> (Expr a)
+applyToExpr theta bexpr =
     case bexpr of
 
+        Var      x -> evalTheta theta x
         -- we assume in advance that LHS of an assignment is a free variable
         -- otherwise, treat the source program as incorrect
-        Binary BAsgn (Var x) y -> let z = applyToTerm theta y in
+        Binary BAsgn (Var x) y -> let z = applyToExpr theta y in
                                      if memberTheta x theta then
                                          Binary BEQ (evalTheta theta x) z
                                      else
                                          Binary BAsgn (Var x) z
 
-        Binary  f x1 x2 -> Binary f (applyToTerm theta x1) (applyToTerm theta x2)
-        Unary f x      -> Unary f $ applyToFormula theta x
-        Binary f x1 x2 -> Binary f (applyToFormula theta x1) (applyToFormula theta x2)
+        Binary  f x1 x2 -> Binary f (applyToExpr theta x1) (applyToExpr theta x2)
+        Unary f x      -> Unary f $ applyToExpr theta x
+        Binary f x1 x2 -> Binary f (applyToExpr theta x1) (applyToExpr theta x2)
 
         x               -> x
 
-applyToTerm :: (Ord a) => Subst a -> (Expr a) -> (Expr a)
-applyToTerm theta aexpr =
-    case aexpr of
+varList :: Subst a -> [a]
+varList (Th m) = [x | Var x <- M.elems m]
 
-        Var      x -> evalTheta theta x
-
-        Unary  f x      -> Unary f $ processRec x
-        Binary f x1 x2  -> Binary f (processRec x1) (processRec x2)
-
-        x                -> x
-
-    where processRec x = applyToTerm theta x
-
--- TODO continue from here
--- replace all variables with fresh names, store the replacement into a substitution
--- the fresh names are numbered starting from the input counter
-refreshVarNames :: (Ord a, Named a) => Expr a -> Subst a
-refreshVarNames e = mconcat $ f <$> [1..] `zip` toList e
+-- | Replace all variables with fresh names, store the replacement into a substitution
+refreshVarNames :: (Ord a, Named a) => String -> Subst a -> Subst a
+refreshVarNames prefix e = mconcat $ f <$> [1..] `zip` varList e
   where 
-    f :: Named a => (Int, a) -> Subst a
-    f (i, v) = v |-> (Var $ rename v $ "X_" ++ show i)
+    f (i, v) = v |-> (Var $ rename (prefix ++ show i) v)
+
+-- | Attempt to unify the two expressions. Will return Nothing if the expressions cannot be unified
+unify :: (Ord a, Named a) => Expr a -> Expr a -> Maybe (Subst a)
+unify x y = unify' [(x, y)]
+
+-- See: https://en.wikipedia.org/wiki/Unification_(computer_science)#A_unification_algorithm
+unify' :: (Ord a) => [(Expr a, Expr a)] -> Maybe (Subst a)
+-- Eliminate
+unify' g@((v@(Var x), y):t)
+  | v `elem` vars g = 
+    do
+      let s = applyToExpr $ x |-> y
+      rest <- unify' $ (t & traversed . both %~ s)
+      return $ (x |-> y) <> rest
+-- Decompose
+unify' ((Pred n xs, Pred m ys):t)
+  | n == m && length xs == length ys = unify' $ xs `zip` ys <> t
+  | otherwise = Nothing
+-- Swap
+unify' ((x, Var y):t) = unify' ((Var y, x):t)
+-- Delete / conflict
+unify' ((x,y):t) 
+  | x == y    = unify' t
+  | otherwise = Nothing
+unify' [] = Just emptyTheta
+
+vars :: [(Expr a, Expr a)] -> [Expr a]
+vars ((x@(Var _), y@(Var _)):t) = x:y:(vars t)
+vars ((x@(Var _), _):t) = x:(vars t)
+vars ((_, x@(Var _)):t) = x:(vars t)
 

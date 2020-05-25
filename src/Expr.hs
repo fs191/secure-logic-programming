@@ -1,9 +1,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveFoldable#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Expr
   ( Expr(..)
@@ -11,6 +12,8 @@ module Expr
   , extractAllPredicates
   , isConstExpr
   , ruleIndent
+  , simplifyBool
+  , _Pred
   ) where
 
 ---------------------------------------------------------
@@ -19,14 +22,32 @@ module Expr
 
 import Prelude hiding ((<>))
 import Control.Exception
-import Data.Typeable
 import Data.Foldable
+import Data.Generics.Uniplate
+
+import Control.Lens
 
 import Data.Text.Prettyprint.Doc
 
 data EvaluationException a
   = NonConstantTerm (Expr a)
   deriving (Show, Exception)
+
+data UnOp
+  = Not
+  | Neg
+  deriving (Ord,Eq)
+
+instance Show UnOp where
+  show Not = "-"
+
+data BinOp
+  = Div | Mult | Add | Sub
+  | Min | Max
+  | And | Or
+  | Implies
+  | BLT | BLE | BEQ | BGE | BGT | BAsgn
+  deriving (Ord,Eq,Show)
 
 -- artihmetic expressions
 data Expr a
@@ -37,22 +58,16 @@ data Expr a
   | Unary  UnOp   (Expr a)
   | Binary BinOp  (Expr a) (Expr a)
   | Pred   String [Expr a]
-  deriving (Ord,Eq,Functor,Foldable,Show)
+  deriving (Functor,Foldable,Show,Eq,Uniplate)
+makePrisms ''Expr
 
 instance (Pretty a) => Pretty (Expr a) where
   pretty (Var x) = pretty x
   pretty (ConstNum x) = pretty x
   pretty (ConstStr x) = pretty x
-  pretty (Unary op x) = pretty op <> pretty x
-  pretty (Binary op x y) = pretty x <> pretty op <> pretty y
-
-data BinOp
-  = Div | Mult | Add | Sub
-  | Min | Max
-  | And | Or
-  | Implies
-  | BLT | BLE | BEQ | BGE | BGT | BAsgn
-  deriving (Ord,Eq,Show)
+  pretty (Unary o x) = pretty o <> pretty x
+  pretty (Binary o x y) = pretty x <> pretty o <> pretty y
+  pretty (Pred n args) = pretty n <> (tupled $ pretty <$> args)
 
 instance Pretty UnOp where
   pretty = pretty . show
@@ -68,14 +83,6 @@ instance Pretty BinOp where
   pretty BGT   = " > "
   pretty BAsgn = " := "
 
-data UnOp
-  = Not
-  | Neg
-  deriving (Ord,Eq)
-
-instance Show UnOp where
-  show Not = "-"
-
 ------------------------------------------------------------------------------------
 -- this is currently used only for visual feedback
 ruleIndent :: String
@@ -89,8 +96,8 @@ isConstExpr expr = not . null $ toList expr
 -- evaluate an expression
 evalInt :: Expr a -> Maybe Int
 evalInt (ConstNum x)    = Just x
-evalInt (Binary op x y) = toBinIntOp op <*> evalInt x <*> evalInt y
-evalInt (Unary op x)    = toUnIntOp op <*> evalInt x
+evalInt (Binary o x y) = toBinIntOp o <*> evalInt x <*> evalInt y
+evalInt (Unary o x)    = toUnIntOp o <*> evalInt x
 evalInt _               = Nothing
 
 toBinIntOp :: BinOp -> Maybe (Int -> Int -> Int)
@@ -105,9 +112,9 @@ toUnIntOp _   = Nothing
 
 evalBool :: Expr a -> Maybe Bool
 evalBool (ConstBool x) = Just x
-evalBool (Binary op x y) = asum
-  [ toBinBoolOp op <*> evalBool x <*> evalBool y
-  , toBinPredOp op <*> evalInt  x <*> evalInt  y
+evalBool (Binary o x y) = asum
+  [ toBinBoolOp o <*> evalBool x <*> evalBool y
+  , toBinPredOp o <*> evalInt  x <*> evalInt  y
   ]
 
 toBinBoolOp :: BinOp -> Maybe (Bool -> Bool -> Bool)
@@ -123,6 +130,9 @@ toBinPredOp BGE = Just (>=)
 toBinPredOp BLE = Just (<=)
 toBinPredOp BEQ = Just (==)
 toBinPredOp _   = Nothing
+
+simplifyBool :: Expr a -> Expr a
+simplifyBool = id
 
 extractAllPredicates :: Expr a -> [(String, [Expr a])]
 extractAllPredicates bexpr =
