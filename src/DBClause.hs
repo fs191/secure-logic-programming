@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module DBClause 
@@ -11,6 +12,8 @@ module DBClause
   ) where
 
 import Data.Text.Prettyprint.Doc
+import Data.Data hiding (DataType)
+import Data.Typeable
 
 class Named a where
   name   :: a -> String
@@ -21,13 +24,13 @@ class Named a where
 data DBVar
   = Bound DomainType DataType String
   | Free String
-  deriving (Ord, Eq, Show)
+  deriving (Ord, Eq, Show, Data, Typeable)
 
 
 data DataType   = VarBool | VarNum | VarText | Unknown
-  deriving (Ord,Eq,Show)
+  deriving (Ord,Eq,Show,Data,Typeable)
 data DomainType = Public  | Private
-  deriving (Ord,Eq,Show)
+  deriving (Ord,Eq,Show,Data,Typeable)
 
 data DBClause = DBClause 
   { _dcFunctor :: String 

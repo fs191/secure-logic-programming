@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -11,7 +12,6 @@ module Expr
   , BinOp(..), UnOp(..)
   , extractAllPredicates
   , isConstExpr
-  , ruleIndent
   , simplifyBool
   , _Pred
   ) where
@@ -20,14 +20,15 @@ module Expr
 ---- Arithmetic and Boolean expressions
 ---------------------------------------------------------
 
-import Prelude hiding ((<>))
 import Control.Exception
+import Control.Lens hiding (plate)
+
+import Data.Data
 import Data.Foldable
-import Data.Generics.Uniplate
-
-import Control.Lens
-
+import Data.Generics.Uniplate.Data ()
 import Data.Text.Prettyprint.Doc
+
+import Prelude hiding ((<>))
 
 data EvaluationException a
   = NonConstantTerm (Expr a)
@@ -36,7 +37,7 @@ data EvaluationException a
 data UnOp
   = Not
   | Neg
-  deriving (Ord,Eq)
+  deriving (Ord,Eq,Data, Typeable)
 
 instance Show UnOp where
   show Not = "-"
@@ -47,7 +48,7 @@ data BinOp
   | And | Or
   | Implies
   | BLT | BLE | BEQ | BGE | BGT | BAsgn
-  deriving (Ord,Eq,Show)
+  deriving (Ord,Eq,Show,Data,Typeable)
 
 -- artihmetic expressions
 data Expr a
@@ -58,35 +59,33 @@ data Expr a
   | Unary  UnOp   (Expr a)
   | Binary BinOp  (Expr a) (Expr a)
   | Pred   String [Expr a]
-  deriving (Functor,Foldable,Show,Eq,Uniplate)
+  deriving (Functor,Foldable,Show,Eq,Data,Typeable)
 makePrisms ''Expr
 
 instance (Pretty a) => Pretty (Expr a) where
-  pretty (Var x) = pretty x
-  pretty (ConstNum x) = pretty x
-  pretty (ConstStr x) = pretty x
-  pretty (Unary o x) = pretty o <> pretty x
+  pretty (Var x)        = pretty x
+  pretty (ConstNum x)   = pretty x
+  pretty (ConstStr x)   = pretty x
+  pretty (ConstBool x)  = pretty x
+  pretty (Unary o x)    = pretty o <> pretty x
   pretty (Binary o x y) = pretty x <> pretty o <> pretty y
-  pretty (Pred n args) = pretty n <> (tupled $ pretty <$> args)
+  pretty (Pred n args)  = pretty n <> (tupled $ pretty <$> args)
 
 instance Pretty UnOp where
   pretty = pretty . show
 
 instance Pretty BinOp where
   pretty And = ",\n"
-  pretty Or  = " OR "
-  pretty x   = pretty . show $ x
-  pretty BLT   = " < "
-  pretty BLE   = " <= "
-  pretty BEQ   = " == "
-  pretty BGE   = " >= "
-  pretty BGT   = " > "
-  pretty BAsgn = " := "
+  pretty Or  = "OR"
+  pretty BLT   = "<"
+  pretty BLE   = "<="
+  pretty BEQ   = "="
+  pretty BGE   = ">="
+  pretty BGT   = ">"
+  pretty BAsgn = ":="
+  pretty Add   = "+"
+  pretty x     = pretty $ show x
 
-------------------------------------------------------------------------------------
--- this is currently used only for visual feedback
-ruleIndent :: String
-ruleIndent = "  "
 --------------------------
 -- is the expression constant (i.e. does not contain any variables)?
 isConstExpr :: Expr a -> Bool

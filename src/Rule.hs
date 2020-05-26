@@ -6,7 +6,10 @@ module Rule
   ( Rule
   , rule, fact
   , args
+  , isFact
   , ruleHead, ruleTail
+  , refreshRule
+  , applySubst
   ) where
 
 ---------------------------------------------------------
@@ -18,6 +21,7 @@ import           Data.Text.Prettyprint.Doc
 import           Control.Lens
 
 import           Expr
+import           Substitution
 import qualified DBClause as D
 
 -- a rule has a list of arguments and a formula that represents rule premise
@@ -36,16 +40,29 @@ instance D.Named Rule where
 instance Pretty Rule where
   pretty r =
     (pretty $ r ^. ruleHead . _Pred . _1) <+>
+    tupled (pretty <$> r ^. ruleHead . _Pred . _2) <+>
     ":-" <+>  
     hardline <+>
     (indent 2 $ pretty $ _ruleTail r)
 
 fact :: String -> [Expr D.DBVar] -> Rule
-fact n args = Rule (Pred n args) (ConstBool True)
+fact n as = Rule (Pred n as) (ConstBool True)
 
 rule :: String -> [Expr D.DBVar] -> Expr D.DBVar -> Rule
-rule n args p = Rule (Pred n args) p
+rule n as p = Rule (Pred n as) p
 
 args :: Rule -> [Expr D.DBVar]
 args = view $ ruleHead . _Pred . _2
+
+isFact :: Rule -> Bool
+isFact r = _ruleTail r == ConstBool True
+
+refreshRule :: String -> Rule -> Rule
+refreshRule prefix r = applySubst s r
+  where 
+    s = mconcat $ refreshExpr prefix <$> [r ^. ruleHead, r ^. ruleTail]
+
+applySubst :: Subst D.DBVar -> Rule -> Rule
+applySubst s r = r & ruleHead %~ applyToExpr s
+                   & ruleTail %~ applyToExpr s
 

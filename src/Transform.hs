@@ -7,9 +7,7 @@ module Transform
 ----  to intermediate representation
 ---------------------------------------------------------
 
-import qualified Data.Map as M
-
-import Data.Generics.Uniplate as U
+import Data.Generics.Uniplate.Operations as U
 import Data.Maybe
 
 import Control.Lens
@@ -17,27 +15,28 @@ import Control.Lens
 import Rule
 import Expr
 import Substitution
-import DBClause
 import qualified DatalogProgram as DP
 
--- generate all possible ground rules for n iterations
+-- | generate all possible ground rules for n iterations
 deriveAllGroundRules :: DP.DatalogProgram -> Int -> DP.DatalogProgram
-deriveAllGroundRules program n = program & DP.ruleLens %~ f n
+deriveAllGroundRules program n = program & DP.ruleLens %~ f
   where
-    f :: Int -> [Rule] -> [Rule]
-    f n = foldl (.) id $ replicate n inlineOnce
+    f :: [Rule] -> [Rule]
+    f x = foldl (.) id (replicate n (simplify . inlineOnce)) x
 
 inlineOnce :: [Rule] -> [Rule]
-inlineOnce r = (ruleTail %~ f r) <$> r
-  where 
-    f :: [Rule] -> Expr DBVar -> Expr DBVar
-    f r = foldl (.) id (inlineExpr <$> r)
+inlineOnce rs =
+  rs <> do
+    tgt <- refreshRule "X_" <$> rs
+    src <- refreshRule "Y_" <$> rs
+    let shd = src ^. ruleHead
+    let stl = src ^. ruleTail
+    let ttl = tgt ^. ruleTail
+    (p@(Pred _ _), mut) <- U.contexts ttl
+    let subst = unify shd p
+    s <- maybeToList subst
+    return . applySubst s $ tgt & ruleTail .~ mut stl
 
-inlineExpr :: Rule -> Expr DBVar -> Expr DBVar
-inlineExpr r = U.transform $ \x ->
-  case x of 
-    p@(Pred n as) -> applyToExpr (unified p) p
-    x             -> x
-  where
-    unified p = fromMaybe emptyTheta $ unify p (r ^. ruleHead)
+simplify :: [Rule] -> [Rule]
+simplify = id
 

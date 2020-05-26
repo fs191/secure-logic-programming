@@ -2,8 +2,9 @@
 
 module Substitution
   ( Subst
-  , refreshVarNames
+  , refreshExpr
   , applyToExpr
+  , refreshAndApply
   , emptyTheta
   , assignmentsToTheta
   , updateTheta
@@ -16,11 +17,13 @@ module Substitution
 
 import qualified Data.Map as M
 
-import Control.Lens
+import Data.Generics.Uniplate.Operations
+import Data.Data
+
+import Control.Lens hiding (universe, transform)
 
 import Expr
 import DBClause
-
 
 newtype Subst a = Th (M.Map a (Expr a))
   deriving (Semigroup, Monoid)
@@ -40,19 +43,9 @@ evalTheta (Th theta) x =
     then theta M.! x 
     else Var x
 
-memberTheta :: (Ord a) => a -> Subst a -> Bool
-memberTheta x (Th theta) = M.member x theta
-
 -- update the substitution
 updateTheta :: (Ord a) => a -> (Expr a) -> Subst a -> Subst a
-updateTheta a b (Th theta) =
-
-    let theta' = M.insert a b theta in
-    Th $ M.fromList $ map (\(x,y) -> case y of
-                                    Var z -> if z == a then (x,b) else (x,y)
-                                    _      -> (x,y)
-                          ) (M.toList theta')
-
+updateTheta a b theta = (a |-> b) <> theta
 
 -- extract assignments into a substitution
 assignmentsToTheta :: (Ord a) => (Expr a) -> Subst a -> ((Expr a), Subst a)
@@ -74,40 +67,26 @@ assignmentsToTheta bexpr theta =
     where processRec theta' x = assignmentsToTheta x theta'
 
 -- | Apply a substitution to an expression
-applyToExpr :: (Ord a) => Subst a -> (Expr a) -> (Expr a)
-applyToExpr theta bexpr =
-    case bexpr of
+applyToExpr :: (Data a, Ord a) => Subst a -> (Expr a) -> (Expr a)
+applyToExpr theta bexpr = transform f bexpr
+  where f (Var x) = evalTheta theta x
+        f x       = x
 
-        Var      x -> evalTheta theta x
-        -- we assume in advance that LHS of an assignment is a free variable
-        -- otherwise, treat the source program as incorrect
-        Binary BAsgn (Var x) y -> let z = applyToExpr theta y in
-                                     if memberTheta x theta then
-                                         Binary BEQ (evalTheta theta x) z
-                                     else
-                                         Binary BAsgn (Var x) z
+refreshExpr :: (Data a, Named a, Ord a) => String -> Expr a -> Subst a
+refreshExpr prefix e = mconcat 
+  [ v |-> (Var $ rename (prefix <> name v) v)
+  | (Var v) <- universe e
+  ]
 
-        Binary  f x1 x2 -> Binary f (applyToExpr theta x1) (applyToExpr theta x2)
-        Unary f x      -> Unary f $ applyToExpr theta x
-        Binary f x1 x2 -> Binary f (applyToExpr theta x1) (applyToExpr theta x2)
-
-        x               -> x
-
-varList :: Subst a -> [a]
-varList (Th m) = [x | Var x <- M.elems m]
-
--- | Replace all variables with fresh names, store the replacement into a substitution
-refreshVarNames :: (Ord a, Named a) => String -> Subst a -> Subst a
-refreshVarNames prefix e = mconcat $ f <$> [1..] `zip` varList e
-  where 
-    f (i, v) = v |-> (Var $ rename (prefix ++ show i) v)
+refreshAndApply :: (Data a, Named a, Ord a) => String -> Expr a -> Expr a
+refreshAndApply prefix e = applyToExpr (refreshExpr prefix e) e
 
 -- | Attempt to unify the two expressions. Will return Nothing if the expressions cannot be unified
-unify :: (Ord a, Named a) => Expr a -> Expr a -> Maybe (Subst a)
+unify :: (Ord a, Data a, Named a) => Expr a -> Expr a -> Maybe (Subst a)
 unify x y = unify' [(x, y)]
 
 -- See: https://en.wikipedia.org/wiki/Unification_(computer_science)#A_unification_algorithm
-unify' :: (Ord a) => [(Expr a, Expr a)] -> Maybe (Subst a)
+unify' :: (Data a, Ord a) => [(Expr a, Expr a)] -> Maybe (Subst a)
 -- Eliminate
 unify' g@((v@(Var x), y):t)
   | v `elem` vars g = 
