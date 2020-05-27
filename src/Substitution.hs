@@ -82,8 +82,6 @@ assignmentsToTheta bexpr theta =
 
         -- we assume in advance that LHS of an assignment is a free variable,
         -- and that there are no other assignments in RHS
-        Binary BAsgn (Var x) y -> (ConstBool True, updateTheta x y theta)
-
         Binary f x1 x2  -> let (y1,theta1) = processRec theta  x1 in
                             let (y2,theta2) = processRec theta1 x2 in
                             (Binary f y1 y2, theta2)

@@ -9,6 +9,7 @@ module Transform
 
 import Data.Generics.Uniplate.Operations as U
 import Data.Maybe
+import Data.List
 import qualified Data.Set as S
 
 import Control.Applicative
@@ -27,6 +28,7 @@ deriveAllGroundRules program n = program & DP.ruleLens %~ f
     f :: [Rule] -> [Rule]
     f x = foldl (.) id (replicate n pipeline) x
     pipeline = 
+      removeDuplicateFacts .
       removeFalseFacts .
       liftA simplify . 
       (traversed . ruleTail %~ simplifyAnds) .
@@ -97,6 +99,10 @@ isAnd :: Expr a -> Bool
 isAnd (Binary And _ _) = True
 isAnd _ = False
 
+-- | Removes facts that always evaluate to False
 removeFalseFacts :: [Rule] -> [Rule]
 removeFalseFacts = filter (\x -> x ^. ruleTail /= ConstBool False)
+
+removeDuplicateFacts :: [Rule] -> [Rule]
+removeDuplicateFacts = nub
 

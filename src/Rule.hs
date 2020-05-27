@@ -30,7 +30,7 @@ data Rule = Rule
   { _ruleHead :: Expr D.DBVar
   , _ruleTail :: Expr D.DBVar
   }
-  deriving (Show)
+  deriving (Show,Eq)
 makeLenses ''Rule
 
 instance D.Named Rule where

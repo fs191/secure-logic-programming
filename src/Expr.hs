@@ -12,7 +12,6 @@ module Expr
   , BinOp(..), UnOp(..)
   , extractAllPredicates
   , isConstExpr, isLeaf
-  , simplifyBool
   , _Pred
   ) where
 
@@ -46,7 +45,7 @@ data BinOp
   = Div | Mult | Add | Sub
   | Min | Max
   | And | Or
-  | BLT | BLE | BEQ | BGE | BGT | BAsgn
+  | BLT | BLE | BEQ | BGE | BGT
   deriving (Ord,Eq,Show,Data,Typeable)
 
 -- artihmetic expressions
@@ -81,7 +80,6 @@ instance Pretty BinOp where
   pretty BEQ   = " = "
   pretty BGE   = " >= "
   pretty BGT   = " > "
-  pretty BAsgn = " := "
   pretty Add   = " + "
   pretty x     = pretty $ show x
 
@@ -89,47 +87,6 @@ instance Pretty BinOp where
 -- is the expression constant (i.e. does not contain any variables)?
 isConstExpr :: Expr a -> Bool
 isConstExpr expr = not . null $ toList expr
-
---------------------------
--- evaluate an expression
-evalInt :: Expr a -> Maybe Int
-evalInt (ConstNum x)    = Just x
-evalInt (Binary o x y) = toBinIntOp o <*> evalInt x <*> evalInt y
-evalInt (Unary o x)    = toUnIntOp o <*> evalInt x
-evalInt _               = Nothing
-
-toBinIntOp :: BinOp -> Maybe (Int -> Int -> Int)
-toBinIntOp Add  = Just (+)
-toBinIntOp Mult = Just (*)
-toBinIntOp Sub  = Just (-)
-toBinIntOp _    = Nothing
-
-toUnIntOp :: UnOp -> Maybe (Int -> Int)
-toUnIntOp Neg = Just negate
-toUnIntOp _   = Nothing
-
-evalBool :: Expr a -> Maybe Bool
-evalBool (ConstBool x) = Just x
-evalBool (Binary o x y) = asum
-  [ toBinBoolOp o <*> evalBool x <*> evalBool y
-  , toBinPredOp o <*> evalInt  x <*> evalInt  y
-  ]
-
-toBinBoolOp :: BinOp -> Maybe (Bool -> Bool -> Bool)
-toBinBoolOp And     = Just (&&)
-toBinBoolOp Or      = Just (||)
-toBinBoolOp _       = Nothing
-
-toBinPredOp :: BinOp -> Maybe (Int -> Int -> Bool)
-toBinPredOp BGT = Just (>)
-toBinPredOp BLT = Just (<)
-toBinPredOp BGE = Just (>=)
-toBinPredOp BLE = Just (<=)
-toBinPredOp BEQ = Just (==)
-toBinPredOp _   = Nothing
-
-simplifyBool :: Expr a -> Expr a
-simplifyBool = id
 
 extractAllPredicates :: Expr a -> [(String, [Expr a])]
 extractAllPredicates bexpr =

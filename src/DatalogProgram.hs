@@ -11,7 +11,7 @@ module DatalogProgram
   , LogicProgram
   , makeGoal
   , rules, goal
-  , mapRules, setRules
+  , setRules
   , inputs, outputs, formula
   , toDatalogSource
   , fromRulesAndGoal
@@ -41,7 +41,6 @@ class LogicProgram a where
   goal        :: a -> Maybe Goal
   ruleNames   :: a -> [String]
   rulesByName :: a -> String -> [Rule]
-  mapRules    :: (Rule -> Rule) -> a -> a
   setRules    :: [Rule] -> a -> a
 
   ruleNames prog = nub $ name <$> rules prog
@@ -75,7 +74,7 @@ instance IsGoal Goal where
   toGoal = id
 
 data DatalogProgram = DatalogProgram
-  { _dpRules :: M.Map String [Rule]
+  { _dpRules :: [Rule]
   , _dpGoal  :: Maybe Goal
   , _ppDBClauses :: [DBClause]
   }
@@ -93,10 +92,9 @@ genRuleMap rs = M.unionsWith (<>) $ f <$> rs
     f x = M.singleton (name x) [x]
 
 instance LogicProgram DatalogProgram where
-  rules = concat . M.elems . _dpRules
+  rules = _dpRules
   goal  = _dpGoal
-  mapRules f = dpRules %~ ((f <$>) <$>)
-  setRules r = dpRules .~ genRuleMap r
+  setRules r = dpRules .~ r
 
 makeGoal ::
      [Expr DBVar]
@@ -118,11 +116,11 @@ toDatalogSource :: DatalogProgram -> String
 toDatalogSource  = undefined
 
 fromRulesAndGoal :: [Rule] -> Maybe Goal -> DatalogProgram
-fromRulesAndGoal rs g = DatalogProgram (genRuleMap rs) g []
+fromRulesAndGoal rs g = DatalogProgram rs g []
 
 ruleLens :: Traversal' DatalogProgram [Rule]
-ruleLens = dpRules . traversed
+ruleLens = dpRules
 
 ppDatalogProgram :: [Rule] -> Maybe Goal -> [DBClause] -> DatalogProgram
-ppDatalogProgram r = DatalogProgram (genRuleMap r)
+ppDatalogProgram r = DatalogProgram r
 
