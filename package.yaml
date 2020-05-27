@@ -37,6 +37,7 @@ dependencies:
 - parser-combinators
 - lens
 - prettyprinter
+- union-find
 # Testing only
 # For some reason I get errors in ghcide if these are not in the dependencies
 - hspec

@@ -11,7 +11,7 @@ module Expr
   ( Expr(..)
   , BinOp(..), UnOp(..)
   , extractAllPredicates
-  , isConstExpr
+  , isConstExpr, isLeaf
   , simplifyBool
   , _Pred
   ) where
@@ -46,7 +46,6 @@ data BinOp
   = Div | Mult | Add | Sub
   | Min | Max
   | And | Or
-  | Implies
   | BLT | BLE | BEQ | BGE | BGT | BAsgn
   deriving (Ord,Eq,Show,Data,Typeable)
 
@@ -59,7 +58,7 @@ data Expr a
   | Unary  UnOp   (Expr a)
   | Binary BinOp  (Expr a) (Expr a)
   | Pred   String [Expr a]
-  deriving (Functor,Foldable,Show,Eq,Data,Typeable)
+  deriving (Ord,Functor,Foldable,Show,Eq,Data,Typeable)
 makePrisms ''Expr
 
 instance (Pretty a) => Pretty (Expr a) where
@@ -76,14 +75,14 @@ instance Pretty UnOp where
 
 instance Pretty BinOp where
   pretty And = ",\n"
-  pretty Or  = "OR"
-  pretty BLT   = "<"
-  pretty BLE   = "<="
-  pretty BEQ   = "="
-  pretty BGE   = ">="
-  pretty BGT   = ">"
-  pretty BAsgn = ":="
-  pretty Add   = "+"
+  pretty Or  = " OR "
+  pretty BLT   = " < "
+  pretty BLE   = " <= "
+  pretty BEQ   = " = "
+  pretty BGE   = " >= "
+  pretty BGT   = " > "
+  pretty BAsgn = " := "
+  pretty Add   = " + "
   pretty x     = pretty $ show x
 
 --------------------------
@@ -119,7 +118,6 @@ evalBool (Binary o x y) = asum
 toBinBoolOp :: BinOp -> Maybe (Bool -> Bool -> Bool)
 toBinBoolOp And     = Just (&&)
 toBinBoolOp Or      = Just (||)
-toBinBoolOp Implies = Just $ \x y -> not y || x
 toBinBoolOp _       = Nothing
 
 toBinPredOp :: BinOp -> Maybe (Int -> Int -> Bool)
@@ -141,4 +139,11 @@ extractAllPredicates bexpr =
         Binary _ x1 x2 -> (processRec x1) ++ (processRec x2)
         _               -> []
     where processRec x = extractAllPredicates x
+
+isLeaf :: Expr a -> Bool
+isLeaf (Var _)       = True
+isLeaf (ConstBool _) = True
+isLeaf (ConstNum _)  = True
+isLeaf (ConstStr _)  = True
+isLeaf _             = False
 

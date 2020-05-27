@@ -18,6 +18,15 @@ x = Var $ Free "x"
 y :: Expr DBVar
 y = Var $ Free "y"
 
+xs :: Expr [Char]
+xs = Var "x"
+
+ys :: Expr [Char]
+ys = Var "y"
+
+zs :: Expr [Char]
+zs = Var "z"
+
 c1 :: Expr a
 c1 = ConstNum 1
 
@@ -53,17 +62,29 @@ spec =
       refreshes $ f [x]
       refreshes $ f [x, y]
       refreshes $ f [x, c1]
+    describe "Substitution.compress" $ do
+      compresses ["x" |-> ys, "y" |-> c1] ["x" |-> c1, "y" |-> c1]
+      compresses ["x" |-> c2, "y" |-> c1] ["x" |-> c2, "y" |-> c1]
+      compresses ["x" |-> ys, "y" |-> zs] ["x" |-> zs, "y" |-> zs, "z" |-> zs]
       
 
 unifies :: Expr DBVar -> Expr DBVar -> Spec
-unifies a b = it ("Can unify " <> (show $ pretty a) <> " and " <> (show $ pretty b))
-  $ (isJust $ a `unify` b) `shouldBe` True
+unifies a b = it desc $
+  (isJust $ a `unify` b) `shouldBe` True
+  where desc = "Can unify " <> (show $ pretty a) <> " and " <> (show $ pretty b)
 
 unifien't :: Expr DBVar -> Expr DBVar -> Spec
-unifien't a b = it ("Does not unify " <> (show $ pretty a) <> " and " <> (show $ pretty b))
-  $ (isJust $ a `unify` b) `shouldBe` False
+unifien't a b = it desc $
+  (isJust $ a `unify` b) `shouldBe` False
+  where desc = "Does not unify " <> (show $ pretty a) <> " and " <> (show $ pretty b)
 
 refreshes :: Expr DBVar -> Spec
-refreshes e = it ("Refreshes all variables in " <> (show $ pretty e))
-  $ refreshAndApply "X_" e `shouldSatisfy` (\s -> and [isPrefixOf "X_" $ name v | (Var v) <- universe s])
+refreshes e = it desc $
+  refreshAndApply "X_" e `shouldSatisfy` (\s -> and [isPrefixOf "X_" $ name v | (Var v) <- universe s])
+  where desc = "Refreshes all variables in " <> (show $ pretty e)
+
+compresses :: [Subst String] -> [Subst String] -> Spec
+compresses input output = it desc $
+  compress (mconcat input) `shouldBe` mconcat output
+  where desc = "Compresses " <> (show $ pretty input)
 

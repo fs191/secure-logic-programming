@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Substitution
@@ -9,6 +10,8 @@ module Substitution
   , assignmentsToTheta
   , updateTheta
   , unify
+  , compress
+  , (|->)
   ) where
 
 ---------------------------------------------------------
@@ -19,17 +22,39 @@ import qualified Data.Map as M
 
 import Data.Generics.Uniplate.Operations
 import Data.Data
+import Data.Maybe
+import Data.List (nub)
+import Data.Text.Prettyprint.Doc
 
-import Control.Lens hiding (universe, transform)
+import Control.Lens hiding (universe, transform, transformM)
+import Control.Monad.State
+import Control.Monad.Trans.UnionFind
 
 import Expr
 import DBClause
 
 newtype Subst a = Th (M.Map a (Expr a))
-  deriving (Semigroup, Monoid)
+  deriving (Semigroup, Monoid, Eq)
 
 instance (Show a) => Show (Subst a) where
-    show (Th theta) = concat $ map (\(k,v) -> show k ++ " -> " ++ show v ++ "\n") (M.toList theta)
+  show (Th theta) = concat $ map (\(k,v) -> show k ++ " -> " ++ show v ++ "\n") (M.toList theta)
+
+instance (Show a, Pretty a) => Pretty (Subst a) where
+  pretty (Th s) = tupled $ (\(a, b) -> pretty a <+> "->" <+> pretty b) <$> M.toList s
+
+-- | Compresses the substitution using union-find
+compress :: (Ord a) => Subst a -> Subst a
+compress (Th m) = runIdentity . runUnionFind $
+  do
+    let joins = [(k, v) | (k, Var v) <- M.toList m]
+        vs = nub $ (M.keys m) <> [v | Var v <- M.elems m]
+    points <- sequenceA $ fresh <$> vs
+    let pointMap = M.fromList $ vs `zip` points
+        joins' = [(pointMap M.! x, pointMap M.! y) | (x,y) <- joins]
+    sequence_ $ uncurry union <$> joins'
+    reprMap <- sequenceA $ repr <$> pointMap 
+    descMap <- sequenceA $ descriptor <$> reprMap
+    return . Th $ (\k -> fromMaybe (Var k) $ M.lookup k m) <$> descMap
 
 emptyTheta :: Subst a
 emptyTheta = Th $ M.empty
@@ -73,10 +98,15 @@ applyToExpr theta bexpr = transform f bexpr
         f x       = x
 
 refreshExpr :: (Data a, Named a, Ord a) => String -> Expr a -> Subst a
-refreshExpr prefix e = mconcat 
-  [ v |-> (Var $ rename (prefix <> name v) v)
-  | (Var v) <- universe e
-  ]
+refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
+  where 
+    substs = sequenceA $ f <$> nub [v | v@(Var _) <- universe e]
+    f (Var v) =
+      do
+        i <- get
+        modify (+1)
+        let n = prefix <> show i
+        return $ v |-> (Var $ rename n v)
 
 refreshAndApply :: (Data a, Named a, Ord a) => String -> Expr a -> Expr a
 refreshAndApply prefix e = applyToExpr (refreshExpr prefix e) e

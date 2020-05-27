@@ -13,7 +13,6 @@ module DBClause
 
 import Data.Text.Prettyprint.Doc
 import Data.Data hiding (DataType)
-import Data.Typeable
 
 class Named a where
   name   :: a -> String
