@@ -59,7 +59,7 @@ aTerm = try term <|> parens aExpr
 
 term :: Parser (Expr DBVar)
 term = asum
-  [ try $ Var . Free <$> variable 
+  [ try $ Var . free <$> variable 
   , try $ ConstStr   <$> predicateSymbol
   , try $ ConstNum   <$> signedInteger
   ]

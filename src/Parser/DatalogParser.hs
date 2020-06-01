@@ -96,7 +96,7 @@ list =
     void $ symbol "["
     l <- sepBy variable comma
     void $ symbol "]"
-    return $ Var . Free <$> l
+    return $ Var . free <$> l
 
 -----------------------
 -- Exports

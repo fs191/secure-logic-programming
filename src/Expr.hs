@@ -12,6 +12,7 @@ module Expr
   , BinOp(..), UnOp(..)
   , extractAllPredicates
   , isConstExpr, isLeaf
+  , isVar
   , _Pred
   ) where
 
@@ -73,8 +74,8 @@ instance Pretty UnOp where
   pretty = pretty . show
 
 instance Pretty BinOp where
-  pretty And = ",\n"
-  pretty Or  = " OR "
+  pretty And   = ",\n"
+  pretty Or    = " ; "
   pretty BLT   = " < "
   pretty BLE   = " <= "
   pretty BEQ   = " = "
@@ -103,4 +104,8 @@ isLeaf (ConstBool _) = True
 isLeaf (ConstNum _)  = True
 isLeaf (ConstStr _)  = True
 isLeaf _             = False
+
+isVar :: Expr a -> Bool
+isVar (Var _) = True
+isVar _       = False
 

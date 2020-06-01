@@ -30,7 +30,7 @@ data Rule = Rule
   { _ruleHead :: Expr D.DBVar
   , _ruleTail :: Expr D.DBVar
   }
-  deriving (Show,Eq)
+  deriving (Eq)
 makeLenses ''Rule
 
 instance D.Named Rule where
@@ -38,12 +38,16 @@ instance D.Named Rule where
   rename n r = r & ruleHead . _Pred . _1 .~ n
 
 instance Pretty Rule where
+  pretty (Rule h (ConstBool True)) =
+    (pretty h) <> "."
   pretty r =
-    (pretty $ r ^. ruleHead . _Pred . _1) <+>
-    tupled (pretty <$> r ^. ruleHead . _Pred . _2) <+>
+    (pretty $ r ^. ruleHead) <+>
     ":-" <+>  
     hardline <+>
     (indent 2 $ pretty $ _ruleTail r)
+
+instance Show Rule where
+  show = show . pretty
 
 fact :: String -> [Expr D.DBVar] -> Rule
 fact n as = Rule (Pred n as) (ConstBool True)

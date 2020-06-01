@@ -22,8 +22,6 @@ module DatalogProgram
   , ppDatalogProgram
   ) where
 
-import qualified Data.Map as M
-
 import           Data.List
 import           Data.Maybe
 
@@ -83,13 +81,9 @@ makeLenses ''DatalogProgram
 
 instance Pretty DatalogProgram where
   pretty p =
+    (hcat $ (<>";\n\n") . pretty <$> _ppDBClauses p) <>
     (hcat $ (<>";\n\n") . pretty <$> rules p) <>
     (fromMaybe emptyDoc (pretty <$> goal p))
-
-genRuleMap :: [Rule] -> M.Map String [Rule]
-genRuleMap rs = M.unionsWith (<>) $ f <$> rs
-  where
-    f x = M.singleton (name x) [x]
 
 instance LogicProgram DatalogProgram where
   rules = _dpRules

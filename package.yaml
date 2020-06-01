@@ -21,19 +21,14 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 - Cabal
-- process
-- strict
 - megaparsec
 - containers
-- parsec
-- syb
 - mtl
 - text
 - uniplate
 - optparse-applicative
 - semigroups
 - split
-- hashable
 - parser-combinators
 - lens
 - prettyprinter

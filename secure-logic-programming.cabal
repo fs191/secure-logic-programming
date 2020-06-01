@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 940186f32f561476386e9efc5dde678e24e30475d871f78151de3b8504489886
+-- hash: 953d693171679c69765e1034aad8792fe7390926568d1011c26593c88efce239
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -50,20 +50,15 @@ library
     , HUnit
     , base >=4.7 && <5
     , containers
-    , hashable
     , hspec
     , lens
     , megaparsec
     , mtl
     , optparse-applicative
-    , parsec
     , parser-combinators
     , prettyprinter
-    , process
     , semigroups
     , split
-    , strict
-    , syb
     , text
     , union-find
     , uniplate
@@ -83,21 +78,16 @@ executable lpsec
     , HUnit
     , base >=4.7 && <5
     , containers
-    , hashable
     , hspec
     , lens
     , megaparsec
     , mtl
     , optparse-applicative
-    , parsec
     , parser-combinators
     , prettyprinter
-    , process
     , secure-logic-programming
     , semigroups
     , split
-    , strict
-    , syb
     , text
     , union-find
     , uniplate
@@ -120,22 +110,17 @@ test-suite test
     , base >=4.7 && <5
     , containers
     , criterion
-    , hashable
     , hspec
     , hspec-expectations
     , lens
     , megaparsec
     , mtl
     , optparse-applicative
-    , parsec
     , parser-combinators
     , prettyprinter
-    , process
     , secure-logic-programming
     , semigroups
     , split
-    , strict
-    , syb
     , text
     , union-find
     , uniplate

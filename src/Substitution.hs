@@ -7,8 +7,6 @@ module Substitution
   , applyToExpr
   , refreshAndApply
   , emptyTheta
-  , assignmentsToTheta
-  , updateTheta
   , unify
   , compress
   , (|->)
@@ -42,7 +40,7 @@ instance (Show a) => Show (Subst a) where
 instance (Show a, Pretty a) => Pretty (Subst a) where
   pretty (Th s) = tupled $ (\(a, b) -> pretty a <+> "->" <+> pretty b) <$> M.toList s
 
--- | Compresses the substitution using union-find
+-- | Compresses the substitution using union-find.
 compress :: (Ord a) => Subst a -> Subst a
 compress (Th m) = runIdentity . runUnionFind $
   do
@@ -56,38 +54,20 @@ compress (Th m) = runIdentity . runUnionFind $
     descMap <- sequenceA $ descriptor <$> reprMap
     return . Th $ (\k -> fromMaybe (Var k) $ M.lookup k m) <$> descMap
 
+-- | Unit substitution
 emptyTheta :: Subst a
 emptyTheta = Th $ M.empty
 
+-- | Substitute variable `x` with term `y`
 (|->) :: a -> Expr a -> Subst a
 x |-> y = Th $ M.singleton x y
 
+-- | Get the substitution term for variable `x`
 evalTheta :: (Ord a) => Subst a -> a -> (Expr a)
 evalTheta (Th theta) x = 
   if M.member x theta 
     then theta M.! x 
     else Var x
-
--- update the substitution
-updateTheta :: (Ord a) => a -> (Expr a) -> Subst a -> Subst a
-updateTheta a b theta = (a |-> b) <> theta
-
--- extract assignments into a substitution
-assignmentsToTheta :: (Ord a) => (Expr a) -> Subst a -> ((Expr a), Subst a)
-assignmentsToTheta bexpr theta =
-    case bexpr of
-
-        Unary  f x      -> let (y,theta') = processRec theta x in
-                            (Unary f y, theta')
-
-        -- we assume in advance that LHS of an assignment is a free variable,
-        -- and that there are no other assignments in RHS
-        Binary f x1 x2  -> let (y1,theta1) = processRec theta  x1 in
-                            let (y2,theta2) = processRec theta1 x2 in
-                            (Binary f y1 y2, theta2)
-        _                -> (bexpr,theta)
-
-    where processRec theta' x = assignmentsToTheta x theta'
 
 -- | Apply a substitution to an expression
 applyToExpr :: (Data a, Ord a) => Subst a -> (Expr a) -> (Expr a)
@@ -95,6 +75,8 @@ applyToExpr theta bexpr = transform f bexpr
   where f (Var x) = evalTheta theta x
         f x       = x
 
+-- | Rename all the variables in `e` by 
+-- enumerating them and prepending the names with `prefix`
 refreshExpr :: (Data a, Named a, Ord a) => String -> Expr a -> Subst a
 refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
   where 
@@ -105,6 +87,7 @@ refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
         modify (+1)
         let n = prefix <> show i
         return $ v |-> (Var $ rename n v)
+    f _ = error "Expected a variable, got something else"
 
 refreshAndApply :: (Data a, Named a, Ord a) => String -> Expr a -> Expr a
 refreshAndApply prefix e = applyToExpr (refreshExpr prefix e) e
@@ -134,8 +117,10 @@ unify' ((x,y):t)
   | otherwise = Nothing
 unify' [] = Just emptyTheta
 
+--
+-- Utils
+--
+
 vars :: [(Expr a, Expr a)] -> [Expr a]
-vars ((x@(Var _), y@(Var _)):t) = x:y:(vars t)
-vars ((x@(Var _), _):t) = x:(vars t)
-vars ((_, x@(Var _)):t) = x:(vars t)
+vars x = filter isVar $ uncurry (<>) $ unzip x
 

@@ -13,10 +13,10 @@ import DBClause
 import Substitution
 
 x :: Expr DBVar
-x = Var $ Free "x"
+x = Var $ free "x"
 
 y :: Expr DBVar
-y = Var $ Free "y"
+y = Var $ free "y"
 
 xs :: Expr [Char]
 xs = Var "x"

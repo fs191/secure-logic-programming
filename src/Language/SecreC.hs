@@ -46,10 +46,15 @@ instance Pretty SCType where
 
 -- | Top-level statements
 data TopStatement
-  = Funct FunctionDecl
+  -- Function declaration
+  = Funct FunctionDecl 
+  -- Struct declaration
   | Struct StructDecl
+  -- Import statement
   | Import String
+  -- SecreC domain statement
   | Domain SCDomain SCKind
+  -- Empty line
   | Empty
 
 instance Pretty TopStatement where
@@ -62,7 +67,9 @@ instance Pretty TopStatement where
 -- TODO use GADTs to express the return type
 data Statement 
   = Comment String
+  -- Variable declaration
   | VarDecl SCVar
+  -- Function call
   | FunCall String [Expr SCVar]
 
 instance Pretty Statement where

@@ -39,8 +39,8 @@ deriveAllGroundRules program n = program & DP.ruleLens %~ f
 inlineOnce :: [Rule] -> [Rule]
 inlineOnce rs =
   rs <> do
-    tgt <- refreshRule "X_" <$> rs
-    src <- refreshRule "Y_" <$> rs
+    tgt <- refreshRule "_X" <$> rs
+    src <- refreshRule "_Y" <$> rs
     let shd = src ^. ruleHead
     let stl = src ^. ruleTail
     let ttl = tgt ^. ruleTail
@@ -88,6 +88,7 @@ simplifyVars r = applyToExpr subst r
           | otherwise = Nothing
         f _ = Nothing
 
+-- Removes duplicate terms from the and operations at root
 simplifyAnds :: (Ord a) => Expr a -> Expr a
 simplifyAnds x = foldr1 (Binary And) $ simplifyAnds' x
 
@@ -103,6 +104,7 @@ isAnd _ = False
 removeFalseFacts :: [Rule] -> [Rule]
 removeFalseFacts = filter (\x -> x ^. ruleTail /= ConstBool False)
 
+-- | Removes duplicates of facts that appear more than once
 removeDuplicateFacts :: [Rule] -> [Rule]
 removeDuplicateFacts = nub
 
