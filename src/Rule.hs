@@ -22,23 +22,18 @@ import           Control.Lens
 
 import           Expr
 import           Substitution
-import qualified DBClause as D
 
 -- a rule has a list of arguments and a formula that represents rule premise
 
 data Rule = Rule
-  { _ruleHead :: Expr D.DBVar
-  , _ruleTail :: Expr D.DBVar
+  { _ruleHead :: Expr
+  , _ruleTail :: Expr
   }
   deriving (Eq)
 makeLenses ''Rule
 
-instance D.Named Rule where
-  name       = view $ ruleHead . _Pred . _1
-  rename n r = r & ruleHead . _Pred . _1 .~ n
-
 instance Pretty Rule where
-  pretty (Rule h (ConstBool True)) =
+  pretty (Rule h (ConstBool _ True)) =
     (pretty h) <> "."
   pretty r =
     (pretty $ r ^. ruleHead) <+>
@@ -49,24 +44,24 @@ instance Pretty Rule where
 instance Show Rule where
   show = show . pretty
 
-fact :: String -> [Expr D.DBVar] -> Rule
-fact n as = Rule (Pred n as) (ConstBool True)
+fact :: String -> [Expr] -> Rule
+fact n as = Rule (predicate n as) (constTrue)
 
-rule :: String -> [Expr D.DBVar] -> Expr D.DBVar -> Rule
-rule n as p = Rule (Pred n as) p
+rule :: String -> [Expr] -> Expr -> Rule
+rule n as p = Rule (predicate n as) p
 
-args :: Rule -> [Expr D.DBVar]
-args = view $ ruleHead . _Pred . _2
+args :: Rule -> [Expr]
+args = view $ ruleHead . _Pred . _3
 
 isFact :: Rule -> Bool
-isFact r = _ruleTail r == ConstBool True
+isFact r = _ruleTail r == constTrue
 
 refreshRule :: String -> Rule -> Rule
 refreshRule prefix r = applySubst s r
   where 
     s = mconcat $ refreshExpr prefix <$> [r ^. ruleHead, r ^. ruleTail]
 
-applySubst :: Subst D.DBVar -> Rule -> Rule
+applySubst :: Subst -> Rule -> Rule
 applySubst s r = r & ruleHead %~ applyToExpr s
                    & ruleTail %~ applyToExpr s
 

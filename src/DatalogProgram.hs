@@ -19,6 +19,7 @@ module DatalogProgram
   , ruleNames
   , rulesByName
   , ruleLens
+  , dbClauseLens
   , ppDatalogProgram
   ) where
 
@@ -31,7 +32,6 @@ import           Control.Lens
 
 import           Rule
 import           Expr
-import           DBClause
 import           Data.Text.Prettyprint.Doc
 
 class LogicProgram a where
@@ -74,14 +74,14 @@ instance IsGoal Goal where
 data DatalogProgram = DatalogProgram
   { _dpRules :: [Rule]
   , _dpGoal  :: Maybe Goal
-  , _ppDBClauses :: [DBClause]
+  , _dpDBClauses :: [DBClause]
   }
   deriving (Show)
 makeLenses ''DatalogProgram
 
 instance Pretty DatalogProgram where
   pretty p =
-    (hcat $ (<>";\n\n") . pretty <$> _ppDBClauses p) <>
+    (hcat $ (<>";\n\n") . pretty <$> _dpDBClauses p) <>
     (hcat $ (<>";\n\n") . pretty <$> rules p) <>
     (fromMaybe emptyDoc (pretty <$> goal p))
 
@@ -114,6 +114,9 @@ fromRulesAndGoal rs g = DatalogProgram rs g []
 
 ruleLens :: Traversal' DatalogProgram [Rule]
 ruleLens = dpRules
+
+dbClauseLens :: Lens' DatalogProgram [DBClause]
+dbClauseLens = dpDBClauses
 
 ppDatalogProgram :: [Rule] -> Maybe Goal -> [DBClause] -> DatalogProgram
 ppDatalogProgram r = DatalogProgram r

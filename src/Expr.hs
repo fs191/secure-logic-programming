@@ -9,11 +9,14 @@
 
 module Expr
   ( Expr(..)
-  , BinOp(..), UnOp(..)
-  , extractAllPredicates
+  , PPType(..), PPDomain(..)
   , isConstExpr, isLeaf
   , isVar
   , _Pred
+  , constStr
+  , constTrue, constFalse
+  , var
+  , predicate
   ) where
 
 ---------------------------------------------------------
@@ -24,88 +27,88 @@ import Control.Exception
 import Control.Lens hiding (plate)
 
 import Data.Data
-import Data.Foldable
 import Data.Generics.Uniplate.Data ()
 import Data.Text.Prettyprint.Doc
 
 import Prelude hiding ((<>))
 
+import Language.SecreC.Types
+
 data EvaluationException a
-  = NonConstantTerm (Expr a)
+  = NonConstantTerm Expr
   deriving (Show, Exception)
 
-data UnOp
-  = Not
-  | Neg
-  deriving (Ord,Eq,Data, Typeable)
+data Ann = Ann
+  { _type   :: Maybe PPType
+  , _domain :: Maybe PPDomain
+  }
+  deriving (Ord, Show, Eq, Data, Typeable)
 
-instance Show UnOp where
-  show Not = "-"
-
-data BinOp
-  = Div | Mult | Add | Sub
-  | Min | Max
-  | And | Or
-  | BLT | BLE | BEQ | BGE | BGT
-  deriving (Ord,Eq,Show,Data,Typeable)
+empty :: Ann
+empty = Ann Nothing Nothing
 
 -- artihmetic expressions
-data Expr a
-  = Var a
-  | ConstNum Int
-  | ConstStr String
-  | ConstBool Bool
-  | Unary  UnOp   (Expr a)
-  | Binary BinOp  (Expr a) (Expr a)
-  | Pred   String [Expr a]
-  deriving (Ord,Functor,Foldable,Show,Eq,Data,Typeable)
+-- associative operations are represented with lists
+data Expr
+  = ConstInt   Ann Int
+  | ConstFloat Ann Float
+  | ConstStr   Ann String
+  | ConstBool  Ann Bool
+  | Var  Ann String
+  | Not  Ann Expr
+  | Neg  Ann Expr
+  | Div  Ann Expr Expr
+  | Sub  Ann Expr Expr
+  | LT   Ann Expr Expr
+  | LE   Ann Expr Expr
+  | EQ   Ann Expr Expr
+  | GT   Ann Expr Expr
+  | GE   Ann Expr Expr
+  | Mul  Ann [Expr]
+  | Add  Ann [Expr]
+  | Min  Ann [Expr]
+  | Max  Ann [Expr]
+  | And  Ann [Expr]
+  | Or   Ann [Expr]
+  | Pred Ann String [Expr]
+  deriving (Ord,Show,Eq,Data,Typeable)
 makePrisms ''Expr
 
-instance (Pretty a) => Pretty (Expr a) where
-  pretty (Var x)        = pretty x
-  pretty (ConstNum x)   = pretty x
-  pretty (ConstStr x)   = pretty x
-  pretty (ConstBool x)  = pretty x
-  pretty (Unary o x)    = pretty o <> pretty x
-  pretty (Binary o x y) = pretty x <> pretty o <> pretty y
-  pretty (Pred n args)  = pretty n <> (tupled $ pretty <$> args)
-
-instance Pretty UnOp where
-  pretty = pretty . show
-
-instance Pretty BinOp where
-  pretty And   = ",\n"
-  pretty Or    = " ; "
-  pretty BLT   = " < "
-  pretty BLE   = " <= "
-  pretty BEQ   = " = "
-  pretty BGE   = " >= "
-  pretty BGT   = " > "
-  pretty Add   = " + "
-  pretty x     = pretty $ show x
+instance Pretty Expr where
+  pretty (Var _ x)        = pretty x
+  pretty (ConstInt _ x)   = pretty x
+  pretty (ConstStr _ x)   = pretty x
+  pretty (ConstBool _ x)  = pretty x
+  pretty (Pred _ n args)  = pretty n <> (tupled $ pretty <$> args)
 
 --------------------------
 -- is the expression constant (i.e. does not contain any variables)?
-isConstExpr :: Expr a -> Bool
-isConstExpr expr = not . null $ toList expr
+isConstExpr :: Expr -> Bool
+isConstExpr _ = undefined
 
-extractAllPredicates :: Expr a -> [(String, [Expr a])]
-extractAllPredicates bexpr =
-    case bexpr of
-        Pred f xs -> [(f,xs)]
-        Unary _ x      -> processRec x
-        Binary _ x1 x2 -> (processRec x1) ++ (processRec x2)
-        _               -> []
-    where processRec x = extractAllPredicates x
-
-isLeaf :: Expr a -> Bool
-isLeaf (Var _)       = True
-isLeaf (ConstBool _) = True
-isLeaf (ConstNum _)  = True
-isLeaf (ConstStr _)  = True
+isLeaf :: Expr -> Bool
+isLeaf (Var _ _)       = True
+isLeaf (ConstBool _ _) = True
+isLeaf (ConstInt _ _)  = True
+isLeaf (ConstStr _ _)  = True
 isLeaf _             = False
 
-isVar :: Expr a -> Bool
-isVar (Var _) = True
+isVar :: Expr -> Bool
+isVar (Var _ _) = True
 isVar _       = False
+
+constStr :: String -> Expr
+constStr = ConstStr empty
+
+constTrue :: Expr
+constTrue = ConstBool empty True
+
+constFalse :: Expr
+constFalse = ConstBool empty False
+
+var :: String -> Expr
+var = Var empty
+
+predicate :: String -> [Expr] -> Expr
+predicate = Pred empty
 

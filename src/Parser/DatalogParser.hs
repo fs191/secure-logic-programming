@@ -84,7 +84,7 @@ dbFact =
 dbVar :: Parser DBVar
 dbVar =
   do
-    n <- identifier
+    n <- variable
     void $ symbol ":"
     al <- domainType
     ty <- dataType

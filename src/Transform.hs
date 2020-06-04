@@ -10,7 +10,6 @@ module Transform
 import Data.Generics.Uniplate.Operations as U
 import Data.Maybe
 import Data.List
-import qualified Data.Set as S
 
 import Control.Applicative
 import Control.Lens
@@ -18,20 +17,23 @@ import Control.Lens
 import Rule
 import Expr
 import Substitution
-import DBClause
 import qualified DatalogProgram as DP
 
 -- | Generates all possible ground rules for n iterations
 deriveAllGroundRules :: DP.DatalogProgram -> Int -> DP.DatalogProgram
-deriveAllGroundRules program n = program & DP.ruleLens %~ f
+deriveAllGroundRules program n = program'
+                                   & DP.ruleLens %~ f
   where
+    clauses = program ^. DP.dbClauseLens
+    -- Input program but db clauses are converted to rules
+    program' = program & DP.ruleLens %~ ((dbClauseToRule <$> clauses) <>)
     f :: [Rule] -> [Rule]
     f x = foldl (.) id (replicate n pipeline) x
     pipeline = 
       removeDuplicateFacts .
       removeFalseFacts .
       liftA simplify . 
-      (traversed . ruleTail %~ simplifyAnds) .
+      --(traversed . ruleTail %~ simplifyAnds) .
       (traversed . ruleTail %~ simplifyVars) . 
       inlineOnce
 
@@ -39,8 +41,8 @@ deriveAllGroundRules program n = program & DP.ruleLens %~ f
 inlineOnce :: [Rule] -> [Rule]
 inlineOnce rs =
   rs <> do
-    tgt <- refreshRule "_X" <$> rs
-    src <- refreshRule "_Y" <$> rs
+    tgt <- rs
+    src <- rs
     let shd = src ^. ruleHead
     let stl = src ^. ruleTail
     let ttl = tgt ^. ruleTail
@@ -89,16 +91,17 @@ simplifyVars r = applyToExpr subst r
         f _ = Nothing
 
 -- Removes duplicate terms from AND operations at the root expression
-simplifyAnds :: (Ord a) => Expr a -> Expr a
-simplifyAnds x = foldr1 (Binary And) $ simplifyAnds' x
-
-simplifyAnds' :: (Ord a) => Expr a -> S.Set (Expr a)
-simplifyAnds' (Binary And x y) = S.filter (not . isAnd) $ S.union (simplifyAnds' x) (simplifyAnds' y)
-simplifyAnds' x = S.singleton x
-
-isAnd :: Expr a -> Bool
-isAnd (Binary And _ _) = True
-isAnd _ = False
+-- TODO: find out what's causing it to do weird substitutions in the market.pl example
+--simplifyAnds :: (Ord a) => Expr a -> Expr a
+--simplifyAnds x = foldr1 (Binary And) $ simplifyAnds' x
+--
+--simplifyAnds' :: (Ord a) => Expr a -> S.Set (Expr a)
+--simplifyAnds' (Binary And x y) = S.filter (not . isAnd) $ S.union (simplifyAnds' x) (simplifyAnds' y)
+--simplifyAnds' x = S.singleton x
+--
+--isAnd :: Expr a -> Bool
+--isAnd (Binary And _ _) = True
+--isAnd _ = False
 
 -- | Removes facts that always evaluate to False
 removeFalseFacts :: [Rule] -> [Rule]

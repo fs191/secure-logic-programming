@@ -18,7 +18,7 @@ import Data.Void (Void)
 
 import Control.Monad (void)
 
-import DBClause hiding (dataType)
+import Language.SecreC.Types
 
 type Parser = Parsec Void String
 
@@ -77,14 +77,14 @@ impliedBy = void $ symbol ":-"
 predicateSymbol :: Parser String
 predicateSymbol = (try identifier) <|> stringLiteral
 
-domainType :: Parser DomainType
+domainType :: Parser PPDomain
 domainType =
       (try $ symbol "public"  *> return Public)
   <|> (try $ symbol "private" *> return Private)
 
-dataType :: Parser DataType
+dataType :: Parser PPType
 dataType =
-      (try $ symbol "bool"   *> return VarBool)
-  <|> (try $ symbol "int"    *> return VarNum)
-  <|> (try $ symbol "string" *> return VarText)
+      (try $ symbol "bool"   *> return PPBool)
+  <|> (try $ symbol "int"    *> return PPInt)
+  <|> (try $ symbol "string" *> return PPStr)
 

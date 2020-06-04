@@ -70,7 +70,7 @@ data Statement
   -- Variable declaration
   | VarDecl SCVar
   -- Function call
-  | FunCall String [Expr SCVar]
+  | FunCall String [Expr]
 
 instance Pretty Statement where
   pretty (Comment t) = "//" <> pretty t
@@ -144,12 +144,12 @@ defaultHeader = program
   ]
 
 defaultGoal :: FunctionDecl
-defaultGoal = function Nothing "main" [] $
-  [ VarDecl $ var SCShared3p SCUInt32 "dummy"
+defaultGoal = mainFun $
+  [ VarDecl $ variable SCShared3p SCUInt32 "dummy"
   , Comment "TODO: state your own goal here"
   , FunCall "publish" 
-      [ ConstStr "NOTICE: no goal specified in the main function"
-      , ConstBool False
+      [ constStr "NOTICE: no goal specified in the main function"
+      , constFalse
       ]
   ]
 
@@ -162,8 +162,8 @@ mainFun = function Nothing "main" []
 struct :: Text -> [SCVar] -> StructDecl
 struct = StructDecl
 
-var :: SCDomain -> SCType -> Text -> SCVar
-var = SCVar
+variable :: SCDomain -> SCType -> Text -> SCVar
+variable = SCVar
 
 program :: [TopStatement] -> SCProgram
 program = SCProgram
