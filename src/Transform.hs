@@ -88,7 +88,7 @@ simplifyVars r = applyToExpr subst r
           | otherwise = Nothing
         f _ = Nothing
 
--- Removes duplicate terms from the and operations at root
+-- Removes duplicate terms from AND operations at the root expression
 simplifyAnds :: (Ord a) => Expr a -> Expr a
 simplifyAnds x = foldr1 (Binary And) $ simplifyAnds' x
 

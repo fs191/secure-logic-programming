@@ -7,6 +7,7 @@ module DBClause
   , dataType
   , DataType(..), DomainType(..)
   , varName
+  , domain
   , Named(..)
   ) where
 
@@ -77,4 +78,7 @@ varName (DBVar _ _ n) = n
 
 dbClause :: String -> [DBVar] -> DBClause
 dbClause = DBClause
+
+domain :: DBVar -> DomainType
+domain (DBVar dom _ _) = dom
 

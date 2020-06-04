@@ -122,5 +122,5 @@ unify' [] = Just emptyTheta
 --
 
 vars :: [(Expr a, Expr a)] -> [Expr a]
-vars x = filter isVar $ uncurry (<>) $ unzip x
+vars x = filter isVar . uncurry (<>) $ unzip x
 

@@ -156,6 +156,9 @@ defaultGoal = function Nothing "main" [] $
 function :: Maybe SCType -> Text -> [SCVar] -> [Statement] -> FunctionDecl
 function = FunctionDecl
 
+mainFun :: [Statement] -> FunctionDecl
+mainFun = function Nothing "main" []
+
 struct :: Text -> [SCVar] -> StructDecl
 struct = StructDecl
 
