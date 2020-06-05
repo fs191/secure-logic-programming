@@ -8,6 +8,7 @@ module Rule
   , args
   , isFact
   , ruleHead, ruleTail
+  , dbClauseToRule
   , refreshRule
   , applySubst
   ) where
@@ -22,6 +23,7 @@ import           Control.Lens
 
 import           Expr
 import           Substitution
+import           DBClause
 
 -- a rule has a list of arguments and a formula that represents rule premise
 
@@ -64,4 +66,7 @@ refreshRule prefix r = applySubst s r
 applySubst :: Subst -> Rule -> Rule
 applySubst s r = r & ruleHead %~ applyToExpr s
                    & ruleTail %~ applyToExpr s
+
+dbClauseToRule :: DBClause -> Rule
+dbClauseToRule = undefined
 

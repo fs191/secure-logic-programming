@@ -34,12 +34,12 @@ spec = describe "Parser.parseDatalog" $ do
     cannotParse "examples/prolog/negative/gibberish.pl"
 
 canParse :: String -> Spec
-canParse file = it ("can parse " ++ file) $ action `shouldReturn` Nothing
+canParse file = it ("can parse " ++ file) $ action `shouldReturn` ()
   where action = do
             res <- parseDatalog file <$> readFile file
             case res of
-              Right x -> return Nothing
-              Left  e -> return . Just $ errorBundlePretty e
+              Right x -> return ()
+              Left  e -> error $ errorBundlePretty e
 
 cannotParse :: String -> Spec
 cannotParse file = it ("does not parse " ++ file) $ do

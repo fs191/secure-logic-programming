@@ -6,7 +6,9 @@ module Parser.DatalogParser
 import Text.Megaparsec
 
 import Data.Void (Void)
+import Data.Maybe
 
+import Control.Lens
 import Control.Monad (void)
 
 import Parser.DatalogParser.Lexer
@@ -15,13 +17,14 @@ import Parser.DatalogParser.Expr
 import qualified DatalogProgram as DP
 import Expr
 import qualified Rule as R
-import DBClause hiding (dataType)
+import DBClause
 
 type Parser = Parsec Void String
 
 data Clause
-  = RuleClause R.Rule
-  | DBClause DP.DBClause
+  = RC R.Rule
+  | DBC DBClause
+  | GC DP.Goal
 
 -- Based on:
 -- https://www.ccs.neu.edu/home/ramsdell/tools/datalog/datalog.html#index-comment-syntax-13
@@ -30,17 +33,18 @@ datalogParser :: Parser DP.DatalogProgram
 datalogParser =
   do
     -- TODO Should we parse retractions as well?
-    st <- many $ try clause  <* period
-    q  <- optional $ goal <* period
+    st <- many $ clause <* period
     eof
-    let rs   = [x | RuleClause x <- st]
-    let dbcs = [x | DBClause   x <- st]
+    let rs   = [x | RC  x <- st]
+    let dbcs = [x | DBC x <- st]
+    let q    = listToMaybe [x | GC x <- st]
     return $ DP.ppDatalogProgram rs q dbcs
 
 clause :: Parser Clause
 clause = 
-      (RuleClause <$> ruleP) 
-  <|> (DBClause <$> dbFact)
+      (try $ RC  <$> ruleP )
+  <|> (try $ DBC <$> dbFact)
+  <|> (try $ GC <$> goal)
 
 ruleP :: Parser R.Rule
 ruleP = 
@@ -51,9 +55,8 @@ ruleP =
     let expr = joinExprs b
     return $ R.rule h ps expr
 
-body :: Parser [Expr DBVar]
-body = 
-  sepBy1 bPredExpr comma
+body :: Parser [Expr]
+body = sepBy1 bPredExpr comma
 
 goal :: Parser DP.Goal
 goal = 
@@ -64,7 +67,7 @@ goal =
     void $ symbol ","
     o <- list
     void $ symbol ")"
-    void impliedBy
+    impliedBy
     b <- body
     return $ DP.makeGoal i o $ joinExprs b
 
@@ -81,22 +84,26 @@ dbFact =
     void $ symbol ")"
     return $ dbClause n vs
 
-dbVar :: Parser DBVar
+dbVar :: Parser Expr
 dbVar =
   do
-    n <- variable
+    n <- identifier
     void $ symbol ":"
     al <- domainType
     ty <- dataType
-    return $ bound al ty n
+    -- Add annotations for type and domain
+    let v = var n
+          & annLens . annType .~ Just ty
+          & annLens . domain  .~ Just al
+    return v
 
-list :: Parser [Expr DBVar]
+list :: Parser [Expr]
 list = 
   do
     void $ symbol "["
     l <- sepBy variable comma
     void $ symbol "]"
-    return $ Var . free <$> l
+    return $ var  <$> l
 
 -----------------------
 -- Exports
@@ -117,7 +124,7 @@ parseDatalogFromFile filepath =
 -- Utils
 -----------------------
 
-joinExprs :: [Expr a] -> Expr a
-joinExprs [] = ConstBool True
-joinExprs b  = foldl1 (Binary And) b
+joinExprs :: [Expr] -> Expr
+joinExprs [] = constTrue
+joinExprs b  = foldl1 eAnd b
 

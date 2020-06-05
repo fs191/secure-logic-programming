@@ -46,7 +46,7 @@ inlineOnce rs =
     let shd = src ^. ruleHead
     let stl = src ^. ruleTail
     let ttl = tgt ^. ruleTail
-    (p@(Pred _ _), mut) <- U.contexts ttl
+    (p@(Pred _ _ _), mut) <- U.contexts ttl
     let subst = unify shd p
     s <- maybeToList subst
     return . applySubst s $ tgt & ruleTail .~ mut stl
@@ -55,37 +55,37 @@ inlineOnce rs =
 simplify :: Rule -> Rule
 simplify r = r & ruleTail %~ U.rewrite f
   where 
-    f (Binary And (ConstBool True) x) = Just x
-    f (Binary And x (ConstBool True)) = Just x
-    f (Binary And (ConstBool False) _) = Just $ ConstBool False
-    f (Binary And _ (ConstBool False)) = Just $ ConstBool False
-    f (Binary Or (ConstBool True) _) = Just $ ConstBool True
-    f (Binary Or _ (ConstBool True)) = Just $ ConstBool True
-    f (Binary Or (ConstBool False) x) = Just x
-    f (Binary Or x (ConstBool False)) = Just x
-    f (Binary Add (ConstNum x) (ConstNum y)) = Just . ConstNum $ x + y
-    f (Binary Sub (ConstNum x) (ConstNum y)) = Just . ConstNum $ x - y
-    f (Binary Mult (ConstNum x) (ConstNum y)) = Just . ConstNum $ x * y
-    f (Binary Min (ConstNum x) (ConstNum y)) = Just . ConstNum $ x `min` y
-    f (Binary Max (ConstNum x) (ConstNum y)) = Just . ConstNum $ x `max` y
-    f (Binary BLT (ConstNum x) (ConstNum y)) = Just . ConstBool $ x < y
-    f (Binary BGT (ConstNum x) (ConstNum y)) = Just . ConstBool $ x > y
-    f (Binary BLE (ConstNum x) (ConstNum y)) = Just . ConstBool $ x <= y
-    f (Binary BGE (ConstNum x) (ConstNum y)) = Just . ConstBool $ x >= y
-    f (Binary BEQ (ConstNum x) (ConstNum y)) = Just . ConstBool $ x == y
-    f (Binary BEQ (Var x) (Var y))
-      | x == y    = Just $ ConstBool True
+    f (And _ (ConstBool _ True) x) = Just x
+    f (And _ x (ConstBool _ True)) = Just x
+    f (And _ (ConstBool _ False) _) = Just $ constBool False
+    f (And _ _ (ConstBool _ False)) = Just $ constBool False
+    f (Or _ (ConstBool _ True) _) = Just $ constBool True
+    f (Or _ _ (ConstBool _ True)) = Just $ constBool True
+    f (Or _ (ConstBool _ False) x) = Just x
+    f (Or _ x (ConstBool _ False)) = Just x
+    f (Add _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x + y
+    f (Sub _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x - y
+    f (Mul _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x * y
+    f (Min _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x `min` y
+    f (Max _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x `max` y
+    f (Lt _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x < y
+    f (Gt _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x > y
+    f (Le _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x <= y
+    f (Ge _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x >= y
+    f (Eq _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x == y
+    f (Eq _ (Var _ x) (Var _ y))
+      | x == y    = Just $ constBool True
       | otherwise = Nothing
     f _ = Nothing
 
 -- | Removes any unnecessary variable equalities (e.g. X=Y)
-simplifyVars :: Expr DBVar -> Expr DBVar
+simplifyVars :: Expr -> Expr
 simplifyVars r = applyToExpr subst r
   where subst = compress . mconcat . catMaybes $ f <$> (U.universe r)
-        f (Binary BEQ (Var v) x) 
+        f (Eq _ (Var _ v) x) 
           | isLeaf x  = Just $ v |-> x
           | otherwise = Nothing
-        f (Binary BEQ x (Var v))
+        f (Eq _ x (Var _ v))
           | isLeaf x  = Just $ v |-> x
           | otherwise = Nothing
         f _ = Nothing
@@ -105,7 +105,7 @@ simplifyVars r = applyToExpr subst r
 
 -- | Removes facts that always evaluate to False
 removeFalseFacts :: [Rule] -> [Rule]
-removeFalseFacts = filter (\x -> x ^. ruleTail /= ConstBool False)
+removeFalseFacts = filter (\x -> x ^. ruleTail /= constBool False)
 
 -- | Removes duplicates of facts that appear more than once
 removeDuplicateFacts :: [Rule] -> [Rule]

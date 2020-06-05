@@ -9,35 +9,34 @@ import Data.Generics.Uniplate.Operations
 import Test.Hspec
 
 import Expr
-import DBClause
 import Substitution
 
-x :: Expr DBVar
-x = Var $ free "x"
+x :: Expr
+x = var "x"
 
-y :: Expr DBVar
-y = Var $ free "y"
+y :: Expr
+y = var "y"
 
-xs :: Expr [Char]
-xs = Var "x"
+xs :: Expr
+xs = var "x"
 
-ys :: Expr [Char]
-ys = Var "y"
+ys :: Expr
+ys = var "y"
 
-zs :: Expr [Char]
-zs = Var "z"
+zs :: Expr
+zs = var "z"
 
-c1 :: Expr a
-c1 = ConstNum 1
+c1 :: Expr
+c1 = constInt 1
 
-c2 :: Expr a
-c2 = ConstNum 2
+c2 :: Expr
+c2 = constInt 2
 
-f :: [Expr a] -> Expr a
-f = Pred "f"
+f :: [Expr] -> Expr
+f = predicate "f"
 
-g :: [Expr a] -> Expr a
-g = Pred "g"
+g :: [Expr] -> Expr
+g = predicate "g"
 
 spec :: Spec
 spec = 
@@ -68,22 +67,22 @@ spec =
       compresses ["x" |-> ys, "y" |-> zs] ["x" |-> zs, "y" |-> zs, "z" |-> zs]
       
 
-unifies :: Expr DBVar -> Expr DBVar -> Spec
+unifies :: Expr -> Expr -> Spec
 unifies a b = it desc $
   (isJust $ a `unify` b) `shouldBe` True
   where desc = "Can unify " <> (show $ pretty a) <> " and " <> (show $ pretty b)
 
-unifien't :: Expr DBVar -> Expr DBVar -> Spec
+unifien't :: Expr -> Expr -> Spec
 unifien't a b = it desc $
   (isJust $ a `unify` b) `shouldBe` False
   where desc = "Does not unify " <> (show $ pretty a) <> " and " <> (show $ pretty b)
 
-refreshes :: Expr DBVar -> Spec
+refreshes :: Expr -> Spec
 refreshes e = it desc $
-  refreshAndApply "X_" e `shouldSatisfy` (\s -> and [isPrefixOf "X_" $ name v | (Var v) <- universe s])
+  refreshAndApply "X_" e `shouldSatisfy` (\s -> and [isPrefixOf "X_" v | (Var _ v) <- universe s])
   where desc = "Refreshes all variables in " <> (show $ pretty e)
 
-compresses :: [Subst String] -> [Subst String] -> Spec
+compresses :: [Subst] -> [Subst] -> Spec
 compresses input output = it desc $
   compress (mconcat input) `shouldBe` mconcat output
   where desc = "Compresses " <> (show $ pretty input)

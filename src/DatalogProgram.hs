@@ -15,46 +15,32 @@ module DatalogProgram
   , inputs, outputs, formula
   , toDatalogSource
   , fromRulesAndGoal
-  , dbClause
-  , ruleNames
-  , rulesByName
   , ruleLens
   , dbClauseLens
   , ppDatalogProgram
   ) where
 
-import           Data.List
 import           Data.Maybe
-
-import           Control.Monad (guard)
 
 import           Control.Lens
 
 import           Rule
 import           Expr
 import           Data.Text.Prettyprint.Doc
+import           DBClause
 
 class LogicProgram a where
   rules       :: a -> [Rule]
   goal        :: a -> Maybe Goal
-  ruleNames   :: a -> [String]
-  rulesByName :: a -> String -> [Rule]
   setRules    :: [Rule] -> a -> a
-
-  ruleNames prog = nub $ name <$> rules prog
-  rulesByName prog n =
-    do
-      f <- rules prog
-      guard $ name f == n
-      return f
 
 class IsGoal a where
   toGoal :: a -> Goal
 
 data Goal = Goal
-  { _gInputs  :: [Expr DBVar]
-  , _gOutputs :: [Expr DBVar]
-  , _gFormula :: Expr DBVar
+  { _gInputs  :: [Expr]
+  , _gOutputs :: [Expr]
+  , _gFormula :: Expr
   }
   deriving (Show)
 
@@ -91,19 +77,19 @@ instance LogicProgram DatalogProgram where
   setRules r = dpRules .~ r
 
 makeGoal ::
-     [Expr DBVar]
-  -> [Expr DBVar]
-  -> Expr DBVar
+     [Expr]
+  -> [Expr]
+  -> Expr
   -> Goal
 makeGoal = Goal
 
-inputs :: Goal -> [Expr DBVar]
+inputs :: Goal -> [Expr]
 inputs = _gInputs
 
-outputs :: Goal -> [Expr DBVar]
+outputs :: Goal -> [Expr]
 outputs = _gOutputs
 
-formula :: Goal -> Expr DBVar
+formula :: Goal -> Expr
 formula = _gFormula
 
 toDatalogSource :: DatalogProgram -> String

@@ -12,7 +12,7 @@ import Data.Void (Void)
 import Data.Foldable
 
 import Parser.DatalogParser.Lexer
-import Expr
+import Expr as E
 import qualified Rule as R
 
 type Parser = Parsec Void String
@@ -23,13 +23,16 @@ type Parser = Parsec Void String
 
 bPredExpr :: Parser Expr
 bPredExpr = 
-      opParse BLE "=<"
-  <|> opParse BLT "<"
-  <|> opParse BGE ">="
-  <|> opParse BGT ">"
-  <|> opParse BEQ "="
-  <|> opParse BEQ "is"
+      (try $ opParse lessEqual    "=<")
+  <|> (try $ opParse less         "<" )
+  <|> (try $ opParse greaterEqual ">=")
+  <|> (try $ opParse greater      ">" )
+  <|> (try $ opParse equal        "=" )
+  <|> (try $ opParse equal        "is")
   <|> predParse
+  where 
+    opParse :: (Expr -> Expr -> Expr) -> String -> Parser Expr
+    opParse f s = f <$> aExpr <*> (symbol s *> aExpr)
 
 -----------------------
 -- Numeric expressions
@@ -37,16 +40,16 @@ bPredExpr =
 
 aExprTable :: [[Operator Parser Expr]]
 aExprTable = 
-  [ [ prefix "-" $ Unary Neg
+  [ [ prefix "-" eNeg
     ]
-  , [ binary "\\/" $ Binary Max
-    , binary "/\\" $ Binary Min
+  , [ binary "\\/" eMax
+    , binary "/\\" eMin
     ]
-  , [ binary "*" $ Binary Mult
-    , binary "/" $ Binary Div
+  , [ binary "*" eMul
+    , binary "/" eDiv
     ]
-  , [ binary "+" $ Binary Add
-    , binary "-" $ Binary Sub
+  , [ binary "+" eAdd
+    , binary "-" eSub
     ]
   ]
 
@@ -58,9 +61,9 @@ aTerm = try term <|> parens aExpr
 
 term :: Parser Expr
 term = asum
-  [ try $ Var . free <$> variable 
-  , try $ ConstStr   <$> predicateSymbol
-  , try $ ConstNum   <$> signedInteger
+  [ try $ var      <$> variable 
+  , try $ constStr <$> predicateSymbol
+  , try $ constInt <$> signedInteger
   ]
 
 -----------------------

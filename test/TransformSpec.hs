@@ -28,8 +28,8 @@ spec =
     canDeriveOn "examples/ppdatalog/relatives.pl" 3
     transContains "examples/prolog/broken.pl" 3 
       [ rule "h" 
-        [ConstStr "a", ConstStr "c", ConstStr "e"] 
-        (ConstBool True)
+        [constStr "a", constStr "c", constStr "e"] 
+        (constTrue)
       ]
 
 canDeriveOn :: String -> Int -> Spec

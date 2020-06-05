@@ -1,6 +1,5 @@
 module Parser.DatalogParser.Lexer 
-  ( lexeme, symbol
-  , sc
+  ( lexeme, symbol, sc
   , variable, identifier
   , stringLiteral
   , predicateSymbol
@@ -80,11 +79,11 @@ predicateSymbol = (try identifier) <|> stringLiteral
 domainType :: Parser PPDomain
 domainType =
       (try $ symbol "public"  *> return Public)
-  <|> (try $ symbol "private" *> return Private)
+  <|> (symbol "private" *> return Private)
 
 dataType :: Parser PPType
 dataType =
       (try $ symbol "bool"   *> return PPBool)
   <|> (try $ symbol "int"    *> return PPInt)
-  <|> (try $ symbol "string" *> return PPStr)
+  <|> (symbol "string" *> return PPStr)
 

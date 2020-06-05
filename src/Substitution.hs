@@ -18,7 +18,7 @@ module Substitution
 
 import qualified Data.Map as M
 
-import Data.Generics.Uniplate.Operations
+import Data.Generics.Uniplate.Data
 import Data.Maybe
 import Data.List (nub)
 import Data.Text.Prettyprint.Doc
