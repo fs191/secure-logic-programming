@@ -35,8 +35,7 @@ data Rule = Rule
 makeLenses ''Rule
 
 instance Pretty Rule where
-  pretty (Rule h (ConstBool _ True)) =
-    (pretty h) <> "."
+  pretty (Rule h (ConstBool _ True)) = pretty h
   pretty r =
     (pretty $ r ^. ruleHead) <+>
     ":-" <+>  
@@ -68,5 +67,5 @@ applySubst s r = r & ruleHead %~ applyToExpr s
                    & ruleTail %~ applyToExpr s
 
 dbClauseToRule :: DBClause -> Rule
-dbClauseToRule = undefined
+dbClauseToRule dbc = Rule (predicate (name dbc) $ vars dbc) constTrue
 

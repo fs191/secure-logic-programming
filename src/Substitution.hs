@@ -27,6 +27,8 @@ import Control.Lens hiding (universe, transform, transformM)
 import Control.Monad.State
 import Control.Monad.Trans.UnionFind
 
+import Language.SecreC.Types as T
+
 import Expr
 
 newtype Subst = Th (M.Map String Expr)
@@ -87,6 +89,7 @@ refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
         return $ v |-> (var n)
     f _ = error "Expected a variable, got something else"
 
+-- | Immediately refreshes variable names in `e`
 refreshAndApply :: String -> Expr -> Expr
 refreshAndApply prefix e = applyToExpr (refreshExpr prefix e) e
 

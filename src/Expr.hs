@@ -10,6 +10,7 @@
 module Expr
   ( Expr(..)
   , PPType(..), PPDomain(..)
+  , Ann
   , isConstExpr, isLeaf
   , isVar
   , _Pred
@@ -30,6 +31,10 @@ module Expr
   , eAnd, eOr
   , annLens
   , annType, domain
+  , dbCol
+  , _Var
+  , _ConstStr
+  , _DBCol
   ) where
 
 ---------------------------------------------------------
@@ -37,7 +42,7 @@ module Expr
 ---------------------------------------------------------
 
 import Control.Exception
-import Control.Lens
+import Control.Lens hiding (children)
 
 import Data.Generics.Uniplate ()
 import Data.Data
@@ -47,12 +52,13 @@ import Data.Text.Prettyprint.Doc
 import Language.SecreC.Types
 
 data Ann = Ann
-  { _annType :: Maybe PPType
+  { 
+    -- Datatype of the term
+    _annType :: Maybe PPType
+    -- Security domain of the term
   , _domain  :: Maybe PPDomain
   }
   deriving (Ord, Show, Eq, Data, Typeable)
-makeLenses ''Ann
-makePrisms ''Ann
 
 empty :: Ann
 empty = Ann Nothing Nothing
@@ -64,6 +70,7 @@ data Expr
   | ConstFloat Ann Float
   | ConstStr   Ann String
   | ConstBool  Ann Bool
+  | DBCol      Ann String
   | Var  Ann String
   | Not  Ann Expr
   | Neg  Ann Expr
@@ -83,18 +90,45 @@ data Expr
   | Or   Ann Expr Expr
   | Pred Ann String [Expr]
   deriving (Ord,Show,Eq,Data,Typeable)
+makeLenses ''Ann
+makePrisms ''Ann
 makePrisms ''Expr
 
 instance Pretty Expr where
-  pretty (Var _ x)        = pretty x
+  pretty e@(Var _ x)      = pretty x <> prettyType e
   pretty (ConstInt _ x)   = pretty x
-  pretty (ConstStr _ x)   = pretty x
+  pretty e@(ConstStr _ x) = pretty x <> prettyType e
+  pretty e@(DBCol _ x)    = pretty x <> prettyType e
   pretty (ConstBool _ x)  = pretty x
   pretty (Pred _ n args)  = pretty n <> (tupled $ pretty <$> args)
+  pretty (Not _ e)        = "!" <> pretty e
+  pretty (Neg _ e)        = "-" <> pretty e
+  pretty (Inv _ e)        = "(" <> pretty e <> ")^(-1)"
+  pretty (Div _ x y)      = pretty x <+> "/" <+> pretty y
+  pretty (Sub _ x y)      = pretty x <+> "-" <+> pretty y
+  pretty (Lt _ x y)       = pretty x <+> "<" <+> pretty y
+  pretty (Le _ x y)       = pretty x <+> "=<" <+> pretty y
+  pretty (Eq _ x y)       = pretty x <+> "=" <+> pretty y
+  pretty (Gt _ x y)       = pretty x <+> ">" <+> pretty y
+  pretty (Ge _ x y)       = pretty x <+> ">=" <+> pretty y
+  pretty (Mul _ x y)      = pretty x <+> "*" <+> pretty y
+  pretty (Add _ x y)      = pretty x <+> "+" <+> pretty y
+  pretty (Or _ x y)       = pretty x <> ";\n" <> pretty y
+  pretty (And _ x y)      = pretty x <> ",\n" <> pretty y
 
 data EvaluationException a
   = NonConstantTerm Expr
   deriving (Show, Exception)
+
+prettyType :: Expr -> Doc ann
+prettyType e 
+  | t == Just PPAuto &&
+    d == Just Public ||
+    t == Nothing     ||
+    d == Nothing 
+      = ""
+  | otherwise = " :" <+> pretty d <+> pretty t
+  where (Ann t d) = head $ e ^. partsOf annLens
 
 --------------------------
 -- is the expression constant (i.e. does not contain any variables)?
@@ -178,7 +212,10 @@ eAnd = And empty
 eOr :: Expr -> Expr -> Expr
 eOr = Or empty
 
+dbCol :: String -> Expr
+dbCol = DBCol empty
+
 -- | A traversal for accessing the annotation of a term
 annLens :: Traversal' Expr Ann
-annLens = biplate
+annLens = template
 

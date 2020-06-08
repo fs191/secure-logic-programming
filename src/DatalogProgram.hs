@@ -67,8 +67,8 @@ makeLenses ''DatalogProgram
 
 instance Pretty DatalogProgram where
   pretty p =
-    (hcat $ (<>";\n\n") . pretty <$> _dpDBClauses p) <>
-    (hcat $ (<>";\n\n") . pretty <$> rules p) <>
+    (hcat $ (<>".\n\n") . pretty <$> _dpDBClauses p) <>
+    (hcat $ (<>".\n\n") . pretty <$> rules p) <>
     (fromMaybe emptyDoc (pretty <$> goal p))
 
 instance LogicProgram DatalogProgram where

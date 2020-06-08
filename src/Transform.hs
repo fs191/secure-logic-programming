@@ -1,18 +1,21 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Transform
   ( deriveAllGroundRules
   ) where
 
 ---------------------------------------------------------
 ---- Transformation of a Datalog script
-----  to intermediate representation
+----   to intermediate representation
 ---------------------------------------------------------
 
+import Data.Data.Lens as D
 import Data.Generics.Uniplate.Operations as U
 import Data.Maybe
 import Data.List
 
 import Control.Applicative
-import Control.Lens
+import Control.Lens as L
 
 import Rule
 import Expr
@@ -34,6 +37,7 @@ deriveAllGroundRules program n = program'
       removeFalseFacts .
       liftA simplify . 
       --(traversed . ruleTail %~ simplifyAnds) .
+      (traversed . ruleTail %~ U.transform bindArgColumns) .
       (traversed . ruleTail %~ simplifyVars) . 
       inlineOnce
 
@@ -110,4 +114,20 @@ removeFalseFacts = filter (\x -> x ^. ruleTail /= constBool False)
 -- | Removes duplicates of facts that appear more than once
 removeDuplicateFacts :: [Rule] -> [Rule]
 removeDuplicateFacts = nub
+
+-- | Binds columns that are arguments of some predicate to a new variable
+bindArgColumns :: Expr -> Expr
+bindArgColumns (Pred ann n as) = foldr eAnd newPred eqs
+  where
+    -- Generate a list of fresh variables
+    varNames = (\i -> var $ "_C_" <> show i) <$> [0..]
+    cols :: [(Expr, Expr)]
+    cols = nub [c | c@(DBCol _ _) <- as] `zip` varNames
+    -- Generate equalities between columns and their variables
+    eqs     = uncurry equal <$> cols
+    -- Generate a new predicate that does not have any column arguments
+    f c@(DBCol _ _) = fromJust $ lookup c cols
+    f c = c
+    newPred = Pred ann n $ f <$> as
+bindArgColumns x = x
 

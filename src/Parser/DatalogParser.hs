@@ -82,7 +82,8 @@ dbFact =
     vs <- sepBy1 dbVar comma
     void $ symbol ")"
     void $ symbol ")"
-    return $ dbClause n vs
+    let vs' = vs & traversed . _DBCol . _2 %~ ((n <> ".") <>)
+    return $ dbClause n vs'
 
 dbVar :: Parser Expr
 dbVar =
@@ -92,7 +93,7 @@ dbVar =
     al <- domainType
     ty <- dataType
     -- Add annotations for type and domain
-    let v = var n
+    let v = dbCol n
           & annLens . annType .~ Just ty
           & annLens . domain  .~ Just al
     return v
