@@ -38,7 +38,7 @@ deriveAllGroundRules program n = program'
       liftA simplify . 
       --(traversed . ruleTail %~ simplifyAnds) .
       (traversed . ruleTail %~ U.transform bindArgColumns) .
-      (traversed . ruleTail %~ simplifyVars) . 
+      (traversed %~ simplifyVars) . 
       inlineOnce
 
 -- | Tries to unify each predicate in each rule body with an appropriate rule
@@ -82,11 +82,14 @@ simplify r = r & ruleTail %~ U.rewrite f
       | otherwise = Nothing
     f _ = Nothing
 
+simplifyVars :: Rule -> Rule
+simplifyVars r = applySubst subst r
+  where subst = simplifyVars' $ r ^. ruleTail
+
 -- | Removes any unnecessary variable equalities (e.g. X=Y)
-simplifyVars :: Expr -> Expr
-simplifyVars r = applyToExpr subst r
-  where subst = compress . mconcat . catMaybes $ f <$> (U.universe r)
-        f (Eq _ (Var _ v) x) 
+simplifyVars' :: Expr -> Subst
+simplifyVars' r = compress . mconcat . catMaybes $ f <$> (U.universe r)
+  where f (Eq _ (Var _ v) x) 
           | isLeaf x  = Just $ v |-> x
           | otherwise = Nothing
         f (Eq _ x (Var _ v))

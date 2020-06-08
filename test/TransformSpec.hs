@@ -31,6 +31,11 @@ spec =
         [constStr "a", constStr "c", constStr "e"] 
         (constTrue)
       ]
+    transContainsOnly "examples/prolog/equal.pl" 1
+      [ rule "equal"
+        [var "Y", var "Y"]
+        (constTrue)
+      ]
 
 canDeriveOn :: String -> Int -> Spec
 canDeriveOn file n = it desc $ action `shouldReturn` ()
@@ -41,12 +46,18 @@ canDeriveOn file n = it desc $ action `shouldReturn` ()
         let d = deriveAllGroundRules f n
         return $ d `seq` ()
 
+transContainsOnly :: String -> Int -> [Rule] -> Spec
+transContainsOnly = transContains' const
+
 transContains :: String -> Int -> [Rule] -> Spec
-transContains file n rs = it desc $
+transContains = transContains' intersect
+
+transContains' :: ([Rule] -> [Rule] -> [Rule]) -> String -> Int -> [Rule] -> Spec
+transContains' fun file n rs = it desc $
   do
     f <- parseDatalogFromFile file
     let d = deriveAllGroundRules f n
-    if rules d `intersect` rs == rs
+    if fun (rules d) rs == rs
       then return ()
       else expectationFailure . failMsg $ rules d
   where
