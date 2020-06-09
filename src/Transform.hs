@@ -9,13 +9,14 @@ module Transform
 ----   to intermediate representation
 ---------------------------------------------------------
 
-import Data.Data.Lens as D
 import Data.Generics.Uniplate.Operations as U
 import Data.Maybe
 import Data.List
+import qualified Data.Set as S
 
 import Control.Applicative
 import Control.Lens as L
+import Control.Monad.State
 
 import Rule
 import Expr
@@ -36,8 +37,9 @@ deriveAllGroundRules program n = program'
       removeDuplicateFacts .
       removeFalseFacts .
       liftA simplify . 
-      --(traversed . ruleTail %~ simplifyAnds) .
-      (traversed . ruleTail %~ U.transform bindArgColumns) .
+      (traversed . ruleTail %~ simplifyAnds) .
+      (liftA $ refreshRule "_X") .
+      (traversed . ruleTail %~ flip evalState 0 . (U.transformM bindArgColumns)) .
       (traversed %~ simplifyVars) . 
       inlineOnce
 
@@ -99,16 +101,16 @@ simplifyVars' r = compress . mconcat . catMaybes $ f <$> (U.universe r)
 
 -- Removes duplicate terms from AND operations at the root expression
 -- TODO: find out what's causing it to do weird substitutions in the market.pl example
---simplifyAnds :: (Ord a) => Expr a -> Expr a
---simplifyAnds x = foldr1 (Binary And) $ simplifyAnds' x
---
---simplifyAnds' :: (Ord a) => Expr a -> S.Set (Expr a)
---simplifyAnds' (Binary And x y) = S.filter (not . isAnd) $ S.union (simplifyAnds' x) (simplifyAnds' y)
---simplifyAnds' x = S.singleton x
---
---isAnd :: Expr a -> Bool
---isAnd (Binary And _ _) = True
---isAnd _ = False
+simplifyAnds :: Expr -> Expr
+simplifyAnds x = foldr1 eAnd . S.filter (not . isAnd) $ simplifyAnds' x
+
+simplifyAnds' :: Expr -> S.Set (Expr)
+simplifyAnds' (And _ x y) = S.union (simplifyAnds' x) (simplifyAnds' y)
+simplifyAnds' x = S.singleton x
+
+isAnd :: Expr -> Bool
+isAnd (And _ _ _) = True
+isAnd _ = False
 
 -- | Removes facts that always evaluate to False
 removeFalseFacts :: [Rule] -> [Rule]
@@ -119,18 +121,23 @@ removeDuplicateFacts :: [Rule] -> [Rule]
 removeDuplicateFacts = nub
 
 -- | Binds columns that are arguments of some predicate to a new variable
-bindArgColumns :: Expr -> Expr
-bindArgColumns (Pred ann n as) = foldr eAnd newPred eqs
-  where
-    -- Generate a list of fresh variables
-    varNames = (\i -> var $ "_C_" <> show i) <$> [0..]
-    cols :: [(Expr, Expr)]
-    cols = nub [c | c@(DBCol _ _) <- as] `zip` varNames
-    -- Generate equalities between columns and their variables
-    eqs     = uncurry equal <$> cols
-    -- Generate a new predicate that does not have any column arguments
-    f c@(DBCol _ _) = fromJust $ lookup c cols
-    f c = c
-    newPred = Pred ann n $ f <$> as
-bindArgColumns x = x
+bindArgColumns :: Expr -> State Int Expr
+bindArgColumns (Pred ann n as) = 
+  do
+    let freshVar :: State Int Expr
+        freshVar = 
+          do
+            i <- get
+            put $ i + 1
+            return . var $ "_COL_" <> show i
+    let cols = [x | x@(DBCol _ _) <- as]
+    vars <- sequenceA $ replicate (length cols) freshVar
+    let cvs   = cols `zip` vars
+        lkp :: Expr -> Expr
+        lkp x = fromMaybe x $ lookup x $ cvs
+        newAs = lkp <$> as
+        eqs   = uncurry equal <$> cvs
+        newPred = Pred ann n newAs
+    return $ foldr eAnd newPred eqs
+bindArgColumns x = return x
 

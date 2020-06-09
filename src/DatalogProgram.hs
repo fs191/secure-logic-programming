@@ -69,7 +69,9 @@ instance Pretty DatalogProgram where
   pretty p =
     (hcat $ (<>".\n\n") . pretty <$> _dpDBClauses p) <>
     (hcat $ (<>".\n\n") . pretty <$> rules p) <>
-    (fromMaybe emptyDoc (pretty <$> goal p))
+    (fromMaybe emptyDoc $ do
+       g <- pretty <$> goal p
+       return $ g <> ".")
 
 instance LogicProgram DatalogProgram where
   rules = _dpRules

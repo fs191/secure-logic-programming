@@ -60,7 +60,7 @@ isFact r = _ruleTail r == constTrue
 refreshRule :: String -> Rule -> Rule
 refreshRule prefix r = applySubst s r
   where 
-    s = mconcat $ refreshExpr prefix <$> [r ^. ruleHead, r ^. ruleTail]
+    s = refreshExpr prefix . eAnd (r ^. ruleHead) $ r ^. ruleTail
 
 applySubst :: Subst -> Rule -> Rule
 applySubst s r = r & ruleHead %~ applyToExpr s
