@@ -41,6 +41,7 @@ uint [[1]] widen_indices (uint [[1]] indices, uint m){
 template <type T>
 T [[1]] myReplicate(T [[1]] a, uint [[1]] ms, uint [[1]] ns){
     assert(size(ms) == size(ns));
+    if (size(a) == 0) return a;
 
     T [[1]] b (sum(ms * ns));
     uint t = 0;
@@ -113,6 +114,7 @@ D T [[2]] myReplicate(D T [[2]] a, uint [[1]] ms, uint [[1]] ns){
 template <type T>
 T [[1]] copyBlock(T [[1]] a, uint [[1]] ms, uint [[1]] ns){
     assert(size(ms) == size(ns));
+    if (size(a) == 0) return a;
 
     T [[1]] b (sum(ms * ns));
     uint32 [[1]] source (size(b));
@@ -397,7 +399,7 @@ T[[2]] myCat(T[[2]] X, T[[2]] Y) {
 
 template <domain D: shared3p, type T>
 D T[[1]] myCat(D T[[1]] X, D T[[1]] Y) {
-    if (size(X) > 0 && size(Y) > 0){
+    //if (size(X) > 0 && size(Y) > 0){
         D T [[1]] Z (size(X) + size(Y));
         uint32 [[1]] indices_X (size(X));
         uint32 [[1]] indices_Y (size(Y));
@@ -410,23 +412,25 @@ D T[[1]] myCat(D T[[1]] X, D T[[1]] Y) {
         Z = partialRearrange(X,Z,indices_X,indices_X);
         Z = partialRearrange(Y,Z,indices_Y,indices_Y + (uint32)size(X));
         return Z;
-    }else if (size(X) > 0){
-        return X;
-    }else{
-        return Y;
-    }
+    //}else if (size(X) > 0){
+    //    return X;
+    //}else{
+    //    return Y;
+    //}
 }
 
 template <domain D: shared3p, type T>
 D T[[2]] myCat(D T[[2]] X, D T[[2]] Y, int d) {
-    if (size(X) > 0 && size(Y) > 0){
+    //if (size(X) > 0 && size(Y) > 0){
         D T [[2]] Z;
         uint offset;
         if (d == 0){
+            assert(shape(X)[1] == shape(Y)[1]);
             offset = shape(X)[1];
             D T [[2]] Z_aux (shape(X)[0] + shape(Y)[0], shape(X)[1]);
             Z = Z_aux;
         }else{
+            assert(shape(X)[0] == shape(Y)[0]);
             offset = shape(X)[1] + shape(Y)[1];
             D T [[2]] Z_aux (shape(X)[0], shape(X)[1] + shape(Y)[1]);
             Z = Z_aux;
@@ -456,11 +460,11 @@ D T[[2]] myCat(D T[[2]] X, D T[[2]] Y, int d) {
         }
         Z = partialRearrange(Y,Z,source_Y,target_Y + offset_Y);
         return Z;
-    }else if (size(X) > 0){
-        return X;
-    }else{
-        return Y;
-    }
+    //}else if (size(X) > 0){
+    //    return X;
+    //}else{
+    //    return Y;
+    //}
 }
 
 template <domain D: shared3p, type T>
@@ -844,12 +848,58 @@ T [[N]] choose(bool [[N]] b, T [[N]] x, T [[N]] y){
     return bn * x + (1 - bn) * y;
 }
 
-template<domain D, type T, dim N>
-D T [[N]] choose(bool [[N]] b, D T [[N]] x, T [[N]] y){
-    T [[N]] bn = (T)b;
+
+template<domain D, dim N>
+D int32 [[N]] choose(bool [[N]] b, D int32 [[N]] x, D int32 [[N]] y){
+    int32 [[N]] bn = (int32)b;
+    return bn * x + (1 - bn) * y;
+}
+template<domain D, dim N>
+D int32 [[N]] choose(bool [[N]] b, int32 [[N]] x, D int32 [[N]] y){
+    int32 [[N]] bn = (int32)b;
+    return bn * x + (1 - bn) * y;
+}
+template<domain D, dim N>
+D int32 [[N]] choose(bool [[N]] b, D int32 [[N]] x, int32 [[N]] y){
+    int32 [[N]] bn = (int32)b;
     return bn * x + (1 - bn) * y;
 }
 
+
+template<domain D, dim N>
+D xor_uint32 [[N]] choose(bool [[N]] b, D xor_uint32 [[N]] x, D xor_uint32 [[N]] y){
+    uint32 [[N]] bn = 4294967295 * (uint32)b;
+    return bn & x ^ (4294967295 - bn) & y;
+}
+template<domain D, dim N>
+D xor_uint32 [[N]] choose(bool [[N]] b, uint32 [[N]] x, D xor_uint32 [[N]] y){
+    uint32 [[N]] bn = 4294967295 * (uint32)b;
+    return bn & x ^ (4294967295 - bn) & y;
+}
+template<domain D, dim N>
+D xor_uint32 [[N]] choose(bool [[N]] b, D xor_uint32 [[N]] x, uint32 [[N]] y){
+    uint32 [[N]] bn = 4294967295 * (uint32)b;
+    return bn & x ^ (4294967295 - bn) & y;
+}
+
+
+template<domain D, dim N>
+D xor_uint8 [[N]] choose(bool [[N]] b, D xor_uint8 [[N]] x, D xor_uint8 [[N]] y){
+    uint8 [[N]] bn = 255 * (uint8)b;
+    return bn & x ^ (255 - bn) & y;
+}
+template<domain D, dim N>
+D xor_uint8 [[N]] choose(bool [[N]] b, uint8 [[N]] x, D xor_uint8 [[N]] y){
+    uint8 [[N]] bn = 255 * (uint8)b;
+    return bn & x ^ (255 - bn) & y;
+}
+template<domain D, dim N>
+D xor_uint8 [[N]] choose(bool [[N]] b, D xor_uint8 [[N]] x, uint8 [[N]] y){
+    uint8 [[N]] bn = 255 * (uint8)b;
+    return bn & x ^ (255 - bn) & y;
+}
+
+/*
 template<domain D, type T, dim N>
 D T [[N]] choose(bool [[N]] b, T [[N]] x, D T [[N]] y){
     T [[N]] bn = (T)b;
@@ -861,6 +911,8 @@ D T [[N]] choose(bool [[N]] b, D T [[N]] x, D T [[N]] y){
     T [[N]] bn = (T)b;
     return bn * x + (1 - bn) * y;
 }
+*/
+
 /*
 template<domain D>
 D int32 [[1]] getIntColumn(string ds, string tableName, uint colIndex, uint m, uint mi, uint ni){
@@ -922,32 +974,76 @@ relColumn<public, uint32, uint8> constColumn(string arg){
     return result;
 }
 
-template <domain D>
-relColumn<D, xor_uint32, xor_uint8> constColumn(D xor_uint8 [[1]] arg){
-    D xor_uint32 [[1]] val = CRC32(arg);
-    relColumn<D, xor_uint32, xor_uint8> result;
-    result.val = val;
-    result.str = str;
-    result.fv = reshape(false,1);
+// TODO did not understand why exactly it does not work with a template
+//template <domain D>
+relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(string arg, uint m){
+    pd_shared3p xor_uint8 [[1]] str = bl_str(arg);
+    pd_shared3p xor_uint32 val = CRC32(str);
+    relColumn<pd_shared3p, xor_uint32, xor_uint8> result;
+    result.val = reshape(val,m);
+    result.str = reshape(str,m,size(str));
+    result.fv = reshape(false,m);
     return result;
 }
 
 template <domain D>
-relColumn<D, int32, int32> constColumn(D int32 arg){
+relColumn<D, xor_uint32, xor_uint8> constColumn(D xor_uint8 [[1]] arg, uint m){
+    D xor_uint32 [[1]] val = CRC32(arg);
+    relColumn<D, xor_uint32, xor_uint8> result;
+    result.val = reshape(val,m);
+    result.str = reshape(str,m,size(str));
+    result.fv = reshape(false,m);
+    return result;
+}
+
+template <domain D, type T>
+relColumn<D, int32, int32> constColumn(D T arg0, uint m){
+    int32 arg = (int32)arg0;
     relColumn<D, int32, int32> result;
-    result.val = arg;
-    result.str = arg;
+    result.val = reshape(arg,m);
+    result.str = reshape(0,m,0);
+    result.fv = reshape(false,m);
+    return result;
+}
+
+/*
+we may need this for testing to convert public int to private
+template <domain D1, domain D2, type T>
+relColumn<D1, int32, int32> constColumn(D2 T arg0){
+    int32 arg = (int32)arg0;
+    relColumn<D1, int32, int32> result;
+    result.val = reshape(arg,1);
+    result.str = reshape(0,1,0);
     result.fv = reshape(false,1);
+    return result;
+}
+*/
+
+template <domain D, type T, type T0, type T1>
+relColumn<D, T0, T1> constColumn(D T arg){
+    return constColumn(arg, 1 :: uint);
+}
+
+template <domain D, type T, type S>
+relColumn<D, T, S> freeVarColumn(uint m){
+    relColumn<D, T, S> result;
+    result.val = reshape(0,m);
+    result.str = reshape(0,m,0);
+    result.fv  = reshape(true,m);
     return result;
 }
 
 template <domain D, type T, type S>
 relColumn<D, T, S> freeVarColumn(){
-    relColumn<D, T, S> result;
-    result.val = reshape(0,1);
-    result.str = reshape(0,1,0);
-    result.fv  = reshape(true,1);
-    return result;
+    return freeVarColumn(1 :: uint);
+}
+
+bool [[1]] trueColumn(uint m){
+    return reshape(true,m);
+}
+
+bool [[1]] trueColumn(){
+    return trueColumn(1 :: uint);
 }
 
 template<domain D, type T, type S>
@@ -1075,8 +1171,8 @@ subst<D, T, S> unify(relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y){
     bool [[2]] xfv = reshape(myReplicate(x.fv, ms, ns), m, n);
 
     //printArray(x.fv);
-    pd_shared3p S0 [[2]] xstr0 = xstr;
-    pd_shared3p S1 [[2]] ystr0 = ystr;
+    //pd_shared3p S0 [[2]] xstr0 = xstr;
+    //pd_shared3p S1 [[2]] ystr0 = ystr;
     //printMatrix(declassify(xstr0));
     //printMatrix(declassify(ystr0));
     D T [[1]] val = choose(x.fv, y.val, x.val);
@@ -1098,18 +1194,23 @@ subst<D, T, S> unify(relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y){
 template<domain D>
 D uint32 [[1]] lpShuffle(D bool [[1]] b){
     publish("does solution exist:", any(b));
-    pd_shared3p uint32 [[1]] pi  = countSortPermutation(!b);
+    D uint32 [[1]] pi  = countSortPermutation(!b);
     return pi;
 }
-template<domain D0, domain D, type T, type S>
-void publishArg(uint i, string vname, D0 uint32 [[1]] pi, uint32 n, D T [[1]] val, D S [[2]] str){
+template<domain D0, domain D, type T, dim N>
+D0 T [[N]] postprocess(D0 uint32 [[1]] pi, uint32 n, D T [[N]] val){
+    return mySlice(applyPermutation(val,pi), 0, n);
+}
 
+template<domain D, type T0, type T, type S>
+void publishArg(T0 i0, string vname, D T [[1]] val, D S [[2]] str){
+    uint i = (uint)i0;
     publish("var" + tostring(i), vname);
     if (shape(str)[1] >= 1){
         publish("len" + tostring(i), shape(str)[1]);
-        publish("val" + tostring(i), mySlice(applyPermutation(str,pi), 0, n));
+        publish("val" + tostring(i), str);
     } else {
-        publish("val" + tostring(i), mySlice(applyPermutation(val,pi), 0, n));
+        publish("val" + tostring(i), val);
     }
 }
 
@@ -1121,6 +1222,9 @@ D bool [[1]] apply_op(string s, D0 T [[1]] x, D1 T [[1]] y){
     if      (s == "==") b = (x == y);
     else if (s == "<=") b = (x <= y);
     else if (s == "<")  b = (x <  y);
+    else if (s == ">=") b = (x >= y);
+    else if (s == ">")  b = (x >  y);
+    else assert(false);
     return b;
 }
 
