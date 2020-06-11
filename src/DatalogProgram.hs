@@ -18,6 +18,8 @@ module DatalogProgram
   , ruleLens
   , dbClauseLens
   , ppDatalogProgram
+  , programGoalExpr
+  , dpRules
   ) where
 
 import           Data.Maybe
@@ -43,6 +45,7 @@ data Goal = Goal
   , _gFormula :: Expr
   }
   deriving (Show)
+makeLenses ''Goal
 
 instance Pretty Goal where
   pretty g = 
@@ -108,4 +111,7 @@ dbClauseLens = dpDBClauses
 
 ppDatalogProgram :: [Rule] -> Maybe Goal -> [DBClause] -> DatalogProgram
 ppDatalogProgram r = DatalogProgram r
+
+programGoalExpr :: DatalogProgram -> Maybe Expr
+programGoalExpr = (^? dpGoal . _Just . gFormula)
 

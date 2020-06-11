@@ -2,11 +2,11 @@ module Adornment
   ( Binding(..)
   , BindingPattern
   , adornProgram
-  , predicatePattern
   ) where
 
 import DatalogProgram
 import Expr
+import RGGraph
 import Rule
 
 import Control.Applicative
@@ -18,32 +18,47 @@ import Data.List
 import Data.Maybe
 import qualified Data.Set as S
 
-data Binding
-  = Free
-  | Bound
-  deriving (Show,Enum,Eq,Ord)
+data Adornment = Adornment String BindingPattern
+  deriving (Eq)
 
-newtype BindingPattern = BindingPattern [Binding]
+adornProgram :: DatalogProgram -> Maybe DatalogProgram
+adornProgram p = 
+  do 
+    e <- programGoalExpr p
+    let rs = rules p
+        pairs = adornments e
+    return $ p & dpRules .~ adornRules rs pairs
 
-adornProgram :: DatalogProgram -> DatalogProgram
-adornProgram = undefined adornRule
+adornRules :: [Rule] -> [Adornment] -> [Rule]
+adornRules _ [] = []
+adornRules rs ((Adornment n p):ts) = nub $ adorned <> adornRules rs (ts <> ts')
+  where 
+    adornables :: [Rule]
+    adornables = filter (\x -> ruleName x == n) rs
+    adorned :: [Rule]
+    adorned = flip adornRule p <$> adornables
+    ands :: [Expr]
+    ands = concat $ adorned ^.. folded . ruleTail . to andsToList
+    ts' = nub . concat $ adornments <$> ands
+
+adornments :: Expr -> [Adornment]
+adornments e = [Adornment n $ predicatePattern x | x@(Pred _ n _) <- preds]
+  where
+    preds = [x | x@(Pred _ _ _) <- U.universe e]
 
 -- | Reorders the predicates in the rule body so that 
 -- the rule fails as early as possible for the given binding pattern
 adornRule :: Rule -> BindingPattern -> Rule
-adornRule r pat@(BindingPattern ps) = flip evalState [] $ do
-  -- Predicate name with binding pattern suffix
-  let n      = r ^. ruleHead . _Pred . _2 . to (++ bindingPatternSuffix pat)
+adornRule r pat = flip evalState [] $ do
       -- Get all leaves of the `And` tree
-      _terms = concat [[x, y] | (And _ x y) <- U.universe $ r ^. ruleTail]
-      terms  = filter (not . isAnd) _terms
       -- Get all initially bound variables
-      _bound = ps `zip` (r ^. ruleHead . _Pred . _3)
+  let terms = andsToList $ r ^. ruleTail
+      _bound = pat `zip` (r ^. ruleHead . _Pred . _3)
       bound  = [x | (Bound, Var _ x) <- _bound]
-  let terms' = adornExprs terms $ S.fromList bound
+      terms' = adornExprs terms $ S.fromList bound
   return $ r 
-    & ruleHead . _Pred . _2 .~ n
     & ruleTail .~ foldr1 eAnd terms'
+    & ruleHead %~ suffixPredicate pat
 
 adornExprs :: [Expr] -> S.Set String -> [Expr]
 adornExprs exprs bound = fromJust $ evalStateT (many action) (exprs, bound)
@@ -59,33 +74,10 @@ adornExprs exprs bound = fromJust $ evalStateT (many action) (exprs, bound)
         modify $ _1 .~ tail sorted
         return $ head sorted
 
--- | If given a predicate, returns a binding pattern that has 'f'
--- at the position of each variable and 'b' in place of anything else
-predicatePattern :: Expr -> Maybe BindingPattern
-predicatePattern (Pred _ _ as) = Just . BindingPattern $ f <$> as
-  where
-    f (Var _ _) = Free
-    f _         = Bound
-predicatePattern _ = Nothing
-
-bindingChar :: Binding -> Char
-bindingChar Free  = 'f'
-bindingChar Bound = 'b'
-
-bindingPatternSuffix :: BindingPattern -> String
-bindingPatternSuffix (BindingPattern l) = bindingChar <$> l
 
 --
 -- Utilities
 --
-
-isAnd :: Expr -> Bool
-isAnd (And _ _ _) = True
-isAnd _ = False
-
-predicateVarNames :: Expr -> [String]
-predicateVarNames (Pred _ _ vs) = [n | (Var _ n) <- vs]
-predicateVarNames _ = error "Expecting a predicate"
 
 comp :: S.Set String -> Expr -> Expr -> Ordering
 comp bound (Pred _ _ xs) (Pred _ _ ys) = 

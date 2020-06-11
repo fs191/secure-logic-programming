@@ -11,6 +11,7 @@ module Rule
   , dbClauseToRule
   , refreshRule
   , applySubst
+  , ruleName
   ) where
 
 ---------------------------------------------------------
@@ -68,4 +69,7 @@ applySubst s r = r & ruleHead %~ applyToExpr s
 
 dbClauseToRule :: DBClause -> Rule
 dbClauseToRule dbc = Rule (predicate (name dbc) $ vars dbc) constTrue
+
+ruleName :: Rule -> String
+ruleName (Rule (Pred _ n _) _) = n
 

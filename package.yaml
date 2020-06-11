@@ -33,6 +33,7 @@ dependencies:
 - lens
 - prettyprinter
 - union-find
+- algebraic-graphs
 # Testing only
 # For some reason I get errors in ghcide if these are not in the dependencies
 - hspec

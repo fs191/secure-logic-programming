@@ -35,6 +35,8 @@ module Expr
   , _Var
   , _ConstStr
   , _DBCol
+  , andsToList
+  , predicateVarNames
   ) where
 
 ---------------------------------------------------------
@@ -44,7 +46,7 @@ module Expr
 import Control.Exception
 import Control.Lens hiding (children)
 
-import Data.Generics.Uniplate ()
+import Data.Generics.Uniplate.Data as U (universe)
 import Data.Data
 import Data.Data.Lens
 import Data.Text.Prettyprint.Doc
@@ -218,4 +220,14 @@ dbCol = DBCol empty
 -- | A traversal for accessing the annotation of a term
 annLens :: Traversal' Expr Ann
 annLens = template
+
+-- | Turns all `And`s to a list, 
+-- starting from the root of the expression
+andsToList :: Expr -> [Expr]
+andsToList (And _ l r) = andsToList l <> andsToList r
+andsToList x = [x]
+
+predicateVarNames :: Expr -> [String]
+predicateVarNames (Pred _ _ vs) = [n | (Var _ n) <- vs]
+predicateVarNames _ = error "Expecting a predicate"
 

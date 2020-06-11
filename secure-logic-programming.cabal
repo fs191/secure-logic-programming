@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4c3c94ad47f2f506dd9c3026c4ec7b964906454a52d92dff940bb74c6b43ab8e
+-- hash: fce490916301490a82b6ed590f41bfedf7f9ae61766d52e6febab81679255815
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -38,6 +38,7 @@ library
       Parser.DatalogParser
       Parser.DatalogParser.Expr
       Parser.DatalogParser.Lexer
+      RGGraph
       Rule
       Substitution
       Table
@@ -50,6 +51,7 @@ library
   build-depends:
       Cabal
     , HUnit
+    , algebraic-graphs
     , base >=4.7 && <5
     , containers
     , hspec
@@ -78,6 +80,7 @@ executable lpsec
   build-depends:
       Cabal
     , HUnit
+    , algebraic-graphs
     , base >=4.7 && <5
     , containers
     , hspec
@@ -109,6 +112,7 @@ test-suite test
   build-depends:
       Cabal
     , HUnit
+    , algebraic-graphs
     , base >=4.7 && <5
     , containers
     , criterion
