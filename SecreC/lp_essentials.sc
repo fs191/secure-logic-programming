@@ -1198,7 +1198,7 @@ D uint32 [[1]] lpShuffle(D bool [[1]] b){
     return pi;
 }
 template<domain D0, domain D, type T, dim N>
-D0 T [[N]] postprocess(D0 uint32 [[1]] pi, uint32 n, D T [[N]] val){
+D0 T [[N]] filterTrue(D0 uint32 [[1]] pi, uint32 n, D T [[N]] val){
     return mySlice(applyPermutation(val,pi), 0, n);
 }
 
