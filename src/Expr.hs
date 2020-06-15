@@ -10,7 +10,7 @@
 module Expr
   ( Expr(..)
   , PPType(..), PPDomain(..)
-  , Ann
+  , Ann(..)
   , isConstExpr, isLeaf
   , isVar
   , _Pred
