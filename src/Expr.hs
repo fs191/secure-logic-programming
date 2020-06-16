@@ -31,12 +31,14 @@ module Expr
   , eAnd, eOr
   , annLens
   , annType, domain
+  , getAnn
   , dbCol
   , _Var
   , _ConstStr
   , _DBCol
   , andsToList
   , predicateVarNames
+  , predicateName
   ) where
 
 ---------------------------------------------------------
@@ -217,6 +219,28 @@ eOr = Or empty
 dbCol :: String -> Expr
 dbCol = DBCol empty
 
+getAnn :: Expr -> Ann
+getAnn (Var t _)      = t
+getAnn (ConstInt t _) = t
+getAnn (ConstStr t _) = t
+getAnn (DBCol t _)    = t
+getAnn (ConstBool t _)  = t
+getAnn (Pred t _ _)     = t
+getAnn (Not t _)        = t
+getAnn (Neg t _)        = t
+getAnn (Inv t _)        = t
+getAnn (Div t _ _)      = t
+getAnn (Sub t _ _)      = t
+getAnn (Lt t _ _)       = t
+getAnn (Le t _ _)       = t
+getAnn (Eq t _ _)       = t
+getAnn (Gt t _ _)       = t
+getAnn (Ge t _ _)       = t
+getAnn (Mul t _ _)      = t
+getAnn (Add t _ _)      = t
+getAnn (Or t _ _)       = t
+getAnn (And t _ _)      = t
+
 -- | A traversal for accessing the annotation of a term
 annLens :: Traversal' Expr Ann
 annLens = template
@@ -226,6 +250,10 @@ annLens = template
 andsToList :: Expr -> [Expr]
 andsToList (And _ l r) = andsToList l <> andsToList r
 andsToList x = [x]
+
+predicateName :: Expr -> String
+predicateName (Pred _ p _) = p
+predicateName _ = error "Expecting a predicate"
 
 predicateVarNames :: Expr -> [String]
 predicateVarNames (Pred _ _ vs) = [n | (Var _ n) <- vs]
