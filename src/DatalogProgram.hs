@@ -20,6 +20,7 @@ module DatalogProgram
   , ppDatalogProgram
   , programGoalExpr
   , dpRules
+  , gFormula
   ) where
 
 import           Data.Maybe
