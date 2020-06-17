@@ -32,7 +32,7 @@ data Rule = Rule
   { _ruleHead :: Expr
   , _ruleTail :: Expr
   }
-  deriving (Eq)
+  deriving (Eq, Ord)
 makeLenses ''Rule
 
 instance Pretty Rule where

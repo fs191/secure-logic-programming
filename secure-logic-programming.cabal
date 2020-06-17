@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fce490916301490a82b6ed590f41bfedf7f9ae61766d52e6febab81679255815
+-- hash: d9fcdb516397e93f219b73766374ffa8813881b70ddca64b0aa02cddd7287777
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -27,11 +27,12 @@ source-repository head
 
 library
   exposed-modules:
-      Adornment
+      Annotation
       DatalogProgram
       DBClause
       ErrorMsg
       Expr
+      Language.Datalog.Literal
       Language.SecreC
       Language.SecreC.Types
       Lib

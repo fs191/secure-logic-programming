@@ -18,7 +18,6 @@ import Control.Applicative
 import Control.Lens as L
 import Control.Monad.State
 
-import Adornment
 import Rule
 import Expr
 import Substitution
@@ -27,7 +26,7 @@ import qualified DatalogProgram as DP
 -- | Generates all possible ground rules for n iterations
 deriveAllGroundRules :: DP.DatalogProgram -> Int -> DP.DatalogProgram
 deriveAllGroundRules program n = program'
-                                   & fromMaybe program' . adornProgram
+                                   -- & fromMaybe program' . adornProgram
                                    & DP.ruleLens %~ f
   where
     clauses = program ^. DP.dbClauseLens

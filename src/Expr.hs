@@ -9,7 +9,6 @@
 
 module Expr
   ( Expr(..)
-  , PPType(..), PPDomain(..)
   , Ann
   , isConstExpr, isLeaf
   , isVar
@@ -30,7 +29,6 @@ module Expr
   , eMin, eMax
   , eAnd, eOr
   , annLens
-  , annType, domain
   , dbCol
   , _Var
   , _ConstStr
@@ -46,24 +44,13 @@ module Expr
 import Control.Exception
 import Control.Lens hiding (children)
 
-import Data.Generics.Uniplate.Data as U (universe)
 import Data.Data
 import Data.Data.Lens
 import Data.Text.Prettyprint.Doc
 
 import Language.SecreC.Types
 
-data Ann = Ann
-  { 
-    -- Datatype of the term
-    _annType :: Maybe PPType
-    -- Security domain of the term
-  , _domain  :: Maybe PPDomain
-  }
-  deriving (Ord, Show, Eq, Data, Typeable)
-
-empty :: Ann
-empty = Ann Nothing Nothing
+import Annotation
 
 -- artihmetic expressions
 -- associative operations are represented with lists
@@ -92,8 +79,6 @@ data Expr
   | Or   Ann Expr Expr
   | Pred Ann String [Expr]
   deriving (Ord,Show,Eq,Data,Typeable)
-makeLenses ''Ann
-makePrisms ''Ann
 makePrisms ''Expr
 
 instance Pretty Expr where
@@ -130,7 +115,9 @@ prettyType e
     d == Nothing 
       = ""
   | otherwise = " :" <+> pretty d <+> pretty t
-  where (Ann t d) = head $ e ^. partsOf annLens
+  where ann = head $ e ^. partsOf annLens
+        t   = ann ^. annType
+        d   = ann ^. domain
 
 --------------------------
 -- is the expression constant (i.e. does not contain any variables)?

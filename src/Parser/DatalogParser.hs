@@ -18,6 +18,7 @@ import qualified DatalogProgram as DP
 import Expr
 import qualified Rule as R
 import DBClause
+import Annotation
 
 type Parser = Parsec Void String
 
