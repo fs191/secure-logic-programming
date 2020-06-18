@@ -1,10 +1,12 @@
 import ProgramOptions
 import OptParse
 import Parser.DatalogParser
+import Language.SecreC
 
 --import CSVImport(generateDataToDBscript)
 
 import Control.Monad
+import Data.Text.Prettyprint.Doc
 
 main :: IO ()
 main = do
@@ -30,11 +32,9 @@ main = do
 
 
   -- we can output either only yes/no answer, or also valuations of free variables
-  let secrec = undefined
+  let secrec = show (pretty (secrecCode program))
 
   -- Output the results
   if outFilePath /= ""
      then writeFile outFilePath secrec
      else putStrLn secrec
-
-

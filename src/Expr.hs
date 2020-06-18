@@ -10,7 +10,7 @@
 module Expr
   ( Expr(..)
   , PPType(..), PPDomain(..)
-  , Ann(..)
+  , Ann
   , isConstExpr, isLeaf
   , isVar
   , _Pred
@@ -32,6 +32,7 @@ module Expr
   , annLens
   , annType, domain
   , getAnn
+  , getVarName
   , dbCol
   , _Var
   , _ConstStr
@@ -39,6 +40,7 @@ module Expr
   , andsToList
   , predicateVarNames
   , predicateName
+  , predicateArity
   ) where
 
 ---------------------------------------------------------
@@ -258,4 +260,12 @@ predicateName _ = error "Expecting a predicate"
 predicateVarNames :: Expr -> [String]
 predicateVarNames (Pred _ _ vs) = [n | (Var _ n) <- vs]
 predicateVarNames _ = error "Expecting a predicate"
+
+predicateArity :: Expr -> Int
+predicateArity (Pred _ _ xs) = length xs
+predicateArity _ = error "Expecting a predicate"
+
+getVarName :: Expr -> String
+getVarName (Var _ n) = n
+getVarName _ = error "Expecting a variable"
 
