@@ -23,6 +23,7 @@ dependencies:
 - Cabal
 - megaparsec
 - containers
+- transformers
 - mtl
 - text
 - uniplate
