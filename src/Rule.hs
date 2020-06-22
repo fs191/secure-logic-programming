@@ -11,6 +11,7 @@ module Rule
   , dbClauseToRule
   , refreshRule
   , applySubst
+  , ruleAnn
   , ruleName
   , ruleSchema
   ) where
@@ -73,6 +74,9 @@ dbClauseToRule dbc = Rule (predicate (name dbc) $ vars dbc) constTrue
 
 ruleName :: Rule -> String
 ruleName (Rule (Pred _ n _) _) = n
+
+ruleAnn :: Rule -> Ann
+ruleAnn (Rule (Pred ann _ _) _) = ann
 
 ruleSchema :: Rule -> [Ann]
 ruleSchema (Rule (Pred _ _ zs) _) = map getAnn zs
