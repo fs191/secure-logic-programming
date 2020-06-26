@@ -9,6 +9,7 @@
 
 module Expr
   ( Expr(..)
+  , PPType(..), PPDomain(..)
   , Ann
   , isConstExpr, isLeaf
   , isVar
@@ -29,12 +30,17 @@ module Expr
   , eMin, eMax
   , eAnd, eOr
   , annLens
+  , annType, domain
+  , getAnn
+  , getVarName
   , dbCol
   , _Var
   , _ConstStr
   , _DBCol
   , andsToList
   , predicateVarNames
+  , predicateName
+  , predicateArity
   ) where
 
 ---------------------------------------------------------
@@ -204,6 +210,9 @@ eOr = Or empty
 dbCol :: String -> Expr
 dbCol = DBCol empty
 
+getAnn :: Expr -> Ann
+getAnn x = head $ x ^.. annLens
+
 -- | A traversal for accessing the annotation of a term
 annLens :: Traversal' Expr Ann
 annLens = template
@@ -214,7 +223,19 @@ andsToList :: Expr -> [Expr]
 andsToList (And _ l r) = andsToList l <> andsToList r
 andsToList x = [x]
 
+predicateName :: Expr -> String
+predicateName (Pred _ p _) = p
+predicateName _ = error "Expecting a predicate"
+
 predicateVarNames :: Expr -> [String]
 predicateVarNames (Pred _ _ vs) = [n | (Var _ n) <- vs]
 predicateVarNames _ = error "Expecting a predicate"
+
+predicateArity :: Expr -> Int
+predicateArity (Pred _ _ xs) = length xs
+predicateArity _ = error "Expecting a predicate"
+
+getVarName :: Expr -> String
+getVarName (Var _ n) = n
+getVarName _ = error "Expecting a variable"
 

@@ -945,8 +945,9 @@ relColumn<D, T, S> extendColumn(relColumn<D, T, S> x, uint m, uint mi, uint ni){
 
 }
 
-template<domain D>
-relColumn<D, int32, int32> getIntColumn(string ds, string tableName, uint colIndex, uint m, uint mi, uint ni){
+template<domain D, type T>
+relColumn<D, int32, int32> getDBColumn(string ds, string tableName, T _colIndex, uint m, uint mi, uint ni){
+    uint colIndex = (uint)_colIndex;
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
 
@@ -961,6 +962,38 @@ relColumn<D, int32, int32> getIntColumn(string ds, string tableName, uint colInd
 }
 
 
+template<domain D, type T, type T1, type T2>
+relColumn<D, T1, T2> getDBColumn(string ds, string tableName, T _colIndex, uint m, uint mi, uint ni){
+    uint colIndex = (uint)_colIndex;
+    uint rv;
+    uint [[1]] ms (mi); ms = 1;
+    uint [[1]] ns (mi); ns = ni;
+
+    D T1 [[1]] col     = reshape(0,mi);
+    D T2 [[2]] col_str = reshape(0,mi,0);
+    rv = tdbReadColumn(ds, tableName, colIndex);
+    for (uint i = 0; i < mi; i++){
+        //TODO we hope to find a better solution for public columns
+        pd_shared3p xor_uint8 [[1]] temp = tdbVmapGetVlenValue(rv, "values", i);
+
+        col[i] = declassifyIfNeed(CRC32(temp));
+        uint n = size(temp);
+
+        D T2 [[2]] temp2 = reshape(0, shape(col_str)[0], max(shape(col_str)[1], n));
+        temp2 = mySetSlice(col_str, temp2, 0, shape(col_str)[0], 0, shape(col_str)[1]);
+        D T2 [[1]] temp3 = declassifyIfNeed(temp);
+        temp2 = mySetSlice(myReshape(temp3, 1, n), temp2, i, i+1, 0, n);
+        col_str = temp2;
+    }
+    col     = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
+    col_str = copyBlock(myReplicate(col_str, ms, ns), {mi * ni}, {m / (mi * ni)});
+
+    public relColumn<D, T1, T2> result;
+    result.fv  = reshape(false, m);
+    result.val = col;
+    result.str = col_str;
+    return result;
+}
 
 //convert a string to uint32 hash
 relColumn<public, uint32, uint8> constColumn(string arg){
@@ -1076,48 +1109,17 @@ relColumn<D, T1, S1> myCat(relColumn<D, T0, S0> x, relColumn<public, T1, S1> y){
     return z;
 }
 
-template<domain D, type T1, type T2>
-relColumn<D, T1, T2> getStrColumn(string ds, string tableName, uint colIndex, uint m, uint mi, uint ni){
-    uint rv;
-    uint [[1]] ms (mi); ms = 1;
-    uint [[1]] ns (mi); ns = ni;
-
-    D T1 [[1]] col     = reshape(0,mi);
-    D T2 [[2]] col_str = reshape(0,mi,0);
-    rv = tdbReadColumn(ds, tableName, colIndex);
-    for (uint i = 0; i < mi; i++){
-        //TODO we hope to find a better solution for public columns
-        pd_shared3p xor_uint8 [[1]] temp = tdbVmapGetVlenValue(rv, "values", i);
-
-        col[i] = declassifyIfNeed(CRC32(temp));
-        uint n = size(temp);
-
-        D T2 [[2]] temp2 = reshape(0, shape(col_str)[0], max(shape(col_str)[1], n));
-        temp2 = mySetSlice(col_str, temp2, 0, shape(col_str)[0], 0, shape(col_str)[1]);
-        D T2 [[1]] temp3 = declassifyIfNeed(temp);
-        temp2 = mySetSlice(myReshape(temp3, 1, n), temp2, i, i+1, 0, n);
-        col_str = temp2;
-    }
-    col     = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
-    col_str = copyBlock(myReplicate(col_str, ms, ns), {mi * ni}, {m / (mi * ni)});
-
-    public relColumn<D, T1, T2> result;
-    result.fv  = reshape(false, m);
-    result.val = col;
-    result.str = col_str;
-    return result;
-}
 
 //simple unification (without comparing term structure which we delegate to preprocessing)
 // we return a bit denoting whether the terms were unifiable, and the result of unification
-template<domain D, type T, type S>
+template<domain D, type T>
 struct subst {
     D bool [[1]] b;
-    relColumn<D, T, S> z;
+    T arg0;
 }
 
 template<domain D, type T, type S>
-subst<D, T, S> unify(relColumn<D, T, S> x, T y){
+subst<D, relColumn<D, T, S> > unify(relColumn<D, T, S> x, T y){
 
     uint m = size(x.val);
     relColumn<D, T, S> y_col;
@@ -1128,7 +1130,7 @@ subst<D, T, S> unify(relColumn<D, T, S> x, T y){
 }
 
 template<domain D, type T, type S>
-subst<D, T, S> unify(relColumn<D, T, S> x, string y){
+subst<D, relColumn<D, T, S> > unify(relColumn<D, T, S> x, string y){
 
     D S [[1]] y_str = bl_str(y);
     D T y_val = CRC32(y);
@@ -1147,7 +1149,7 @@ subst<D, T, S> unify(relColumn<D, T, S> x, string y){
 }
 
 template<domain D, type T, type S, domain D0, type T0, type S0, domain D1, type T1, type S1>
-subst<D, T, S> unify(relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y){
+subst<D, relColumn<D, T, S> > unify(relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y){
 
     assert(size(x.val) == size(y.val));
     D bool [[1]] b = (x.val == y.val) | x.fv | y.fv;
@@ -1183,9 +1185,9 @@ subst<D, T, S> unify(relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y){
     z.str = str;
     z.fv = fv;
 
-    subst<D, T, S> theta;
+    subst<D, relColumn<D, T, S> > theta;
     theta.b = b;
-    theta.z = z;
+    theta.arg0 = z;
 
     return theta;
 }
@@ -1197,6 +1199,8 @@ D uint32 [[1]] lpShuffle(D bool [[1]] b){
     D uint32 [[1]] pi  = countSortPermutation(!b);
     return pi;
 }
+
+/*
 template<domain D0, domain D, type T, dim N>
 D0 T [[N]] filterTrue(D0 uint32 [[1]] pi, uint32 n, D T [[N]] val){
     return mySlice(applyPermutation(val,pi), 0, n);
@@ -1211,6 +1215,27 @@ void publishArg(T0 i0, string vname, D T [[1]] val, D S [[2]] str){
         publish("val" + tostring(i), str);
     } else {
         publish("val" + tostring(i), val);
+    }
+}
+*/
+
+template<domain D0, domain D, type T, type S>
+relColumn<D0,T,S> filterTrue(D0 uint32 [[1]] pi, uint32 n, relColumn<D,T,S> col){
+    relColumn<D0,T,S> result;
+    result.val = mySlice(applyPermutation(col.val,pi), 0, n);
+    result.str = mySlice(applyPermutation(col.str,pi), 0, n);
+    return result;
+}
+
+template<domain D, type T0, type T, type S>
+void publishArg(T0 i0, string vname, relColumn<D,T,S> col){
+    uint i = (uint)i0;
+    publish("var" + tostring(i), vname);
+    if (shape(col.str)[1] >= 1){
+        publish("len" + tostring(i), shape(col.str)[1]);
+        publish("val" + tostring(i), col.str);
+    } else {
+        publish("val" + tostring(i), col.val);
     }
 }
 

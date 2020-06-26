@@ -20,7 +20,9 @@ module DatalogProgram
   , ppDatalogProgram
   , programGoalExpr
   , dpRules
+  , dpDBClauses
   , gFormula, gInputs, gOutputs
+  , dpGoal
   ) where
 
 import           Data.Maybe
