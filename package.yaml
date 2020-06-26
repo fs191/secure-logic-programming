@@ -39,6 +39,7 @@ dependencies:
 # For some reason I get errors in ghcide if these are not in the dependencies
 - hspec
 - HUnit
+- shelly
 
 library:
   source-dirs: src

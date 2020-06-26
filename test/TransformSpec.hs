@@ -31,11 +31,6 @@ spec =
         [constStr "a", constStr "c", constStr "e"] 
         (constTrue)
       ]
-    transContainsOnly "examples/prolog/equal.pl" 1
-      [ rule "equal"
-        [var "Y", var "Y"]
-        (constTrue)
-      ]
 
 canDeriveOn :: String -> Int -> Spec
 canDeriveOn file n = it desc $ action `shouldReturn` ()

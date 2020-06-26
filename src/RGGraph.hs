@@ -27,7 +27,6 @@ import Data.Generics.Uniplate.Data as U
 import Data.Set as S
 import Data.List as L
 import Data.Maybe
-import Data.Text.Prettyprint.Doc
 
 import Debug.Trace
 
@@ -50,16 +49,19 @@ data AdornState = AdornState
   }
 makeLenses ''AdornState
 
-type AdornM = StateT AdornState (Except AdornmentException)
+type AdornM = 
+  StateT AdornState (Except AdornmentException)
 
 runAdornM :: AdornM a -> Either AdornmentException a
 runAdornM x = runExcept $ evalStateT x (AdornState [] [] S.empty [])
 
+-- | Suffixes rules with parameter bindings and optimizes each rule to
+-- fail as early as possible
 adornProgram :: DatalogProgram -> Either AdornmentException DatalogProgram
 adornProgram p = runAdornM $
   do
     let (Just _goal) = goal p
-    let _args = _goal ^. gInputs <> _goal ^. gOutputs
+    let _args = _goal ^. gInputs
     let _gRule = rule "__goal" _args (_goal ^. gFormula)
     gsRules .= rules p
     gsRules %= L.insert _gRule
@@ -105,7 +107,9 @@ adornRule a@(Adornable r bp) =
     let (BindingPattern _bp) = bp
     let _args = args r `zip` _bp
     let _boundArgs = fst <$> L.filter ((==Bound) . snd) _args
-    let _boundNames = (\(Var _ n) -> n) <$> _boundArgs
+    let _varNameFun (Var _ n) = Just n
+        _varNameFun _         = Nothing
+    let _boundNames = catMaybes $ _varNameFun <$> _boundArgs
     modify $ gsBound .~ fromList _boundNames
     _bound <- use gsBound
 

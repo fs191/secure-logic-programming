@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f221f9dbdf8f33798a3fee95fd7bb2a31f55dd04d8404aa000bc98aee2632c8b
+-- hash: 1d0c44f650358ee3bb732b8c57f2345f23df124284e49c6d562ff9e565f5dc9c
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -63,6 +63,7 @@ library
     , parser-combinators
     , prettyprinter
     , semigroups
+    , shelly
     , split
     , text
     , transformers
@@ -94,6 +95,7 @@ executable lpsec
     , prettyprinter
     , secure-logic-programming
     , semigroups
+    , shelly
     , split
     , text
     , transformers
@@ -107,6 +109,7 @@ test-suite test
   other-modules:
       ParserSpec
       SubstSpec
+      Swipl
       TransformSpec
       Paths_secure_logic_programming
   hs-source-dirs:
@@ -129,6 +132,7 @@ test-suite test
     , prettyprinter
     , secure-logic-programming
     , semigroups
+    , shelly
     , split
     , text
     , transformers
