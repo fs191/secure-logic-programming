@@ -7,6 +7,7 @@ import Language.SecreC
 
 import Control.Monad
 import Data.Text.Prettyprint.Doc
+import Transform
 
 main :: IO ()
 main = do
@@ -16,9 +17,11 @@ main = do
   let inFileName = _inFile args
   -- text file containing output SecreC program
   let outFilePath = _outFile args
+  let _ite = _iterations args
 
   -- parse the input datalog program
   program <- parseDatalogFromFile inFileName
+  let _trans = deriveAllGroundRules program _ite
 
   -- create a Sharemind script that can be used to upload the tables used in given program
   -- WARNING: this is used for testing only, do not apply it to actual private data!
@@ -32,7 +35,7 @@ main = do
 
 
   -- we can output either only yes/no answer, or also valuations of free variables
-  let secrec = show (pretty (secrecCode program))
+  let secrec = show (pretty (secrecCode _trans))
 
   -- Output the results
   if outFilePath /= ""
