@@ -3,6 +3,7 @@
 module Swipl 
   ( runDatalogFromFile
   , runDatalogProgram
+  , preservesSemantics
   ) where
 
 import Shelly
@@ -10,6 +11,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Prettyprint.Doc
 import DatalogProgram
+import Test.Hspec
+import Parser.DatalogParser
 
 runDatalogFromFile :: FilePath -> IO [Text]
 runDatalogFromFile p = shelly $ runDatalogFromFile' p
@@ -36,4 +39,17 @@ runDatalogProgram dp = shelly $ withTmpDir action
         let _path = tmp <> "/dprog"
         writefile _path . T.pack . show $ pretty dp
         runDatalogFromFile' _path
+
+preservesSemantics 
+  :: (DatalogProgram -> DatalogProgram) 
+  -> String 
+  -> Spec
+preservesSemantics f p = it desc $
+  do
+    _prog <- parseDatalogFromFile p
+    _pre  <- runDatalogProgram _prog
+    _post <- runDatalogProgram $ f _prog
+    _pre `shouldBe` _post
+  where
+    desc = "preserves semantics of " <> p
 

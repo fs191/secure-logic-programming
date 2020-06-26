@@ -12,6 +12,7 @@ import Transform
 import Rule
 import DatalogProgram
 import Expr
+import Swipl
 
 spec :: Spec
 spec =
@@ -26,11 +27,22 @@ spec =
     canDeriveOn "examples/ppdatalog/employee.pl" 3
     canDeriveOn "examples/ppdatalog/relatives.pl" 1
     canDeriveOn "examples/ppdatalog/relatives.pl" 3
+    transPreserveSem "examples/ppdatalog/fib.pl" 1
+    transPreserveSem "examples/ppdatalog/fib.pl" 3
+    transPreserveSem "examples/ppdatalog/market.pl" 1
+    transPreserveSem "examples/ppdatalog/market.pl" 3
+    transPreserveSem "examples/ppdatalog/auction.pl" 1
+    transPreserveSem "examples/ppdatalog/auction.pl" 3
+    transPreserveSem "examples/ppdatalog/employee.pl" 1
+    transPreserveSem "examples/ppdatalog/employee.pl" 3
+    transPreserveSem "examples/ppdatalog/relatives.pl" 1
+    transPreserveSem "examples/ppdatalog/relatives.pl" 3
     transContains "examples/prolog/broken.pl" 3 
       [ rule "h" 
         [constStr "a", constStr "c", constStr "e"] 
         (constTrue)
       ]
+
 
 canDeriveOn :: String -> Int -> Spec
 canDeriveOn file n = it desc $ action `shouldReturn` ()
@@ -73,4 +85,6 @@ transContains' fun file n rs = it desc $
       , vsep $ pretty <$> rs
       ]
      
+transPreserveSem :: String -> Int -> Spec
+transPreserveSem f n = preservesSemantics (flip deriveAllGroundRules n) f
 
