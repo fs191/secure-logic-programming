@@ -31,7 +31,7 @@ deriveAllGroundRules program n = program'
   where
     clauses = program ^. DP.dbClauseLens
     -- Input program but db clauses are converted to rules
-    program' = program & DP.ruleLens %~ ((dbClauseToRule <$> clauses) <>)
+    program' = program -- & DP.ruleLens %~ ((dbClauseToRule <$> clauses) <>)
     f :: [Rule] -> [Rule]
     f x = foldl (.) id (replicate n pipeline) x
     pipeline = 

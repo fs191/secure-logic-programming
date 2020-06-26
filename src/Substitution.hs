@@ -89,6 +89,13 @@ refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
         return $ v |-> (var n)
     f _ = error "Expected a variable, got something else"
 
+-- Prefixes variable names with gibberish
+safePrefix :: Expr -> Expr
+safePrefix e = transform f e
+  where
+    f (Var a n) = Var a $ "Slfjjl" ++ n
+    f x = x
+
 -- | Immediately refreshes variable names in `e`
 refreshAndApply :: String -> Expr -> Expr
 refreshAndApply prefix e = applyToExpr (refreshExpr prefix e) e
