@@ -9,4 +9,4 @@ bargain(Buyer,Seller,Product) :-
     findPotentialBargain(Buyer,Seller,Product,Price1,Price2),
     Price1 >= Price2.
 
-goal([X1,X2],[Y]) :- bargain(X1, Y, X2).
+goal([X1],[Y]) :- bargain(X1, Y, X2).

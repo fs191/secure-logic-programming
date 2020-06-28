@@ -12,4 +12,4 @@ sg(X,Y) :-
   par(Y,Y1),
   sg(X1,Y1).
 
-goal([],[]) :- sg('chris','dave').
+goal([],[Y]) :- sg('chris',Y).

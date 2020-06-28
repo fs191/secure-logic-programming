@@ -13,4 +13,6 @@ viewESM(X0,0,X4) :-
   dm(X3,X4),
   X1 = X3.
 
-goal([X],[Y1,Y2]) :- viewESM(Y1,Y2,X).
+:- input([]).
+:- output([Y1, Y2]).
+viewESM(Y1,Y2,'manager1')?
