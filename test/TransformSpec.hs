@@ -11,38 +11,20 @@ import Parser.DatalogParser
 import Transform
 import Rule
 import DatalogProgram
-import Expr
 import Swipl
 
 spec :: Spec
 spec =
   describe "Transform.deriveAllGroundRules" $ do
-    canDeriveOn "examples/ppdatalog/fib.pl" 1
-    canDeriveOn "examples/ppdatalog/fib.pl" 3
-    canDeriveOn "examples/ppdatalog/market.pl" 1
-    canDeriveOn "examples/ppdatalog/market.pl" 3
-    canDeriveOn "examples/ppdatalog/auction.pl" 1
-    canDeriveOn "examples/ppdatalog/auction.pl" 3
-    canDeriveOn "examples/ppdatalog/employee.pl" 1
-    canDeriveOn "examples/ppdatalog/employee.pl" 3
-    canDeriveOn "examples/ppdatalog/relatives.pl" 1
-    canDeriveOn "examples/ppdatalog/relatives.pl" 3
-    transPreserveSem "examples/ppdatalog/fib.pl" 1
-    transPreserveSem "examples/ppdatalog/fib.pl" 3
-    transPreserveSem "examples/ppdatalog/market.pl" 1
-    transPreserveSem "examples/ppdatalog/market.pl" 3
-    transPreserveSem "examples/ppdatalog/auction.pl" 1
-    transPreserveSem "examples/ppdatalog/auction.pl" 3
-    transPreserveSem "examples/ppdatalog/employee.pl" 1
-    transPreserveSem "examples/ppdatalog/employee.pl" 3
-    transPreserveSem "examples/ppdatalog/relatives.pl" 1
-    transPreserveSem "examples/ppdatalog/relatives.pl" 3
-    transContains "examples/prolog/broken.pl" 3 
-      [ rule "h" 
-        [constStr "a", constStr "c", constStr "e"] 
-        (constTrue)
-      ]
-
+    transPreserveSem "examples/prolog/fib.pl" 1
+    transPreserveSem "examples/prolog/fib.pl" 3
+    transPreserveSem "examples/prolog/market.pl" 1
+    transPreserveSem "examples/prolog/market.pl" 3
+    transPreserveSem "examples/prolog/auction.pl" 1
+    transPreserveSem "examples/prolog/auction.pl" 3
+    transPreserveSem "examples/prolog/employee.pl" 1
+    transPreserveSem "examples/prolog/employee.pl" 3
+    transPreserveSem "examples/prolog/relatives.pl" 1
 
 canDeriveOn :: String -> Int -> Spec
 canDeriveOn file n = it desc $ action `shouldReturn` ()

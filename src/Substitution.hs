@@ -27,8 +27,6 @@ import Control.Lens hiding (universe, transform, transformM)
 import Control.Monad.State
 import Control.Monad.Trans.UnionFind
 
-import Language.SecreC.Types as T
-
 import Expr
 
 newtype Subst = Th (M.Map String Expr)
@@ -88,13 +86,6 @@ refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
         let n = prefix <> show i
         return $ v |-> (var n)
     f _ = error "Expected a variable, got something else"
-
--- Prefixes variable names with gibberish
-safePrefix :: Expr -> Expr
-safePrefix e = transform f e
-  where
-    f (Var a n) = Var a $ "Slfjjl" ++ n
-    f x = x
 
 -- | Immediately refreshes variable names in `e`
 refreshAndApply :: String -> Expr -> Expr

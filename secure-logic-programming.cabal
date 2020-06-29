@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1d0c44f650358ee3bb732b8c57f2345f23df124284e49c6d562ff9e565f5dc9c
+-- hash: e7005741b4d4c3a713b98b4cdb94731b3676de99930e87c6cb838a371c825db1
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -44,6 +44,7 @@ library
       Substitution
       Table
       Transform
+      TypeChecker
   other-modules:
       Paths_secure_logic_programming
   hs-source-dirs:

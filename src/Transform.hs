@@ -39,7 +39,7 @@ deriveAllGroundRules program n = program'
       removeFalseFacts .
       liftA simplify . 
       (traversed . ruleTail %~ simplifyAnds) .
-      (liftA $ refreshRule "_X") .
+      (liftA $ refreshRule "X_") .
       (traversed . ruleTail %~ flip evalState 0 . (U.transformM bindArgColumns)) .
       (traversed %~ simplifyVars) . 
       inlineOnce

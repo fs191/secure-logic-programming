@@ -67,7 +67,7 @@ refreshRule prefix r' = applySubst s r
     r = r' & ruleTail %~ safePrefix
     s = refreshExpr prefix . eAnd (r ^. ruleHead) $ r ^. ruleTail
 
--- Prefixes variable names with gibberish
+-- | Prefixes variable names with gibberish
 safePrefix :: Expr -> Expr
 safePrefix e = transform f e
   where
