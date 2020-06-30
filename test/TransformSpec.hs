@@ -4,13 +4,8 @@ module TransformSpec where
 
 import Test.Hspec
 
-import Data.Text.Prettyprint.Doc
-import Data.List
-
 import Parser.DatalogParser
 import Transform
-import Rule
-import DatalogProgram
 import Swipl
 
 spec :: Spec
@@ -25,6 +20,12 @@ spec =
     transPreserveSem "examples/prolog/employee.pl" 1
     transPreserveSem "examples/prolog/employee.pl" 3
     transPreserveSem "examples/prolog/relatives.pl" 1
+    runsSuccessfully "examples/prolog/fib.pl" ["2"]
+    runsSuccessfully "examples/prolog/market.pl"  ["alice"]
+    runsSuccessfully "examples/prolog/auction.pl" ["wololo"]
+    runsSuccessfully "examples/prolog/employee.pl"  ["wololo"]
+    runsSuccessfully "examples/prolog/relatives.pl"  ["wololo"]
+    
 
 canDeriveOn :: String -> Int -> Spec
 canDeriveOn file n = it desc $ action `shouldReturn` ()
@@ -34,38 +35,6 @@ canDeriveOn file n = it desc $ action `shouldReturn` ()
         f <- parseDatalogFromFile file
         let d = deriveAllGroundRules f n
         return $ d `seq` ()
-
-transContainsOnly :: String -> Int -> [Rule] -> Spec
-transContainsOnly = transContains' const
-
-transContains :: String -> Int -> [Rule] -> Spec
-transContains = transContains' intersect
-
-transContains' :: ([Rule] -> [Rule] -> [Rule]) -> String -> Int -> [Rule] -> Spec
-transContains' fun file n rs = it desc $
-  do
-    f <- parseDatalogFromFile file
-    let d = deriveAllGroundRules f n
-    if fun (rules d) rs == rs
-      then return ()
-      else expectationFailure . failMsg $ rules d
-  where
-    desc = show $ hsep
-      [ "Transformation of" 
-      , pretty file 
-      , "with"
-      , pretty n 
-      , "iterations contains"
-      , hardline
-      , indent 6 $ list $ pretty <$> rs
-      ]
-    failMsg d = show $ vsep
-      [ vsep $ pretty <$> d
-      , softline
-      , "does not contain"
-      , softline
-      , vsep $ pretty <$> rs
-      ]
      
 transPreserveSem :: String -> Int -> Spec
 transPreserveSem f n = preservesSemantics (flip deriveAllGroundRules n) f

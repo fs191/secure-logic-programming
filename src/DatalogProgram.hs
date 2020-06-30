@@ -20,6 +20,7 @@ module DatalogProgram
   , gFormula, gInputs, gOutputs
   , dpGoal
   , directive
+  , prolog
   ) where
 
 import           Data.Maybe
@@ -31,8 +32,9 @@ import           Expr
 import           Data.Text.Prettyprint.Doc
 import           DBClause
 
-class DatalogSource a where
-  datalog :: a -> Doc ann
+class PrologSource a where
+  -- | Pretty-print data as valid prolog source code
+  prolog :: a -> Doc ann
 
 data Goal = Goal
   { _gInputs  :: [Expr]
@@ -76,8 +78,28 @@ instance Pretty DatalogProgram where
        g <- pretty <$> _dpGoal p
        return $ g <> ".")
 
-instance DatalogSource DatalogProgram where
-  datalog = undefined
+instance PrologSource DatalogProgram where
+  prolog dp = vsep
+    [ vsep $ prolog <$> dp ^. dpRules
+    , prolog . fromJust $ dp ^. dpGoal
+    ]
+
+instance PrologSource Goal where
+  prolog g = cat
+    [ "goal(" 
+    , list (pretty <$> _gInputs g)
+    , ","
+    , list (pretty <$> _gOutputs g)
+    , ") :- "
+    , prolog $ _gFormula g
+    , "."
+    ]
+
+instance PrologSource Rule where
+  prolog x = pretty x <> "."
+
+instance PrologSource Expr where
+  prolog = pretty
 
 makeGoal ::
      [Expr]
