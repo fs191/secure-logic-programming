@@ -6,12 +6,8 @@
 module DatalogProgram
   ( DatalogProgram
   , Goal, Directive
-  , IsGoal, toGoal
   , DBClause
-  , LogicProgram
   , makeGoal
-  , rules, goal
-  , setRules
   , inputs, outputs, formula
   , toDatalogSource
   , fromRulesAndGoal
@@ -35,13 +31,8 @@ import           Expr
 import           Data.Text.Prettyprint.Doc
 import           DBClause
 
-class LogicProgram a where
-  rules       :: a -> [Rule]
-  goal        :: a -> Maybe Goal
-  setRules    :: [Rule] -> a -> a
-
-class IsGoal a where
-  toGoal :: a -> Goal
+class DatalogSource a where
+  datalog :: a -> Doc ann
 
 data Goal = Goal
   { _gInputs  :: [Expr]
@@ -52,17 +43,11 @@ data Goal = Goal
 makeLenses ''Goal
 
 instance Pretty Goal where
-  pretty g = 
-       "goal(["
-    <> (hsep . punctuate "," $ pretty <$> _gInputs g)
-    <> "],["
-    <> (hsep . punctuate "," $ pretty <$> _gOutputs g)
-    <> "]) :-\n"
-    <> indent 2 (pretty $ _gFormula g)
-
-
-instance IsGoal Goal where
-  toGoal = id
+  pretty g = vsep
+    [ "inputs(" <> list (pretty <$> _gInputs g) <> ")."
+    , "outputs(" <> list (pretty <$> _gOutputs g) <> ")."
+    , pretty (_gFormula g) <> "?"
+    ]
 
 data Directive = Directive String [Expr]
   deriving (Show)
@@ -86,15 +71,13 @@ makeLenses ''DatalogProgram
 instance Pretty DatalogProgram where
   pretty p =
     (hcat $ (<>".\n\n") . pretty <$> _dpDirectives p) <>
-    (hcat $ (<>".\n\n") . pretty <$> rules p) <>
+    (hcat $ (<>".\n\n") . pretty <$> _dpRules p) <>
     (fromMaybe emptyDoc $ do
-       g <- pretty <$> goal p
+       g <- pretty <$> _dpGoal p
        return $ g <> ".")
 
-instance LogicProgram DatalogProgram where
-  rules = _dpRules
-  goal  = _dpGoal
-  setRules r = dpRules .~ r
+instance DatalogSource DatalogProgram where
+  datalog = undefined
 
 makeGoal ::
      [Expr]
