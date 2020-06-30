@@ -39,7 +39,7 @@ g :: [Expr] -> Expr
 g = predicate "g"
 
 spec :: Spec
-spec = 
+spec = parallel $
   do
     describe "Substitution.unify" $ do
       unifies c1 c1

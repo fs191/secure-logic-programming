@@ -17,7 +17,7 @@ import Parser.DatalogParser
 import DatalogProgram
 
 spec :: Spec
-spec = describe "Parser.parseDatalog" $ do
+spec = parallel . describe "Parser.parseDatalog" $ do
     canParse "examples/prolog/onlyFacts.pl"
     canParse "examples/prolog/onlyRules.pl"
     canParse "examples/prolog/onlyGoal.pl"

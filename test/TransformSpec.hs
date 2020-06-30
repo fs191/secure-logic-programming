@@ -10,7 +10,7 @@ import Swipl
 
 spec :: Spec
 spec =
-  describe "Transform.deriveAllGroundRules" $ do
+  parallel . describe "Transform.deriveAllGroundRules" $ do
     transPreserveSem "examples/prolog/fib.pl" 1
     transPreserveSem "examples/prolog/fib.pl" 3
     transPreserveSem "examples/prolog/market.pl" 1
