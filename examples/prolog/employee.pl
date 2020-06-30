@@ -25,4 +25,5 @@ viewESM(E,S,M) :-
     secureEDS(E,D,S),
     dm(D,M).
 
-goal([],[Y1,Y2]) :- viewESM(Y1,Y2,'manager1').
+:-outputs([Y1,Y2]).
+viewESM(Y1,Y2,'manager1')?

@@ -9,4 +9,5 @@ fib(N, F) :-
         fib(N2, F2),
         F is F1+F2.
 
-goal([],[Y]) :- fib(2,Y).
+:-outputs([Y]).
+fib(2,Y)?

@@ -1,18 +1,18 @@
 module Parser.DatalogParser.Lexer 
   ( lexeme, symbol, sc
   , variable, identifier
-  , stringLiteral
-  , predicateSymbol
   , signedInteger
   , comma, period, impliedBy
-  , parens
+  , parens, brackets
   , domainType, dataType
+  , typing
   ) where
 
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as C
 
+import Data.Foldable
 import Data.Void (Void)
 
 import Control.Monad (void)
@@ -41,7 +41,20 @@ variable = lexeme $
     return $ h:t
 
 identifier :: Parser String
-identifier = lexeme $
+identifier = asum
+  [ try $ between sQuote sQuote identifier'
+  , try $ between dQuote dQuote identifier'
+  , identifier'
+  ]
+
+sQuote :: Parser String
+sQuote = symbol "'"
+
+dQuote :: Parser String
+dQuote = symbol "\""
+
+identifier' :: Parser String
+identifier' = lexeme $
   do
     h <- lowerChar <|> identifierSymbols
     t <- many $ alphaNumChar <|> identifierSymbols
@@ -49,14 +62,6 @@ identifier = lexeme $
 
 identifierSymbols :: Parser Char
 identifierSymbols = oneOf ['_', '-']
-
-stringLiteral :: Parser String
-stringLiteral = 
-      (try $ strLike '\'')
-  <|> (try $ strLike '\"')
-
-strLike :: Char -> Parser String
-strLike c = lexeme $ char c *> manyTill C.charLiteral (char c)
 
 signedInteger :: Parser Int
 signedInteger = lexeme $ C.signed sc C.decimal
@@ -70,11 +75,11 @@ period = void $ symbol "."
 parens :: Parser a -> Parser a
 parens = lexeme . between (char '(') (char ')')
 
+brackets :: Parser a -> Parser a
+brackets = lexeme . between (char '[') (char ']')
+
 impliedBy :: Parser ()
 impliedBy = void $ symbol ":-"
-
-predicateSymbol :: Parser String
-predicateSymbol = (try identifier) <|> stringLiteral
 
 domainType :: Parser PPDomain
 domainType =
@@ -86,4 +91,12 @@ dataType =
       (try $ symbol "bool"   *> return PPBool)
   <|> (try $ symbol "int"    *> return PPInt)
   <|> (symbol "string" *> return PPStr)
+
+typing :: Parser (Maybe PPDomain, PPType)
+typing =
+  do
+    void $ symbol ":"
+    dom <- optional domainType
+    dat <- dataType
+    return (dom, dat)
 

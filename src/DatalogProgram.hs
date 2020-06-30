@@ -5,7 +5,7 @@
 
 module DatalogProgram
   ( DatalogProgram
-  , Goal
+  , Goal, Directive
   , IsGoal, toGoal
   , DBClause
   , LogicProgram
@@ -16,18 +16,19 @@ module DatalogProgram
   , toDatalogSource
   , fromRulesAndGoal
   , ruleLens
-  , dbClauseLens
+  --, dbClauseLens
   , ppDatalogProgram
   , programGoalExpr
   , dpRules
   , dpDBClauses
   , gFormula, gInputs, gOutputs
   , dpGoal
+  , directive
   ) where
 
 import           Data.Maybe
 
-import           Control.Lens
+import           Control.Lens hiding (List)
 
 import           Rule
 import           Expr
@@ -63,17 +64,28 @@ instance Pretty Goal where
 instance IsGoal Goal where
   toGoal = id
 
+data Directive = Directive String [Expr]
+  deriving (Show)
+
+instance Pretty Directive where
+  pretty (Directive n as) = hsep
+    [ ":-"
+    , pretty n
+    , tupled $ pretty <$> as
+    ]
+
 data DatalogProgram = DatalogProgram
-  { _dpRules :: [Rule]
-  , _dpGoal  :: Maybe Goal
-  , _dpDBClauses :: [DBClause]
+  { _dpRules      :: [Rule]
+  , _dpGoal       :: Maybe Goal
+  , _dpDirectives :: [Directive]
   }
   deriving (Show)
+
 makeLenses ''DatalogProgram
 
 instance Pretty DatalogProgram where
   pretty p =
-    (hcat $ (<>".\n\n") . pretty <$> _dpDBClauses p) <>
+    (hcat $ (<>".\n\n") . pretty <$> _dpDirectives p) <>
     (hcat $ (<>".\n\n") . pretty <$> rules p) <>
     (fromMaybe emptyDoc $ do
        g <- pretty <$> goal p
@@ -109,12 +121,20 @@ fromRulesAndGoal rs g = DatalogProgram rs g []
 ruleLens :: Traversal' DatalogProgram [Rule]
 ruleLens = dpRules
 
-dbClauseLens :: Lens' DatalogProgram [DBClause]
-dbClauseLens = dpDBClauses
-
-ppDatalogProgram :: [Rule] -> Maybe Goal -> [DBClause] -> DatalogProgram
+ppDatalogProgram :: [Rule] -> Maybe Goal -> [Directive] -> DatalogProgram
 ppDatalogProgram r = DatalogProgram r
 
 programGoalExpr :: DatalogProgram -> Maybe Expr
 programGoalExpr = (^? dpGoal . _Just . gFormula)
+
+directive :: String -> [Expr] -> Directive
+directive = Directive
+
+dpDBClauses :: Fold DatalogProgram DBClause
+dpDBClauses = dpDirectives . folded . to(dirToDBC) . _Just
+
+-- | Attempts to convert a directive to DBClause
+dirToDBC :: Directive -> Maybe DBClause
+dirToDBC (Directive "type" [(ConstStr _ n), (List _ as)]) = Just $ dbClause n as
+dirToDBC _ = Nothing
 

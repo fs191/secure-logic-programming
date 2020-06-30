@@ -1,5 +1,5 @@
-:-type(sells(seller:private string, item:private string, price:private int)).
-:-type(buys (buyer :private string, item:private string, price:private int)).
+:-type(sells, [seller:private string, item:private string, price:private int]).
+:-type(buys, [buyer :private string, item:private string, price:private int]).
 
 bargain(X,Y,Z) :-
     sells(Y,Z,P1),
@@ -7,4 +7,5 @@ bargain(X,Y,Z) :-
     Z = V,
     P1 =< P2.
 
-goal([],[Y]) :- bargain('alice',Y,'garlic').
+:-outputs([Y]).
+bargain('alice',Y,'garlic')?

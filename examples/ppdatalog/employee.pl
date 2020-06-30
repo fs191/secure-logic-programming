@@ -1,5 +1,5 @@
-:-type(eds(employee:public string,department:public string, salary:private int)).
-:-type(dm(department:public string, manager:public string)).
+:-type(eds, [employee:public string,department:public string, salary:private int]).
+:-type(dm, [department:public string, manager:public string]).
 
 secureEDS(E,D,0) :-
     eds(E,D,S),
@@ -13,4 +13,5 @@ viewESM(E,S,M) :-
     secureEDS(E,D,S),
     dm(D,M).
 
-goal([],[Y1,Y2]) :- viewESM(Y1,Y2,'manager1').
+:-outputs([Y1,Y2]).
+viewESM(Y1,Y2,'manager1')?

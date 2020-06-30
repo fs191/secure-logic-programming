@@ -39,7 +39,6 @@ data Adornable = Adornable
   , _aPat  :: BindingPattern
   }
   deriving (Eq, Ord, Show)
-makeLenses ''Adornable
 
 data AdornState = AdornState
   { _gsVisited :: [Adornable]
@@ -47,10 +46,11 @@ data AdornState = AdornState
   , _gsBound   :: Set String
   , _gsRules   :: [Rule]
   }
-makeLenses ''AdornState
-
 type AdornM = 
   StateT AdornState (Except AdornmentException)
+
+makeLenses ''Adornable
+makeLenses ''AdornState
 
 runAdornM :: AdornM a -> Either AdornmentException a
 runAdornM x = runExcept $ evalStateT x (AdornState [] [] S.empty [])
@@ -60,9 +60,7 @@ runAdornM x = runExcept $ evalStateT x (AdornState [] [] S.empty [])
 adornProgram :: DatalogProgram -> Either AdornmentException DatalogProgram
 adornProgram p = runAdornM $
   do
-    let (Just _goal) = goal p
-    let _args = _goal ^. gInputs
-    let _gRule = rule "__goal" _args (_goal ^. gFormula)
+    let _gRule = goalToRule . fromJust $ goal p
     gsRules .= rules p
     gsRules %= L.insert _gRule
     gsQueue .= [allBound _gRule]
@@ -205,4 +203,8 @@ suffixExpr = U.transform f
         Just bp -> suffixPredicate bp p
         Nothing -> p
     f x = x
+
+goalToRule :: Goal -> Rule
+goalToRule g = rule "__goal" _args (g ^. gFormula)
+  where _args = g ^. gInputs
 

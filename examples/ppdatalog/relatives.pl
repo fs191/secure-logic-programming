@@ -1,4 +1,4 @@
-:-type(par(child:private string, parent:private string)).
+:-type(par, [child:private string, parent:private string]).
 
 parents(X,Y) :-
   par(Z,X),
@@ -12,4 +12,5 @@ sg(X,Y) :-
   par(Y,Y1),
   sg(X1,Y1).
 
-goal([],[Y]) :- sg('chris',Y).
+:-outputs([Y]).
+sg('chris',Y)?

@@ -29,9 +29,9 @@ deriveAllGroundRules program n = program'
                                    -- & fromMaybe program' . adornProgram
                                    & DP.ruleLens %~ f
   where
-    clauses = program ^. DP.dbClauseLens
+    clauses = program ^.. DP.dpDBClauses
     -- Input program but db clauses are converted to rules
-    program' = program -- & DP.ruleLens %~ ((dbClauseToRule <$> clauses) <>)
+    program' = program
     f :: [Rule] -> [Rule]
     f x = foldl (.) id (replicate n pipeline) x
     pipeline = 
@@ -121,7 +121,7 @@ removeFalseFacts = filter (\x -> x ^. ruleTail /= constBool False)
 removeDuplicateFacts :: [Rule] -> [Rule]
 removeDuplicateFacts = nub
 
--- | Binds columns that are arguments of some predicate to a new variable
+-- | Binds constants that are arguments of some predicate to a new variable
 bindArgColumns :: Expr -> State Int Expr
 bindArgColumns (Pred ann n as) = 
   do
@@ -130,8 +130,8 @@ bindArgColumns (Pred ann n as) =
           do
             i <- get
             put $ i + 1
-            return . var $ "_COL_" <> show i
-    let cols = [x | x@(DBCol _ _) <- as]
+            return . var $ "_CONST_" <> show i
+    let cols = [x | x@(ConstStr _ _) <- as]
     vars <- sequenceA $ replicate (length cols) freshVar
     let cvs   = cols `zip` vars
         lkp :: Expr -> Expr

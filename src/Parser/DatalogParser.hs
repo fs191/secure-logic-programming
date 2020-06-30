@@ -5,10 +5,10 @@ module Parser.DatalogParser
 
 import Text.Megaparsec
 
+import Data.Foldable
 import Data.Void (Void)
 import Data.Maybe
 
-import Control.Lens
 import Control.Monad (void)
 
 import Parser.DatalogParser.Lexer
@@ -17,15 +17,13 @@ import Parser.DatalogParser.Expr
 import qualified DatalogProgram as DP
 import Expr
 import qualified Rule as R
-import DBClause
-import Annotation
 
 type Parser = Parsec Void String
 
 data Clause
   = RC R.Rule
-  | DBC DBClause
   | GC DP.Goal
+  | DC DP.Directive
 
 -- Based on:
 -- https://www.ccs.neu.edu/home/ramsdell/tools/datalog/datalog.html#index-comment-syntax-13
@@ -33,19 +31,18 @@ data Clause
 datalogParser :: Parser DP.DatalogProgram
 datalogParser =
   do
-    -- TODO Should we parse retractions as well?
-    st <- many $ clause <* period
-    eof
-    let rs   = [x | RC  x <- st]
-    let dbcs = [x | DBC x <- st]
+    st  <- manyTill clause eof
+    let rs   = [x | RC x <- st]
+    let dirs = [x | DC x <- st]
     let q    = listToMaybe [x | GC x <- st]
-    return $ DP.ppDatalogProgram rs q dbcs
+    return $ DP.ppDatalogProgram rs q dirs
 
 clause :: Parser Clause
-clause = 
-      (try $ RC  <$> ruleP )
-  <|> (try $ DBC <$> dbFact)
-  <|> (try $ GC <$> goal)
+clause = asum
+  [ try $ RC  <$> ruleP
+  , try $ GC <$> goal
+  , DC <$> funCall
+  ]
 
 ruleP :: Parser R.Rule
 ruleP = 
@@ -53,8 +50,18 @@ ruleP =
     h <- identifier
     ps <- parens $ sepBy1 term comma
     b <- option [] $ impliedBy *> body
+    void $ symbol "."
     let expr = joinExprs b
     return $ R.rule h ps expr
+
+funCall :: Parser DP.Directive
+funCall =
+  do 
+    impliedBy
+    n <- identifier
+    ps <- parens $ sepBy1 aExpr comma
+    void $ symbol "."
+    return $ DP.directive n ps
 
 body :: Parser [Expr]
 body = sepBy1 bPredExpr comma
@@ -62,50 +69,11 @@ body = sepBy1 bPredExpr comma
 goal :: Parser DP.Goal
 goal = 
   do
-    void $ symbol "goal"
-    void $ symbol "("
-    i <- list
-    void $ symbol ","
-    o <- list
-    void $ symbol ")"
-    impliedBy
-    b <- body
-    return $ DP.makeGoal i o $ joinExprs b
-
-dbFact :: Parser DP.DBClause
-dbFact =
-  do
-    impliedBy
-    void $ symbol "type"
-    void $ symbol "("
-    n  <- identifier
-    void $ symbol "("
-    vs <- sepBy1 dbVar comma
-    void $ symbol ")"
-    void $ symbol ")"
-    let vs' = vs & traversed . _DBCol . _2 %~ ((n <> ".") <>)
-    return $ dbClause n vs'
-
-dbVar :: Parser Expr
-dbVar =
-  do
-    n <- identifier
-    void $ symbol ":"
-    al <- domainType
-    ty <- dataType
-    -- Add annotations for type and domain
-    let v = dbCol n
-          & annLens . annType .~ Just ty
-          & annLens . domain  .~ Just al
-    return v
-
-list :: Parser [Expr]
-list = 
-  do
-    void $ symbol "["
-    l <- sepBy variable comma
-    void $ symbol "]"
-    return $ var  <$> l
+    h <- identifier
+    ps <- parens $ sepBy1 term comma
+    let p = predicate h ps
+    void $ symbol "?"
+    return $ DP.makeGoal [] [] p
 
 -----------------------
 -- Exports

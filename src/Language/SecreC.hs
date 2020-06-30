@@ -404,7 +404,7 @@ secrecCode dp = program $
    (xis,goal)  = case (dp ^. DP.dpGoal) of
        Just g ->  concreteGoal rules (DP.inputs g) (DP.outputs g) (DP.formula g)
        Nothing -> defaultGoal
-   extPreds = dp ^. DP.dpDBClauses
+   extPreds = dp ^.. DP.dpDBClauses
    (intPredPs, intPredNs) = unzip $ nub $ map (\p -> (predicateName p, predicateArity p)) $ map (\r -> r ^. ruleHead) rules
 
    lss = [ls | r <- rules, let ls = filter (>= 0) $ zipWith (\r' l -> if ruleName r == ruleName r' then l else -1) rules [0..]]
@@ -431,7 +431,7 @@ extPredDecl dbc = struct (SCTemplateDecl Nothing) (nameTableStruct p) (y:ys)
     xs = vars dbc
     y  = variable SCPublic (SCArray 1 SCBool) nameBB
     is = [0..length xs - 1]
-    ys = zipWith (\x i -> case x of {(DBCol pptype _) -> variable SCPublic (scColTypeI i pptype) (nameArg i) ; _ -> error $ "Expected a DBCol, but see " ++ show x}) xs is
+    ys = zipWith (\x i -> case x of {(ConstStr pptype _) -> variable SCPublic (scColTypeI i pptype) (nameArg i) ; _ -> error $ "Expected a ConstStr, but see " ++ show x}) xs is
 
 extPredGet :: DBClause -> FunctionDecl
 extPredGet dbc = function (SCTemplateDecl Nothing) returnType fname fargs fbody
@@ -676,7 +676,7 @@ formulaToSC dv stmts q j =
         -- here we assume that constants are not passed directly as arguments, but a comparison is added later
         Pred ann p zs    -> let dom = scDomainFromAnn ann in
                             let bb = VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ SCAnds $ map (\i -> SCVarName $ nameB (ind j i)) [0..length zs - 1] in
-                            let (dv',stmts') = foldl (\(dv0, stmts0) (z,i) -> formulaToSC dv0 stmts0 (Eq (getAnn z) z (DBCol (getAnn z) (unpack $ nameTableArg (nameTable j) i))) (ind j i)) (dv,[]) (zip zs [0..]) in
+                            let (dv',stmts') = foldl (\(dv0, stmts0) (z,i) -> formulaToSC dv0 stmts0 (Eq (getAnn z) z (ConstStr (getAnn z) (unpack $ nameTableArg (nameTable j) i))) (ind j i)) (dv,[]) (zip zs [0..]) in
                             (dv', stmts' ++ [bb])
 
         Not ann (Pred _ p zs) ->
@@ -726,7 +726,6 @@ exprToSC e =
     ConstBool  _ c -> funConstCol [SCConstBool c, SCVarName nameMM]
 
     -- should we distinguish between DB and Free variables? it seems that not.
-    DBCol _ x -> SCVarName $ pack x
     Var   _ x -> SCVarName $ pack x
 
     Not  _ e0 -> funBoolOp [SCConstStr "not", exprToSC e0]

@@ -1,11 +1,12 @@
 module Parser.DatalogParser.Expr
   ( aExpr, bPredExpr
-  , term, predicateSymbol
+  , term
   , rule
   ) where
 
 import Text.Megaparsec
 
+import Control.Lens
 import Control.Monad.Combinators.Expr
 
 import Data.Void (Void)
@@ -22,14 +23,15 @@ type Parser = Parsec Void String
 -----------------------
 
 bPredExpr :: Parser Expr
-bPredExpr = 
-      (try $ opParse lessEqual    "=<")
-  <|> (try $ opParse less         "<" )
-  <|> (try $ opParse greaterEqual ">=")
-  <|> (try $ opParse greater      ">" )
-  <|> (try $ opParse equal        "=" )
-  <|> (try $ opParse equal        "is")
-  <|> predParse
+bPredExpr = asum
+  [ try $ opParse lessEqual    "=<"
+  , try $ opParse less         "<" 
+  , try $ opParse greaterEqual ">="
+  , try $ opParse greater      ">" 
+  , try $ opParse equal        "=" 
+  , try $ opParse equal        "is"
+  , predParse
+  ]
   where 
     opParse :: (Expr -> Expr -> Expr) -> String -> Parser Expr
     opParse f s = f <$> aExpr <*> (symbol s *> aExpr)
@@ -54,7 +56,7 @@ aExprTable =
   ]
 
 aExpr :: Parser Expr
-aExpr = makeExprParser aTerm aExprTable
+aExpr = makeExprParser aTerm aExprTable <?> "expression"
 
 aTerm :: Parser Expr
 aTerm = try term <|> parens aExpr
@@ -62,9 +64,13 @@ aTerm = try term <|> parens aExpr
 term :: Parser Expr
 term = asum
   [ try $ var      <$> variable 
-  , try $ constStr <$> predicateSymbol
+  , try strParse
   , try $ constInt <$> signedInteger
-  ]
+  , list
+  ] <?> "term"
+
+list :: Parser Expr
+list = eList <$> (brackets $ sepBy term comma)
 
 -----------------------
 -- Helper functions
@@ -79,10 +85,24 @@ prefix n f = Prefix  (f <$ symbol n)
 predParse :: Parser Expr
 predParse = predicate <$> identifier <*> (parens $ sepBy1 term comma)
 
+strParse :: Parser Expr
+strParse = 
+  do
+    s <- identifier
+    t <- optional typing
+    let f = case t of
+          Just (dom, dat) -> typeExpr dom dat
+          Nothing         -> id
+    return . f $ constStr s
+
 rule :: Parser R.Rule
 rule = 
   do
-    psym <- predicateSymbol
+    psym <- identifier
     terms <- option [] . parens $ sepBy1 term comma
     return $ R.fact psym terms
+
+typeExpr :: Maybe PPDomain -> PPType -> Expr -> Expr
+typeExpr dom dat e = e & annLens . domain  .~ dom
+                       & annLens . annType .~ Just dat
 

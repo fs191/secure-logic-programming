@@ -12,4 +12,5 @@ bargain(X,Y,Z) :-
     Z = V,
     P1 =< P2.
 
-goal([],[Y]) :- bargain('alice',Y,'garlic').
+:-outputs([Y]).
+bargain('alice',Y,'garlic')?

@@ -29,14 +29,13 @@ module Expr
   , eMul, eDiv
   , eMin, eMax
   , eAnd, eOr
+  , eList
   , annLens
   , annType, domain
   , getAnn
   , getVarName
-  , dbCol
   , _Var
   , _ConstStr
-  , _DBCol
   , andsToList
   , predicateVarNames
   , predicateName
@@ -48,7 +47,7 @@ module Expr
 ---------------------------------------------------------
 
 import Control.Exception
-import Control.Lens hiding (children)
+import Control.Lens hiding (children, List)
 
 import Data.Data
 import Data.Data.Lens
@@ -65,7 +64,6 @@ data Expr
   | ConstFloat Ann Float
   | ConstStr   Ann String
   | ConstBool  Ann Bool
-  | DBCol      Ann String
   | Var  Ann String
   | Not  Ann Expr
   | Neg  Ann Expr
@@ -84,6 +82,7 @@ data Expr
   | And  Ann Expr Expr
   | Or   Ann Expr Expr
   | Pred Ann String [Expr]
+  | List Ann [Expr]
   deriving (Ord,Show,Eq,Data,Typeable)
 makePrisms ''Expr
 
@@ -91,7 +90,6 @@ instance Pretty Expr where
   pretty e@(Var _ x)      = pretty x <> prettyType e
   pretty (ConstInt _ x)   = pretty x
   pretty e@(ConstStr _ x) = pretty x <> prettyType e
-  pretty e@(DBCol _ x)    = pretty x <> prettyType e
   pretty (ConstBool _ x)  = pretty x
   pretty (Pred _ n args)  = pretty n <> (tupled $ pretty <$> args)
   pretty (Not _ e)        = "!" <> pretty e
@@ -128,7 +126,8 @@ prettyType e
 --------------------------
 -- is the expression constant (i.e. does not contain any variables)?
 isConstExpr :: Expr -> Bool
-isConstExpr _ = undefined
+isConstExpr (Var _ _) = False
+isConstExpr _         = True
 
 isLeaf :: Expr -> Bool
 isLeaf (Var _ _)       = True
@@ -207,8 +206,8 @@ eAnd = And empty
 eOr :: Expr -> Expr -> Expr
 eOr = Or empty
 
-dbCol :: String -> Expr
-dbCol = DBCol empty
+eList :: [Expr] -> Expr
+eList = List empty
 
 getAnn :: Expr -> Ann
 getAnn x = head $ x ^.. annLens
