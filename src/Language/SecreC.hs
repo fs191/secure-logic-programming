@@ -401,9 +401,7 @@ secrecCode dp = program $
   ++ [Funct goal]
  where
    rules = dp ^. DP.dpRules
-   (xis,goal)  = case (dp ^. DP.dpGoal) of
-       Just g ->  concreteGoal rules (DP.inputs g) (DP.outputs g) (DP.formula g)
-       Nothing -> defaultGoal
+   (xis,goal) = concreteGoal rules (DP.inputs dp) (DP.outputs dp) (DP.goal dp)
    extPreds = dp ^.. DP.dpDBClauses
    (intPredPs, intPredNs) = unzip $ nub $ map (\p -> (predicateName p, predicateArity p)) $ map (\r -> r ^. ruleHead) rules
 

@@ -60,7 +60,7 @@ runAdornM x = runExcept $ evalStateT x (AdornState [] [] S.empty [])
 adornProgram :: DatalogProgram -> Either AdornmentException DatalogProgram
 adornProgram p = runAdornM $
   do
-    let _gRule = goalToRule . fromJust $ p ^. dpGoal
+    let _gRule = goalToRule $ p ^. dpGoal
     gsRules .= p ^. dpRules
     gsRules %= L.insert _gRule
     gsQueue .= [allBound _gRule]
@@ -204,7 +204,6 @@ suffixExpr = U.transform f
         Nothing -> p
     f x = x
 
-goalToRule :: Goal -> Rule
-goalToRule g = rule "__goal" _args (g ^. gFormula)
-  where _args = g ^. gInputs
+goalToRule :: Expr -> Rule
+goalToRule g = rule "__goal" [] g
 

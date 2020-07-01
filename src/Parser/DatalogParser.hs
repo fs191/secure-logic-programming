@@ -7,7 +7,6 @@ import Text.Megaparsec
 
 import Data.Foldable
 import Data.Void (Void)
-import Data.Maybe
 
 import Control.Monad (void)
 
@@ -22,7 +21,7 @@ type Parser = Parsec Void String
 
 data Clause
   = RC R.Rule
-  | GC DP.Goal
+  | GC Expr
   | DC DP.Directive
 
 -- Based on:
@@ -34,7 +33,7 @@ datalogParser =
     st  <- manyTill clause eof
     let rs   = [x | RC x <- st]
     let dirs = [x | DC x <- st]
-    let q    = listToMaybe [x | GC x <- st]
+    let [q]  = [x | GC x <- st]
     return $ DP.ppDatalogProgram rs q dirs
 
 clause :: Parser Clause
@@ -66,14 +65,13 @@ funCall =
 body :: Parser [Expr]
 body = sepBy1 bPredExpr comma
 
-goal :: Parser DP.Goal
+goal :: Parser Expr
 goal = 
   do
     h <- identifier
     ps <- parens $ sepBy1 term comma
-    let p = predicate h ps
     void $ symbol "?"
-    return $ DP.makeGoal [] [] p
+    return $ predicate h ps
 
 -----------------------
 -- Exports

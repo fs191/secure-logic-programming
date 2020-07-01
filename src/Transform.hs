@@ -80,6 +80,7 @@ simplify r = r & ruleTail %~ U.rewrite f
     f (Le _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x <= y
     f (Ge _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x >= y
     f (Eq _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x == y
+    f (Eq _ (ConstStr _ x) (ConstStr _ y)) = Just . constBool $ x == y
     f (Eq _ (Var _ x) (Var _ y))
       | x == y    = Just $ constBool True
       | otherwise = Nothing

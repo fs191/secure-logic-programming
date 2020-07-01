@@ -21,10 +21,9 @@ spec =
     transPreserveSem "examples/prolog/employee.pl" 3
     transPreserveSem "examples/prolog/relatives.pl" 1
     runsSuccessfully "examples/prolog/fib.pl" ["2"]
-    runsSuccessfully "examples/prolog/market.pl"  ["alice"]
-    runsSuccessfully "examples/prolog/auction.pl" ["wololo"]
-    runsSuccessfully "examples/prolog/employee.pl"  ["wololo"]
-    runsSuccessfully "examples/prolog/relatives.pl"  ["wololo"]
+    runsSuccessfully "examples/prolog/market.pl"  ["eve"]
+    runsSuccessfully "examples/prolog/auction.pl" ["eve"]
+    runsSuccessfully "examples/prolog/employee.pl"  ["bob", "0"]
     
 
 canDeriveOn :: String -> Int -> Spec

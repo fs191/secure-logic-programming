@@ -65,6 +65,7 @@ refreshRule :: String -> Rule -> Rule
 refreshRule prefix r' = applySubst s r
   where 
     r = r' & ruleTail %~ safePrefix
+           & ruleHead %~ safePrefix
     s = refreshExpr prefix . eAnd (r ^. ruleHead) $ r ^. ruleTail
 
 -- | Prefixes variable names with gibberish
