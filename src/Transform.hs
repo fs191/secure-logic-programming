@@ -29,7 +29,6 @@ deriveAllGroundRules program n = program'
                                    -- & fromMaybe program' . adornProgram
                                    & DP.ruleLens %~ f
   where
-    clauses = program ^.. DP.dpDBClauses
     -- Input program but db clauses are converted to rules
     program' = program
     f :: [Rule] -> [Rule]

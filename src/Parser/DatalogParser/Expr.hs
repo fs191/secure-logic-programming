@@ -29,7 +29,7 @@ bPredExpr = asum
   , try $ opParse greaterEqual ">="
   , try $ opParse greater      ">" 
   , try $ opParse equal        "=" 
-  , try $ opParse equal        "is"
+  , try $ opParse eIs          "is"
   , predParse
   ]
   where 

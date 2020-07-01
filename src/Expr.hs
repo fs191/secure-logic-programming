@@ -23,6 +23,7 @@ module Expr
   , less, lessEqual
   , greater, greaterEqual
   , equal
+  , eIs
   , eNeg
   , eAdd, eSub
   , eInv
@@ -73,6 +74,7 @@ data Expr
   | Lt   Ann Expr Expr
   | Le   Ann Expr Expr
   | Eq   Ann Expr Expr
+  | Is   Ann Expr Expr
   | Gt   Ann Expr Expr
   | Ge   Ann Expr Expr
   | Mul  Ann Expr Expr
@@ -100,6 +102,7 @@ instance Pretty Expr where
   pretty (Lt _ x y)       = pretty x <+> "<" <+> pretty y
   pretty (Le _ x y)       = pretty x <+> "=<" <+> pretty y
   pretty (Eq _ x y)       = pretty x <+> "=" <+> pretty y
+  pretty (Is _ x y)       = pretty x <+> "is" <+> pretty y
   pretty (Gt _ x y)       = pretty x <+> ">" <+> pretty y
   pretty (Ge _ x y)       = pretty x <+> ">=" <+> pretty y
   pretty (Mul _ x y)      = pretty x <+> "*" <+> pretty y
@@ -208,6 +211,9 @@ eOr = Or empty
 
 eList :: [Expr] -> Expr
 eList = List empty
+
+eIs :: Expr -> Expr -> Expr
+eIs = Is empty
 
 getAnn :: Expr -> Ann
 getAnn x = head $ x ^.. annLens
