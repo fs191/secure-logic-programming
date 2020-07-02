@@ -48,7 +48,7 @@ module Expr
 ---------------------------------------------------------
 
 import Control.Exception
-import Control.Lens hiding (children, List)
+import Control.Lens hiding (transform, children, List)
 
 import Data.Data
 import Data.Data.Lens
@@ -109,6 +109,7 @@ instance Pretty Expr where
   pretty (Add _ x y)      = pretty x <+> "+" <+> pretty y
   pretty (Or _ x y)       = pretty x <> ";\n" <> pretty y
   pretty (And _ x y)      = pretty x <> ",\n" <> pretty y
+  pretty (Is _ x y)       = pretty x <> "is" <> pretty y
 
 data EvaluationException a
   = NonConstantTerm Expr

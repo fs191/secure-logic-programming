@@ -35,7 +35,7 @@ data Rule = Rule
   { _ruleHead :: Expr
   , _ruleTail :: Expr
   }
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 makeLenses ''Rule
 
 instance Pretty Rule where
@@ -45,9 +45,6 @@ instance Pretty Rule where
     ":-" <+>  
     hardline <+>
     (indent 2 $ pretty $ _ruleTail r)
-
-instance Show Rule where
-  show = show . pretty
 
 fact :: String -> [Expr] -> Rule
 fact n as = Rule (predicate n as) (constTrue)

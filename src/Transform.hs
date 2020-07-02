@@ -13,6 +13,8 @@ import Data.Generics.Uniplate.Operations as U
 import Data.List
 import Data.Maybe
 
+import Debug.Trace
+
 import Control.Applicative
 import Control.Lens as L
 import Control.Monad.State
@@ -46,7 +48,7 @@ deriveAllGroundRules program n = program'
 inlineOnce :: [Rule] -> [Rule]
 inlineOnce rs =
   rs <> do
-    tgt <- rs
+    tgt <- refreshRule "T_" <$> rs
     src <- rs
     let shd = src ^. ruleHead
     let stl = src ^. ruleTail

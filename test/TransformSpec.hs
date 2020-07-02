@@ -4,9 +4,25 @@ module TransformSpec where
 
 import Test.Hspec
 
+import Data.Text
 import Parser.DatalogParser
 import Transform
 import Swipl
+
+marketRes :: [Text]
+marketRes = 
+  [ "[eve]" 
+  , "[dave]"
+  ]
+
+employeeRes :: [Text]
+employeeRes = 
+  [ "[bob,0]"
+  , "[alice,2000]"
+  , "[henry,1200]"
+  , "[peggy,2100]"
+  , "[victor,1900]"
+  ]
 
 spec :: Spec
 spec =
@@ -19,11 +35,11 @@ spec =
     transPreserveSem "examples/prolog/auction.pl" 2
     transPreserveSem "examples/prolog/employee.pl" 1
     transPreserveSem "examples/prolog/employee.pl" 2
-    transPreserveSem "examples/prolog/relatives.pl" 1
-    runsSuccessfully "examples/prolog/fib.pl" ["2"]
-    runsSuccessfully "examples/prolog/market.pl"  ["eve"]
-    runsSuccessfully "examples/prolog/auction.pl" ["eve"]
-    runsSuccessfully "examples/prolog/employee.pl"  ["bob", "0"]
+    --transPreserveSem "examples/prolog/relatives.pl" 1
+    runsSuccessfully "examples/prolog/fib.pl" ["[2]"]
+    runsSuccessfully "examples/prolog/market.pl"  marketRes
+    runsSuccessfully "examples/prolog/auction.pl" marketRes
+    runsSuccessfully "examples/prolog/employee.pl"  employeeRes
     
 
 canDeriveOn :: String -> Int -> Spec

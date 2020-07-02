@@ -20,13 +20,14 @@ import qualified Data.Map as M
 
 import Data.Generics.Uniplate.Data
 import Data.Maybe
-import Data.List (nub)
+import Data.List (nub, stripPrefix)
 import Data.Text.Prettyprint.Doc
 
 import Control.Lens hiding (universe, transform, transformM)
 import Control.Monad.State
 import Control.Monad.Trans.UnionFind
 
+import Annotation
 import Expr
 
 newtype Subst = Th (M.Map String Expr)
@@ -40,7 +41,7 @@ instance Pretty Subst where
 
 
 safeStr :: String
-safeStr = "___"
+safeStr = "$"
 
 -- | Compresses the substitution using union-find.
 compress :: Subst -> Subst
@@ -73,10 +74,16 @@ evalTheta (Th theta) x =
 
 -- | Apply a substitution to an expression
 applyToExpr :: Subst -> Expr -> Expr
-applyToExpr theta bexpr = transform f $ safePrefix bexpr
-  where theta'      = mapKeys (safeStr ++) theta
+applyToExpr theta bexpr = removeSafePrefixes . transform f $ safePrefix bexpr
+  where theta'      = mapKeys (safeStr<>) theta
         f (Var _ x) = evalTheta theta' x
         f x         = x
+
+removeSafePrefixes :: Expr -> Expr
+removeSafePrefixes = transform f
+  where
+    f (Var a x) = Var a $ fromMaybe x $ stripPrefix safeStr x
+    f x = x
 
 mapKeys :: (String -> String) -> Subst -> Subst
 mapKeys f (Th theta) = Th $ M.mapKeys f theta
@@ -97,7 +104,7 @@ refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
 
 safePrefix :: Expr -> Expr
 safePrefix = transform f
-  where f (Var a n) = Var a $ safeStr <> n
+  where f (Var a n) = Var a (safeStr <> n)
         f x = x
 
 -- | Immediately refreshes variable names in `e`

@@ -11,6 +11,7 @@ module Swipl
 
 import Shelly
 
+import Data.List
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -37,7 +38,7 @@ runDatalogFromFile' p = silently $
     let _path = T.pack p
     let _action = run "swipl" 
           [ "-g"
-          , "goal(X,Y),maplist(writeln,Y)"
+          , "forall(goal(X,Y), writeln(Y))"
           , "-t"
           , "halt"
           , _path
@@ -70,7 +71,7 @@ preservesSemantics f p = it desc $
     _prog <- parseDatalogFromFile p
     _pre  <- runDatalogProgram _prog
     _post <- runDatalogProgram (f _prog)
-    _pre `shouldBe` _post
+    nub _pre `shouldBe` nub _post
   where
     desc = "preserves semantics of " <> p
 
