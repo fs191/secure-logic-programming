@@ -44,7 +44,7 @@ runDatalogFromFile' p = silently $
           , _path
           ]
     _source <- liftIO $ readFile p
-    let _num = ((("\n"++) . (++"\t") . show) <$> [1..])
+    let _num = ((("\n"++) . (++"\t") . show) <$> ([1..] :: [Int]))
     let _numSource = concat $ (uncurry (++)) <$> _num `zip` lines _source
     res <- handleany_sh 
       (\e -> throw $ SwiplException (show e ++ "\nSource:\n" ++ _numSource)) 

@@ -18,6 +18,9 @@ module DatalogProgram
   , directive
   , prolog
   , goal, inputs, outputs
+  , intentionalFacts
+  , extensionalFacts
+  , facts
   ) where
 
 import           Control.Lens hiding (List)
@@ -123,4 +126,18 @@ prologGoal formula ins outs = hcat
   , prolog formula
   , "."
   ]
+
+intentionalFacts :: DatalogProgram -> [Rule]
+intentionalFacts dp = dp ^.. dpRules . folded . filtered(fil)
+  where fil = view $ ruleTail . to(==constTrue)
+
+extensionalFacts :: DatalogProgram -> [Rule]
+extensionalFacts dp = dp ^.. dpDirectives 
+                           . folded 
+                           . to dirToDBC 
+                           . _Just 
+                           . to dbClauseToRule
+
+facts :: DatalogProgram -> [Rule]
+facts dp = intentionalFacts dp <> extensionalFacts dp
 

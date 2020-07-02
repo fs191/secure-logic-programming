@@ -8,6 +8,7 @@ import Language.SecreC
 import Control.Monad
 import Data.Text.Prettyprint.Doc
 import Transform
+import PostProcessing
 
 main :: IO ()
 main = do
@@ -22,6 +23,7 @@ main = do
   -- parse the input datalog program
   program <- parseDatalogFromFile inFileName
   let _trans = deriveAllGroundRules program _ite
+  let _postProc = filterGroundRules _trans
 
   -- create a Sharemind script that can be used to upload the tables used in given program
   -- WARNING: this is used for testing only, do not apply it to actual private data!
@@ -35,7 +37,7 @@ main = do
 
 
   -- we can output either only yes/no answer, or also valuations of free variables
-  let secrec = show (pretty (secrecCode _trans))
+  let secrec = show (pretty (secrecCode _postProc))
 
   -- Output the results
   if outFilePath /= ""
