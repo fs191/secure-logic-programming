@@ -10,8 +10,8 @@ module Transform
 ---------------------------------------------------------
 
 import Data.Generics.Uniplate.Operations as U
+import Data.List
 import Data.Maybe
-import qualified Data.Set as S
 
 import Control.Applicative
 import Control.Lens as L
@@ -33,7 +33,7 @@ deriveAllGroundRules program n = program'
     f :: [Rule] -> [Rule]
     f x = foldl (.) id (replicate n pipeline) x
     pipeline = 
-      --removeDuplicateFacts .
+      removeDuplicateFacts .
       removeFalseFacts .
       liftA simplify . 
       (traversed . ruleTail %~ simplifyAnds) .
@@ -102,11 +102,11 @@ simplifyVars' r = compress . mconcat . catMaybes $ f <$> (U.universe r)
 -- Removes duplicate terms from AND operations at the root expression
 -- TODO: find out what's causing it to do weird substitutions in the market.pl example
 simplifyAnds :: Expr -> Expr
-simplifyAnds x = foldr1 eAnd . S.filter (not . isAnd) $ simplifyAnds' x
+simplifyAnds x = foldr1 eAnd . nub . filter (not . isAnd) $ simplifyAnds' x
 
-simplifyAnds' :: Expr -> S.Set (Expr)
-simplifyAnds' (And _ x y) = S.union (simplifyAnds' x) (simplifyAnds' y)
-simplifyAnds' x = S.singleton x
+simplifyAnds' :: Expr -> [Expr]
+simplifyAnds' (And _ x y) = (simplifyAnds' x) <> (simplifyAnds' y)
+simplifyAnds' x = [x]
 
 isAnd :: Expr -> Bool
 isAnd (And _ _ _) = True
@@ -119,7 +119,7 @@ removeFalseFacts = filter (\x -> x ^. ruleTail /= constBool False)
 -- | Removes duplicates of facts that appear more than once
 -- TODO make it preserve the order of predicates
 removeDuplicateFacts :: [Rule] -> [Rule]
-removeDuplicateFacts = undefined
+removeDuplicateFacts = nub
 
 -- | Binds constants that are arguments of some predicate to a new variable
 bindArgColumns :: Expr -> State Int Expr

@@ -61,7 +61,7 @@ identifier' = lexeme $
     return $ h:t
 
 identifierSymbols :: Parser Char
-identifierSymbols = oneOf ['_', '-']
+identifierSymbols = oneOf ['_']
 
 signedInteger :: Parser Int
 signedInteger = lexeme $ C.signed sc C.decimal

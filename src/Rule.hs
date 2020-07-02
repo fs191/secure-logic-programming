@@ -67,11 +67,6 @@ refreshRule prefix r = applySubst s r
   where 
     s = refreshExpr prefix . eAnd (r ^. ruleHead) $ r ^. ruleTail
 
-safePrefix :: Expr -> Expr
-safePrefix = transform f
-  where f (Var a n) = Var a $ "S!_" <> n
-        f x = x
-
 applySubst :: Subst -> Rule -> Rule
 applySubst s r = r & ruleHead %~ applyToExpr s
                    & ruleTail %~ applyToExpr s

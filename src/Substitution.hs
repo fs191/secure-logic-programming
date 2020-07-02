@@ -38,6 +38,10 @@ instance Show Subst where
 instance Pretty Subst where
   pretty (Th s) = tupled $ (\(a, b) -> pretty a <+> "->" <+> pretty b) <$> M.toList s
 
+
+safeStr :: String
+safeStr = "___"
+
 -- | Compresses the substitution using union-find.
 compress :: Subst -> Subst
 compress (Th m) = runIdentity . runUnionFind $
@@ -70,15 +74,19 @@ evalTheta (Th theta) x =
 -- | Apply a substitution to an expression
 applyToExpr :: Subst -> Expr -> Expr
 applyToExpr theta bexpr = transform f $ safePrefix bexpr
-  where f (Var _ x) = evalTheta theta x
-        f x       = x
+  where theta'      = mapKeys (safeStr ++) theta
+        f (Var _ x) = evalTheta theta' x
+        f x         = x
+
+mapKeys :: (String -> String) -> Subst -> Subst
+mapKeys f (Th theta) = Th $ M.mapKeys f theta
 
 -- | Rename all the variables in `e` by 
 -- enumerating them and prepending the names with `prefix`
 refreshExpr :: String -> Expr -> Subst
 refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
   where 
-    substs = sequenceA $ f <$> nub [v | v@(Var _ _) <- universe $ safePrefix e]
+    substs = sequenceA $ f <$> nub [v | v@(Var _ _) <- universe e]
     f (Var _ v) =
       do
         i <- get
@@ -89,7 +97,7 @@ refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
 
 safePrefix :: Expr -> Expr
 safePrefix = transform f
-  where f (Var a n) = Var a $ "S!_" <> n
+  where f (Var a n) = Var a $ safeStr <> n
         f x = x
 
 -- | Immediately refreshes variable names in `e`
