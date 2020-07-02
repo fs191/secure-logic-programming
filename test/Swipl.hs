@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Swipl 
@@ -13,12 +14,19 @@ import Shelly
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import Debug.Trace
+import Control.Exception
 
 import Test.Hspec
 
 import Parser.DatalogParser
 import DatalogProgram
+
+data SwiplException
+  = SwiplException String
+  deriving (Exception)
+
+instance Show SwiplException where
+  show (SwiplException s) = "Failed to run swipl program: " ++ s
 
 runDatalogFromFile :: FilePath -> IO [Text]
 runDatalogFromFile p = shelly $ runDatalogFromFile' p
@@ -27,13 +35,19 @@ runDatalogFromFile' :: FilePath -> Sh [Text]
 runDatalogFromFile' p = silently $
   do
     let _path = T.pack p
-    res <- run "swipl" 
-      [ "-g"
-      , "goal(X,Y),maplist(writeln,Y)"
-      , "-t"
-      , "halt"
-      , _path
-      ]
+    let _action = run "swipl" 
+          [ "-g"
+          , "goal(X,Y),maplist(writeln,Y)"
+          , "-t"
+          , "halt"
+          , _path
+          ]
+    _source <- liftIO $ readFile p
+    let _num = ((("\n"++) . (++"\t") . show) <$> [1..])
+    let _numSource = concat $ (uncurry (++)) <$> _num `zip` lines _source
+    res <- handleany_sh 
+      (\e -> throw $ SwiplException (show e ++ "\nSource:\n" ++ _numSource)) 
+      _action
     return $ T.lines res
 
 -- | Runs the program `dp` using swipl. 

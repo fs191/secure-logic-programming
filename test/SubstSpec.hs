@@ -2,9 +2,6 @@ module SubstSpec where
 
 import Data.Maybe
 import Data.Text.Prettyprint.Doc
-import Data.List
-
-import Data.Generics.Uniplate.Operations
 
 import Test.Hspec
 
@@ -17,14 +14,17 @@ x = var "x"
 y :: Expr
 y = var "y"
 
-xs :: Expr
-xs = var "x"
+z :: Expr
+z = var "z"
 
-ys :: Expr
-ys = var "y"
+x0 :: Expr
+x0 = var "X_0"
 
-zs :: Expr
-zs = var "z"
+x1 :: Expr
+x1 = var "X_1"
+
+x2 :: Expr
+x2 = var "X_2"
 
 c1 :: Expr
 c1 = constInt 1
@@ -56,15 +56,19 @@ spec = parallel $
       unifien't (f [c1]) (f [c1, c2])
       unifien't (g [c1]) (f [c1])
     describe "Substitution.refreshVarNames" $ do
-      refreshes c1
-      refreshes x
-      refreshes $ f [x]
-      refreshes $ f [x, y]
-      refreshes $ f [x, c1]
+      refreshes c1 c1
+      refreshes x x0
+      refreshes (f [x]) $ f [x0]
+      refreshes (f [x, y]) $ f [x0, x1]
+      refreshes (f [x, c1]) $ f [x0, c1]
+      refreshes (f [x1, x0]) $ f [x0, x1]
+      refreshes (f [x1, x1]) $ f [x0, x0]
+      refreshes (f [x1, x1, x0]) $ f [x0, x0, x1]
+      refreshes (f [x2, x1, x0]) $ f [x0, x1, x2]
     describe "Substitution.compress" $ do
-      compresses ["x" |-> ys, "y" |-> c1] ["x" |-> c1, "y" |-> c1]
+      compresses ["x" |-> y, "y" |-> c1] ["x" |-> c1, "y" |-> c1]
       compresses ["x" |-> c2, "y" |-> c1] ["x" |-> c2, "y" |-> c1]
-      compresses ["x" |-> ys, "y" |-> zs] ["x" |-> zs, "y" |-> zs, "z" |-> zs]
+      compresses ["x" |-> y, "y" |-> z] ["x" |-> z, "y" |-> z, "z" |-> z]
       
 
 unifies :: Expr -> Expr -> Spec
@@ -77,10 +81,10 @@ unifien't a b = it desc $
   (isJust $ a `unify` b) `shouldBe` False
   where desc = "Does not unify " <> (show $ pretty a) <> " and " <> (show $ pretty b)
 
-refreshes :: Expr -> Spec
-refreshes e = it desc $
-  refreshAndApply "X_" e `shouldSatisfy` (\s -> and [isPrefixOf "X_" v | (Var _ v) <- universe s])
-  where desc = "Refreshes all variables in " <> (show $ pretty e)
+refreshes :: Expr -> Expr -> Spec
+refreshes e e' = it desc $
+  refreshAndApply "X_" e `shouldBe` e'
+  where desc = "Refreshes " <> (show $ pretty e) <> " to " <> (show $ pretty e')
 
 compresses :: [Subst] -> [Subst] -> Spec
 compresses input output = it desc $

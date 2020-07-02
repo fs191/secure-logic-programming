@@ -69,7 +69,7 @@ evalTheta (Th theta) x =
 
 -- | Apply a substitution to an expression
 applyToExpr :: Subst -> Expr -> Expr
-applyToExpr theta bexpr = transform f bexpr
+applyToExpr theta bexpr = transform f $ safePrefix bexpr
   where f (Var _ x) = evalTheta theta x
         f x       = x
 
@@ -78,7 +78,7 @@ applyToExpr theta bexpr = transform f bexpr
 refreshExpr :: String -> Expr -> Subst
 refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
   where 
-    substs = sequenceA $ f <$> nub [v | v@(Var _ _) <- universe e]
+    substs = sequenceA $ f <$> nub [v | v@(Var _ _) <- universe $ safePrefix e]
     f (Var _ v) =
       do
         i <- get
@@ -86,6 +86,11 @@ refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
         let n = prefix <> show i
         return $ v |-> (var n)
     f _ = error "Expected a variable, got something else"
+
+safePrefix :: Expr -> Expr
+safePrefix = transform f
+  where f (Var a n) = Var a $ "S!_" <> n
+        f x = x
 
 -- | Immediately refreshes variable names in `e`
 refreshAndApply :: String -> Expr -> Expr

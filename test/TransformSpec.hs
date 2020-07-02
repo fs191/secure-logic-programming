@@ -12,12 +12,13 @@ spec :: Spec
 spec =
   parallel . describe "Transform.deriveAllGroundRules" $ do
     transPreserveSem "examples/prolog/fib.pl" 1
+    transPreserveSem "examples/prolog/market_xvars.pl" 1
     transPreserveSem "examples/prolog/market.pl" 1
-    transPreserveSem "examples/prolog/market.pl" 3
+    transPreserveSem "examples/prolog/market.pl" 2
     transPreserveSem "examples/prolog/auction.pl" 1
-    transPreserveSem "examples/prolog/auction.pl" 3
+    transPreserveSem "examples/prolog/auction.pl" 2
     transPreserveSem "examples/prolog/employee.pl" 1
-    transPreserveSem "examples/prolog/employee.pl" 3
+    transPreserveSem "examples/prolog/employee.pl" 2
     transPreserveSem "examples/prolog/relatives.pl" 1
     runsSuccessfully "examples/prolog/fib.pl" ["2"]
     runsSuccessfully "examples/prolog/market.pl"  ["eve"]

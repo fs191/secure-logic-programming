@@ -11,7 +11,6 @@ module Transform
 
 import Data.Generics.Uniplate.Operations as U
 import Data.Maybe
-import Data.List
 import qualified Data.Set as S
 
 import Control.Applicative
@@ -34,12 +33,12 @@ deriveAllGroundRules program n = program'
     f :: [Rule] -> [Rule]
     f x = foldl (.) id (replicate n pipeline) x
     pipeline = 
-      removeDuplicateFacts .
+      --removeDuplicateFacts .
       removeFalseFacts .
       liftA simplify . 
       (traversed . ruleTail %~ simplifyAnds) .
       (liftA $ refreshRule "X_") .
-      (traversed . ruleTail %~ flip evalState 0 . (U.transformM bindArgColumns)) .
+      --(traversed . ruleTail %~ flip evalState 0 . (U.transformM bindArgColumns)) .
       (traversed %~ simplifyVars) . 
       inlineOnce
 
@@ -118,8 +117,9 @@ removeFalseFacts :: [Rule] -> [Rule]
 removeFalseFacts = filter (\x -> x ^. ruleTail /= constBool False)
 
 -- | Removes duplicates of facts that appear more than once
+-- TODO make it preserve the order of predicates
 removeDuplicateFacts :: [Rule] -> [Rule]
-removeDuplicateFacts = nub
+removeDuplicateFacts = undefined
 
 -- | Binds constants that are arguments of some predicate to a new variable
 bindArgColumns :: Expr -> State Int Expr

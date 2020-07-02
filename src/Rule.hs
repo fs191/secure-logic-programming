@@ -20,10 +20,10 @@ module Rule
 ---- Data structures for LP facts and rules
 ---------------------------------------------------------
 
+import           Data.Generics.Uniplate.Data
 import           Data.Text.Prettyprint.Doc
 
 import           Control.Lens hiding (transform)
-import           Data.Generics.Uniplate.Data
 
 import           Expr
 import           Substitution
@@ -61,20 +61,16 @@ args = view $ ruleHead . _Pred . _3
 isFact :: Rule -> Bool
 isFact r = _ruleTail r == constTrue
 
+-- | Refresh all variable names in the rule
 refreshRule :: String -> Rule -> Rule
-refreshRule prefix r' = applySubst s r
+refreshRule prefix r = applySubst s r
   where 
-    r = r' & ruleTail %~ safePrefix
-           & ruleHead %~ safePrefix
     s = refreshExpr prefix . eAnd (r ^. ruleHead) $ r ^. ruleTail
 
--- | Prefixes variable names with gibberish
 safePrefix :: Expr -> Expr
-safePrefix e = transform f e
-  where
-    f (Var a n) = Var a $ "$!?" ++ n
-    f x = x
-
+safePrefix = transform f
+  where f (Var a n) = Var a $ "S!_" <> n
+        f x = x
 
 applySubst :: Subst -> Rule -> Rule
 applySubst s r = r & ruleHead %~ applyToExpr s
