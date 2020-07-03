@@ -28,8 +28,6 @@ import Data.Set as S
 import Data.List as L
 import Data.Maybe
 
-import Debug.Trace
-
 data AdornmentException
   = NoGoal
   deriving (Show, Exception)
@@ -67,7 +65,6 @@ adornProgram p = runAdornM $
 
     _adornables <- graphLoop
     let _rules = [r & ruleHead %~ suffixPredicate bp | (Adornable r bp) <- _adornables]
-    traceM "Done\n\n"
     return $ p & dpRules .~ _rules
 
 graphLoop :: AdornM [Adornable]
@@ -75,8 +72,6 @@ graphLoop =
   do
     _visited <- use gsVisited
     _queue <- use gsQueue
-    traceM "\n----"
-
     -- Loop while queue is not empty
     _empty <- isQueueEmpty
     if _empty
@@ -99,9 +94,6 @@ adornRule a@(Adornable r bp) =
   do
     -- Set the bound variables list to equal all the bound variables in
     -- the rule head
-    traceM "Adorning rule:"
-    traceM $ show r
-    traceM $ "with pattern " <> show bp
     let (BindingPattern _bp) = bp
     let _args = args r `zip` _bp
     let _boundArgs = fst <$> L.filter ((==Bound) . snd) _args
@@ -132,8 +124,6 @@ adornRule a@(Adornable r bp) =
               _bindings = repeat . fromJust $ ann ^. bindings
               _ads = uncurry Adornable <$> zip _rs _bindings
           L.filter (not . isVisited _visQueue) _ads
-    traceM "Adding new rules to queue:"
-    traceM $ show _newPairs
     gsQueue %= (<> _newPairs)
 
     return ()
