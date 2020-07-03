@@ -53,6 +53,11 @@ transPreserveSemDB :: String -> Int -> [Expr] -> Spec
 transPreserveSemDB f n db = 
   preservesSemanticsDB (flip deriveAllGroundRules n) f db
 
+
+--
+-- Expected results
+--
+
 marketRes :: [Text]
 marketRes = 
   [ "[eve]" 
@@ -67,6 +72,10 @@ employeeRes =
   , "[peggy,2100]"
   , "[victor,1900]"
   ]
+
+--
+-- PPDatalog databases
+--
 
 marketDB :: [Expr]
 marketDB =

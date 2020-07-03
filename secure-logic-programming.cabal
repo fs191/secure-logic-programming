@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 79f030899c0e772544946286c54d65e5fd116d7767a15c428fae9cfb3cc10471
+-- hash: c0938f02765ddd933dd3d185c355283be3ecbd601bd0f27f470b71d444b207e6
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -33,6 +33,7 @@ library
       ErrorMsg
       Expr
       Language.Datalog.Literal
+      Language.Prolog.PrologSource
       Language.SecreC
       Language.SecreC.Types
       Lib

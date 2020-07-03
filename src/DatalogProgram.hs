@@ -15,12 +15,14 @@ module DatalogProgram
   , dpRules
   , dpDBClauses
   , dpGoal
-  , directive
   , prolog
   , goal, inputs, outputs
   , intentionalFacts
   , extensionalFacts
   , facts
+  , inputDirective
+  , outputDirective
+  , dbDirective
   ) where
 
 import           Control.Lens hiding (List)
@@ -29,20 +31,21 @@ import           Rule
 import           Expr
 import           Data.Text.Prettyprint.Doc
 import           DBClause
+import           Language.Prolog.PrologSource
 
-class PrologSource a where
-  -- | Pretty-print data as valid prolog source code
-  prolog :: a -> Doc ann
-
-data Directive = Directive String [Expr]
+data Directive 
+  = InputDirective [Expr]
+  | OutputDirective [Expr]
+  | DBDirective String [Expr]
   deriving (Show)
 
 instance Pretty Directive where
-  pretty (Directive n as) = hsep
-    [ ":-"
-    , pretty n
-    , tupled $ pretty <$> as
-    ]
+  pretty (InputDirective as) = ":-inputs([" <> _ps <> "])."
+    where _ps = cat . punctuate ", " $ pretty <$> as
+  pretty (OutputDirective as) = ":-outputs([" <> _ps <> "])."
+    where _ps = cat . punctuate ", " $ pretty <$> as
+  pretty (DBDirective n as) = ":-type(" <> (pretty n) <> ",[" <> _ps <> "])."
+    where _ps = cat . punctuate ", " $ pretty <$> as
 
 data DatalogProgram = DatalogProgram
   { _dpRules      :: [Rule]
@@ -52,6 +55,7 @@ data DatalogProgram = DatalogProgram
   deriving (Show)
 
 makeLenses ''DatalogProgram
+makePrisms ''Directive
 
 instance Pretty DatalogProgram where
   pretty p = vsep
@@ -66,11 +70,6 @@ instance PrologSource DatalogProgram where
     , prologGoal (_dpGoal dp) (inputs dp) (outputs dp)
     ]
 
-instance PrologSource Rule where
-  prolog x = pretty x <> "."
-
-instance PrologSource Expr where
-  prolog = pretty
 
 instance PrologSource Directive where
   prolog _ = emptyDoc
@@ -87,34 +86,22 @@ ppDatalogProgram r = DatalogProgram r
 programGoalExpr :: DatalogProgram -> Expr
 programGoalExpr = view dpGoal
 
-directive :: String -> [Expr] -> Directive
-directive = Directive
-
 dpDBClauses :: Fold DatalogProgram DBClause
 dpDBClauses = dpDirectives . folded . to(dirToDBC) . _Just
 
 -- | Attempts to convert a directive to DBClause
 dirToDBC :: Directive -> Maybe DBClause
-dirToDBC (Directive "type" [(ConstStr _ n), (List _ as)]) = Just $ dbClause n as
+dirToDBC (DBDirective n as) = Just $ dbClause n as
 dirToDBC _ = Nothing
 
 goal :: DatalogProgram -> Expr
 goal = _dpGoal
 
-xputs :: String -> DatalogProgram -> [Expr]
-xputs predn dp = dp ^.. dpDirectives . folded . to(f) . folded
-  where
-    f :: Directive -> [Expr]
-    f (Directive _predn [List _ as]) 
-      | predn == _predn = as
-      | otherwise       = []
-    f _ = []
-
 inputs :: DatalogProgram -> [Expr]
-inputs = xputs "inputs"
+inputs = toListOf $ dpDirectives . folded . _InputDirective . folded
 
 outputs :: DatalogProgram -> [Expr]
-outputs = xputs "outputs"
+outputs = toListOf $ dpDirectives . folded . _OutputDirective . folded
 
 prologGoal :: Expr -> [Expr] -> [Expr] -> Doc ann
 prologGoal formula ins outs = hcat
@@ -134,10 +121,19 @@ intentionalFacts dp = dp ^.. dpRules . folded . filtered(fil)
 extensionalFacts :: DatalogProgram -> [Rule]
 extensionalFacts dp = dp ^.. dpDirectives 
                            . folded 
-                           . to dirToDBC 
-                           . _Just 
+                           . to dirToDBC
+                           . _Just
                            . to dbClauseToRule
 
 facts :: DatalogProgram -> [Rule]
 facts dp = intentionalFacts dp <> extensionalFacts dp
+
+inputDirective :: [Expr] -> Directive
+inputDirective = InputDirective
+
+outputDirective :: [Expr] -> Directive
+outputDirective = OutputDirective
+
+dbDirective :: String -> [Expr] -> Directive
+dbDirective = DBDirective
 

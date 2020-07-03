@@ -55,6 +55,7 @@ import Data.Data.Lens
 import Data.Text.Prettyprint.Doc
 
 import Language.SecreC.Types
+import Language.Prolog.PrologSource
 
 import Annotation
 
@@ -110,6 +111,11 @@ instance Pretty Expr where
   pretty (Or _ x y)       = pretty x <> ";\n" <> pretty y
   pretty (And _ x y)      = pretty x <> ",\n" <> pretty y
   pretty (Is _ x y)       = pretty x <> "is" <> pretty y
+
+instance PrologSource Expr where
+  prolog (Var _ x) = pretty x
+  prolog (ConstStr _ x) = pretty x
+  prolog x = pretty x
 
 data EvaluationException a
   = NonConstantTerm Expr

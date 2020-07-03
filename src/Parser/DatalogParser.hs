@@ -54,13 +54,45 @@ ruleP =
     return $ R.rule h ps expr
 
 funCall :: Parser DP.Directive
-funCall =
-  do 
-    impliedBy
-    n <- identifier
-    ps <- parens $ sepBy1 aExpr comma
+funCall = asum
+  [ try inputDir
+  , try outputDir
+  , dbDir
+  ]
+
+inputDir :: Parser DP.Directive
+inputDir = 
+  do
+    void impliedBy
+    void $ symbol "inputs"
+    _ins <- parens . brackets $ do
+      sepBy term comma
     void $ symbol "."
-    return $ DP.directive n ps
+    return $ DP.inputDirective _ins
+
+outputDir :: Parser DP.Directive
+outputDir = 
+  do
+    void impliedBy
+    void $ symbol "outputs"
+    _ins <- parens . brackets $ do
+      sepBy term comma
+    void $ symbol "."
+    return $ DP.outputDirective _ins
+
+dbDir :: Parser DP.Directive
+dbDir = 
+  do
+    void impliedBy
+    void $ symbol "type"
+    _dir <- parens $ do
+      _id <- identifier
+      void comma
+      _ins <- brackets $ do
+        sepBy term comma
+      return $ DP.dbDirective _id _ins
+    void $ symbol "."
+    return _dir
 
 body :: Parser [Expr]
 body = sepBy1 bPredExpr comma
