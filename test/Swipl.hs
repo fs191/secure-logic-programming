@@ -15,7 +15,7 @@ import Shelly
 
 import Control.Lens
 
-import Data.List
+import Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -84,7 +84,7 @@ preservesSemanticsDB f p db = it desc $
     _prog <- parseDatalogFromFile p
     _pre  <- runDatalogProgram $ insertDB db _prog
     _post <- runDatalogProgram . insertDB db $ f _prog
-    nub _pre `shouldBe` nub _post
+    S.fromList _pre `shouldBe` S.fromList _post
   where
     desc = "preserves semantics of " <> p
 

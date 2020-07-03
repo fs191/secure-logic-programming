@@ -1,26 +1,20 @@
+{-# LANGUAGE TemplateHaskell #-}
 module TypeInference
   ( typeInference
   ) where
 
 import Control.Lens
+import Control.Monad.State
 
-import Data.Map
+import Data.Map as M
 
-import Language.SecreC.Types
-import DatalogProgram
-
-data VarInfo = VarInfo
-  { _viDom  :: PPDomain
-  , _viType :: PPType
-  }
-
-data InfrenceState = InfrenceState
-  { _isScopeInfo :: Map String VarInfo
-  }
+import Expr
+import DatalogProgram as DP
+import Language.SecreC.Types ()
 
 typeInference :: DatalogProgram -> DatalogProgram
 typeInference dp = undefined
-  where
-    _goal       = dp ^. dpGoal
-    _inputTypes = inputs dp
+
+inferExpr :: Expr -> Expr
+inferExpr = undefined
 

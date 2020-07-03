@@ -4,9 +4,9 @@
 % in this case, we could actually deduce that Y should also be a public string
 % the equlaity "=" can be treated similarly to "is" from "fib.pl" example, but the free variable can now be both the LHS and the RHS
 % also, more complex unifications like (X + a) = (b + Y) should first be transformed to (X = b) and (Y = b), e.g. via the unifier substitution
-sg(X:public string,Y:unknown string) : unknown bool :-
+sg(X:public string,Y:public string) : public bool :-
   % initially, the type of Y is "unknown"
-  (X:public string = Y:unknown string) : unknown bool.
+  (X:public string = Y:public string) : public bool.
 
 % type of X is public since it is goal's input
 sg(X:public string,Y:private string) : private bool :-
@@ -37,7 +37,7 @@ sg(X:public string,Y:private string) : private bool :-
   par(_Y1:private string,__Y1:private string) : private bool,
   __X1:private string = __Y1:private string   : private bool.
 
-:- inputs([x1 : string]).
-:- outputs([Y : string]).
+:- inputs([x1 : public string]).
+:- outputs([Y : public string]).
 sg(x1:public string, Y:public string) : private bool?
 
