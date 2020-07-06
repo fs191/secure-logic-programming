@@ -128,6 +128,22 @@ unify' g@((v@(Var _ x), y):t)
 unify' ((Pred _ n xs, Pred _ m ys):t)
   | n == m && length xs == length ys = unify' $ xs `zip` ys <> t
   | otherwise = Nothing
+
+unify' ((Expr.List _ xs, Expr.List _ ys):t)
+  | length xs == length ys = unify' $ xs `zip` ys <> t
+  | otherwise = Nothing
+
+unify' ((Add _ x1 x2, Add _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
+unify' ((Sub _ x1 x2, Sub _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
+unify' ((Mul _ x1 x2, Mul _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
+unify' ((Div _ x1 x2, Div _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
+unify' ((Min _ x1 x2, Min _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
+unify' ((Max _ x1 x2, Max _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
+
+unify' ((Not _ x, Not _ y):t) = unify' $ [x] `zip` [y] <> t
+unify' ((Neg _ x, Neg _ y):t) = unify' $ [x] `zip` [y] <> t
+unify' ((Inv _ x, Inv _ y):t) = unify' $ [x] `zip` [y] <> t
+
 -- Swap
 unify' ((x, Var _ y):t) = unify' ((var y, x):t)
 -- Delete / conflict
