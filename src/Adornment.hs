@@ -17,6 +17,7 @@ import Annotation
 import DatalogProgram
 import Expr
 import Rule
+import DBClause
 
 import Control.Lens
 import Control.Monad.State
@@ -39,10 +40,11 @@ data Adornable = Adornable
   deriving (Eq, Ord, Show)
 
 data AdornState = AdornState
-  { _gsVisited :: [Adornable]
-  , _gsQueue   :: [Adornable]
-  , _gsBound   :: Set String
-  , _gsRules   :: [Rule]
+  { _gsVisited   :: [Adornable]
+  , _gsQueue     :: [Adornable]
+  , _gsBound     :: Set String
+  , _gsRules     :: [Rule]
+  , _gsDBClauses :: [DBClause]
   }
 type AdornM = 
   StateT AdornState (Except AdornmentException)
@@ -54,7 +56,7 @@ goalStr :: [Char]
 goalStr = "$goal"
 
 runAdornM :: AdornM a -> Either AdornmentException a
-runAdornM x = runExcept $ evalStateT x (AdornState [] [] S.empty [])
+runAdornM x = runExcept $ evalStateT x (AdornState [] [] S.empty [] [])
 
 -- | Suffixes rules with parameter bindings and optimizes each rule to
 -- fail as early as possible
@@ -65,6 +67,7 @@ adornProgram p = runAdornM $
     gsRules .= p ^. dpRules
     gsRules %= L.insert _gRule
     gsQueue .= [allBound _gRule]
+    gsDBClauses .= p ^.. dpDBClauses 
 
     _adornables <- graphLoop
     let _rules = [r & ruleHead %~ suffixPredicate bp | (Adornable r bp) <- _adornables]
@@ -81,14 +84,16 @@ graphLoop =
     _visited <- use gsVisited
     _queue <- use gsQueue
 
-
     -- Loop while queue is not empty
     _empty <- isQueueEmpty
     if _empty
       then return _visited
       else do
         _next <- popQueue
-        adornRule _next
+        _isEdb <- isEDB $ _aRule _next
+        if _isEdb
+          then adornDBRule _next
+          else adornRule _next
         graphLoop
 
 popQueue :: AdornM Adornable
@@ -102,11 +107,7 @@ popQueue =
 adornRule :: Adornable -> AdornM ()
 adornRule a@(Adornable r bp) = 
   do
-    -- Set the bound variables list to equal all the bound variables in
-    -- the rule head
-
-
-
+    -- Add all bound variables in the rule head to gsBound
     let (BindingPattern _bp) = bp
     let _args = args r `zip` _bp
     let _boundArgs = fst <$> L.filter ((==Bound) . snd) _args
@@ -122,13 +123,15 @@ adornRule a@(Adornable r bp) =
     let _suffixed = suffixExpr <$> _reordered
     let _folded = foldr1 eAnd _suffixed
 
-    -- Add new rules to the queue and current rule to gsVisited
+    -- Add current rule to gsVisited
     _rules <- use gsRules
     _visited <- use gsVisited
     _queue   <- use gsQueue
     let _visQueue = L.insert a $ _visited `L.union` _queue
     let _modified = a & aRule . ruleTail .~ _folded
     gsVisited %= L.insert _modified
+
+    -- Generate new adornables and add them to the queue if not visited yet
     let _newPairs :: [Adornable]
         _newPairs  = do
           let toPair (ann, n, _) = (ann, n)
@@ -137,11 +140,14 @@ adornRule a@(Adornable r bp) =
               _bindings = repeat . fromJust $ ann ^. bindings
               _ads = uncurry Adornable <$> zip _rs _bindings
           L.filter (not . isVisited _visQueue) _ads
-
-
     gsQueue %= (<> _newPairs)
 
     return ()
+
+adornDBRule :: Adornable -> AdornM ()
+adornDBRule (Adornable r bp) =
+  do
+    undefined
 
 findRulesByName :: [Rule] -> String -> [Rule]
 findRulesByName rs n = L.filter (\x -> n == ruleName x) rs
@@ -200,6 +206,7 @@ comp bound l r =
 allBound :: Rule -> Adornable
 allBound r = Adornable r . BindingPattern $ const Bound <$> args r
 
+-- | Suffixes the predicate based on its annotations
 suffixExpr :: Expr -> Expr
 suffixExpr = U.transform f
   where
@@ -212,3 +219,7 @@ suffixExpr = U.transform f
 goalToRule :: Expr -> Rule
 goalToRule g = rule goalStr [] g
 
+-- | Returns true if rule is an extensional database fact
+isEDB :: Rule -> AdornM Bool
+isEDB x = use $ gsDBClauses . to (any (\c -> name c == n))
+  where n = x ^. ruleHead . _Pred . _2

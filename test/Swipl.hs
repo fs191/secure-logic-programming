@@ -88,17 +88,17 @@ preservesSemanticsDB f p db = it desc $
   where
     desc = "preserves semantics of " <> p
 
-runsSuccessfully :: String -> [Text] -> Spec
-runsSuccessfully p res = runsSuccessfullyDB p res []
+runsSuccessfully :: String -> (DatalogProgram -> DatalogProgram) -> [Text] -> Spec
+runsSuccessfully n p res = runsSuccessfullyDB n p res []
 
-runsSuccessfullyDB :: String -> [Text] -> [Expr] -> Spec
-runsSuccessfullyDB p res db = it desc $
+runsSuccessfullyDB :: String -> (DatalogProgram -> DatalogProgram) -> [Text] -> [Expr] -> Spec
+runsSuccessfullyDB n p res db = it desc $
   do
-    _prog <- parseDatalogFromFile $ p
-    _res <- runDatalogProgram $ insertDB db _prog
-    _res `shouldBe` res
+    _prog <- parseDatalogFromFile n
+    _res <- runDatalogProgram $ insertDB db . p $ _prog
+    S.fromList _res `shouldBe` S.fromList res
   where
-    desc = "evaluating " <> p <> " outputs " <> show res
+    desc = "evaluating " <> n <> " outputs " <> show res
 
 doesNotRun :: String -> Spec
 doesNotRun p = it desc $
@@ -113,5 +113,4 @@ insertDB db x = x & dpRules %~ (<> _dbRules)
   where
     _dbRules :: [Rule]
     _dbRules = [fact _n _as | Pred _ _n _as <- db]
-
 

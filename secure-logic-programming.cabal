@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6fe17de2d25540c1533100a46ed853851ae151cd6ba650f282a75a21c9ca481a
+-- hash: c7a9869e578898e93c63ca4e01d7385f5ee374aaff299556dc153f25dc055a97
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -115,6 +115,7 @@ test-suite test
       PostProcessingSpec
       SubstSpec
       Swipl
+      TestResults
       TransformSpec
       Paths_secure_logic_programming
   hs-source-dirs:
