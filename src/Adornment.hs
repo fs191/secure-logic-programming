@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module RGGraph 
+module Adornment 
   ( BindingPattern(..)
   , Binding(..)
   , Adornable(..)
@@ -28,8 +28,6 @@ import Data.Set as S
 import Data.List as L
 import Data.Maybe
 
-import Debug.Trace
-
 data AdornmentException
   = NoGoal
   deriving (Show, Exception)
@@ -52,6 +50,9 @@ type AdornM =
 makeLenses ''Adornable
 makeLenses ''AdornState
 
+goalStr :: [Char]
+goalStr = "$goal"
+
 runAdornM :: AdornM a -> Either AdornmentException a
 runAdornM x = runExcept $ evalStateT x (AdornState [] [] S.empty [])
 
@@ -67,15 +68,19 @@ adornProgram p = runAdornM $
 
     _adornables <- graphLoop
     let _rules = [r & ruleHead %~ suffixPredicate bp | (Adornable r bp) <- _adornables]
-    traceM "Done\n\n"
-    return $ p & dpRules .~ _rules
+
+    let isGoal :: Rule -> Bool
+        isGoal x = fromMaybe False $ x ^? ruleHead . _Pred . _2 . to(isPrefixOf goalStr)
+        _goal = head $ L.filter isGoal _rules
+    return $ p & dpRules .~ L.filter (not . isGoal) _rules
+               & dpGoal  .~ (_goal ^. ruleTail)
 
 graphLoop :: AdornM [Adornable]
 graphLoop = 
   do
     _visited <- use gsVisited
     _queue <- use gsQueue
-    traceM "\n----"
+
 
     -- Loop while queue is not empty
     _empty <- isQueueEmpty
@@ -99,9 +104,9 @@ adornRule a@(Adornable r bp) =
   do
     -- Set the bound variables list to equal all the bound variables in
     -- the rule head
-    traceM "Adorning rule:"
-    traceM $ show r
-    traceM $ "with pattern " <> show bp
+
+
+
     let (BindingPattern _bp) = bp
     let _args = args r `zip` _bp
     let _boundArgs = fst <$> L.filter ((==Bound) . snd) _args
@@ -132,8 +137,8 @@ adornRule a@(Adornable r bp) =
               _bindings = repeat . fromJust $ ann ^. bindings
               _ads = uncurry Adornable <$> zip _rs _bindings
           L.filter (not . isVisited _visQueue) _ads
-    traceM "Adding new rules to queue:"
-    traceM $ show _newPairs
+
+
     gsQueue %= (<> _newPairs)
 
     return ()
@@ -205,5 +210,5 @@ suffixExpr = U.transform f
     f x = x
 
 goalToRule :: Expr -> Rule
-goalToRule g = rule "__goal" [] g
+goalToRule g = rule goalStr [] g
 

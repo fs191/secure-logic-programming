@@ -20,14 +20,14 @@ import qualified Data.Map as M
 
 import Data.Generics.Uniplate.Data
 import Data.Maybe
-import Data.List (nub, stripPrefix)
+import Data.List (nub, stripPrefix, isPrefixOf)
 import Data.Text.Prettyprint.Doc
 
+import Control.Exception (assert)
 import Control.Lens hiding (universe, transform, transformM)
 import Control.Monad.State
 import Control.Monad.Trans.UnionFind
 
-import Annotation
 import Expr
 
 newtype Subst = Th (M.Map String Expr)
@@ -74,10 +74,13 @@ evalTheta (Th theta) x =
 
 -- | Apply a substitution to an expression
 applyToExpr :: Subst -> Expr -> Expr
-applyToExpr theta bexpr = removeSafePrefixes . transform f $ safePrefix bexpr
+applyToExpr theta bexpr = removeSafePrefixes . transform f $ safePrefix _bexpr
   where theta'      = mapKeys (safeStr<>) theta
         f (Var _ x) = evalTheta theta' x
         f x         = x
+        _vars       = [b | (Var _ b) <- universe bexpr]
+        -- Ensure that no variables begin with '#' before application
+        _bexpr      = assert (all (not . isPrefixOf "#") _vars) bexpr
 
 removeSafePrefixes :: Expr -> Expr
 removeSafePrefixes = transform f

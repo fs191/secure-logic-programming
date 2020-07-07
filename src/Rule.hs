@@ -20,10 +20,11 @@ module Rule
 ---- Data structures for LP facts and rules
 ---------------------------------------------------------
 
-import           Data.Generics.Uniplate.Data
 import           Data.Text.Prettyprint.Doc
 
 import           Control.Lens hiding (transform)
+
+import           Language.Prolog.PrologSource
 
 import           Expr
 import           Substitution
@@ -45,6 +46,9 @@ instance Pretty Rule where
     ":-" <+>  
     hardline <+>
     (indent 2 $ pretty $ _ruleTail r)
+
+instance PrologSource Rule where
+  prolog x = pretty x <> "."
 
 fact :: String -> [Expr] -> Rule
 fact n as = Rule (predicate n as) (constTrue)

@@ -41,6 +41,7 @@ viewESM(X0 : public string, X2 : private int, X4 : public string) : private bool
 viewESM(X0 : public string, 0 : public int, X4 : public string) : private bool :-
   eds(X0 : public string, X1 : public string, X2 : private int) : public bool,
   2500 : public int =< X2 : private int                         : private bool,
+  % Comparisons are done between public columns, so result is public bool
   dm(X3 : public string, X4 : public string),                   : public bool,
   X1 : public string = X3 : public string                       : public bool.
 
