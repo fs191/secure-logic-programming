@@ -70,7 +70,9 @@ adornProgram p = runAdornM $
     gsDBClauses .= p ^.. dpDBClauses 
 
     _adornables <- graphLoop
-    let _rules = [r & ruleHead %~ suffixPredicate bp | (Adornable r bp) <- _adornables]
+    let _rules = [r & ruleHead %~ suffixPredicate bp 
+                    & ruleHead . annLens . bindings .~ Just bp 
+                    | (Adornable r bp) <- _adornables]
 
     let isGoal :: Rule -> Bool
         isGoal x = fromMaybe False $ x ^? ruleHead . _Pred . _2 . to(isPrefixOf goalStr)
@@ -90,10 +92,7 @@ graphLoop =
       then return _visited
       else do
         _next <- popQueue
-        _isEdb <- isEDB $ _aRule _next
-        if _isEdb
-          then adornDBRule _next
-          else adornRule _next
+        adornRule _next
         graphLoop
 
 popQueue :: AdornM Adornable
@@ -120,7 +119,13 @@ adornRule a@(Adornable r bp) =
     -- Reorder the terms in rule body
     let _terms = andsToList $ r ^. ruleTail
     _reordered <- reorderTerms _terms
-    let _suffixed = suffixExpr <$> _reordered
+    let _suffixNotEDB x =
+          do
+            _isEDB <- isPredEDB x
+            if _isEDB
+              then return x
+              else return $ suffixExpr x
+    _suffixed <- traverse _suffixNotEDB _reordered
     let _folded = foldr1 eAnd _suffixed
 
     -- Add current rule to gsVisited
@@ -133,21 +138,17 @@ adornRule a@(Adornable r bp) =
 
     -- Generate new adornables and add them to the queue if not visited yet
     let _newPairs :: [Adornable]
-        _newPairs  = do
+        _newPairs = do
           let toPair (ann, n, _) = (ann, n)
           (ann, n) <- nub $ _reordered ^.. folded . _Pred . to(toPair)
-          let _rs = findRulesByName _rules n
+          let _rs  = findRulesByName _rules n
               _bindings = repeat . fromJust $ ann ^. bindings
-              _ads = uncurry Adornable <$> zip _rs _bindings
+              _ads  = uncurry Adornable <$> zip _rs _bindings
           L.filter (not . isVisited _visQueue) _ads
+    _notEDB <- filterM (liftM not . isEDB . _aRule) _newPairs
     gsQueue %= (<> _newPairs)
 
     return ()
-
-adornDBRule :: Adornable -> AdornM ()
-adornDBRule (Adornable r bp) =
-  do
-    undefined
 
 findRulesByName :: [Rule] -> String -> [Rule]
 findRulesByName rs n = L.filter (\x -> n == ruleName x) rs
@@ -160,6 +161,7 @@ isVisited visited (Adornable r bp) = anyOf folded f visited
   where
     f (Adornable r' bp') = (r ^. ruleHead == r' ^. ruleHead) && bp == bp'
 
+-- | Suffixes a predicate based on a given binding pattern
 suffixPredicate :: BindingPattern -> Expr -> Expr
 suffixPredicate suf = _Pred . _2 %~ (<> "_" <> show suf)
 
@@ -219,7 +221,12 @@ suffixExpr = U.transform f
 goalToRule :: Expr -> Rule
 goalToRule g = rule goalStr [] g
 
+isPredEDB :: Expr -> AdornM Bool
+isPredEDB x = use $ gsDBClauses . to (any (\c -> name c == n))
+  where n = x ^. _Pred . _2
+
 -- | Returns true if rule is an extensional database fact
 isEDB :: Rule -> AdornM Bool
-isEDB x = use $ gsDBClauses . to (any (\c -> name c == n))
-  where n = x ^. ruleHead . _Pred . _2
+isEDB = view $ ruleHead . to isPredEDB
+
+
