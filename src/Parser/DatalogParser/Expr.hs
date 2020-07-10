@@ -102,7 +102,7 @@ rule =
     terms <- option [] . parens $ sepBy1 term comma
     return $ R.fact psym terms
 
-typeExpr :: Maybe PPDomain -> PPType -> Expr -> Expr
+typeExpr :: PPDomain -> PPType -> Expr -> Expr
 typeExpr dom dat e = e & annLens . domain  .~ dom
-                       & annLens . annType .~ Just dat
+                       & annLens . annType .~ dat
 

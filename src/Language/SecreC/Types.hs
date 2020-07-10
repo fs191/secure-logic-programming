@@ -20,6 +20,7 @@ data PPType
 data PPDomain
   = Public
   | Private
+  | Unknown
   deriving (Ord, Show, Eq, Data, Typeable)
 
 instance Pretty PPType where
@@ -31,6 +32,7 @@ instance Pretty PPType where
 instance Pretty PPDomain where
   pretty Public  = "public"
   pretty Private = "private"
+  pretty Unknown = "unknown"
 
 join :: PPDomain -> PPDomain -> PPDomain
 join Private _ = Private

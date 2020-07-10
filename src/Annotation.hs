@@ -38,15 +38,15 @@ instance Show Binding where
 data Ann = Ann
   { 
     -- Datatype of the term
-    _annType  :: Maybe PPType
+    _annType  :: PPType
     -- Security domain of the term
-  , _domain   :: Maybe PPDomain
+  , _domain   :: PPDomain
   , _bindings :: Maybe BindingPattern
   }
   deriving (Ord, Show, Eq, Data, Typeable)
 
 empty :: Ann
-empty = Ann Nothing Nothing Nothing
+empty = Ann PPAuto Unknown Nothing
 
 makeLenses ''Ann
 

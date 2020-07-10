@@ -1,4 +1,4 @@
-module Parser.DatalogParser.Lexer 
+module Parser.DatalogParser.Lexer
   ( lexeme, symbol, sc
   , variable, identifier
   , signedInteger
@@ -65,7 +65,7 @@ identifierSymbols = oneOf ['_']
 
 signedInteger :: Parser Int
 signedInteger = lexeme $ C.signed sc C.decimal
-  
+
 comma :: Parser ()
 comma = void $ symbol ","
 
@@ -88,15 +88,15 @@ domainType =
 
 dataType :: Parser PPType
 dataType =
-      (try $ symbol "bool"   *> return PPBool)
-  <|> (try $ symbol "int"    *> return PPInt)
+      try (symbol "bool"   *> return PPBool)
+  <|> try (symbol "int"    *> return PPInt)
   <|> (symbol "string" *> return PPStr)
 
-typing :: Parser (Maybe PPDomain, PPType)
+typing :: Parser (PPDomain, PPType)
 typing =
   do
     void $ symbol ":"
-    dom <- optional domainType
+    dom <- domainType
     dat <- dataType
     return (dom, dat)
 

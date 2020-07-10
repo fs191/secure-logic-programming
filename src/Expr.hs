@@ -90,11 +90,12 @@ data Expr
 makePrisms ''Expr
 
 instance Pretty Expr where
-  pretty e@(Var _ x)      = pretty x <> prettyType e
+  pretty e@(Var _ x)      = pretty x -- <> prettyType e
   pretty (ConstInt _ x)   = pretty x
-  pretty e@(ConstStr _ x) = pretty x <> prettyType e
+  pretty e@(ConstStr _ x) = pretty x -- <> prettyType e
   pretty (ConstBool _ x)  = pretty x
-  pretty (Pred _ n args)  = pretty n <> (tupled $ pretty <$> args)
+  pretty (ConstFloat _ x) = pretty x
+  pretty (Pred _ n args)  = pretty n <> tupled (pretty <$> args)
   pretty (Not _ e)        = "!" <> pretty e
   pretty (Neg _ e)        = "-" <> pretty e
   pretty (Inv _ e)        = "(" <> pretty e <> ")^(-1)"
@@ -108,9 +109,11 @@ instance Pretty Expr where
   pretty (Ge _ x y)       = pretty x <+> ">=" <+> pretty y
   pretty (Mul _ x y)      = pretty x <+> "*" <+> pretty y
   pretty (Add _ x y)      = pretty x <+> "+" <+> pretty y
+  pretty (Min _ x y)      = "min(" <> pretty x <> ", " <> pretty y <> ")"
+  pretty (Max _ x y)      = "max(" <> pretty x <> ", " <> pretty y <> ")"
   pretty (Or _ x y)       = pretty x <> ";\n" <> pretty y
   pretty (And _ x y)      = pretty x <> ",\n" <> pretty y
-  pretty (Is _ x y)       = pretty x <> "is" <> pretty y
+  pretty (List _ x)       = list $ pretty <$> x
 
 instance PrologSource Expr where
   prolog (Var _ x) = pretty x
@@ -122,13 +125,7 @@ data EvaluationException a
   deriving (Show, Exception)
 
 prettyType :: Expr -> Doc ann
-prettyType e 
-  | t == Just PPAuto &&
-    d == Just Public ||
-    t == Nothing     ||
-    d == Nothing 
-      = ""
-  | otherwise = " :" <+> pretty d <+> pretty t
+prettyType e = " :" <+> pretty d <+> pretty t
   where ann = head $ e ^. partsOf annLens
         t   = ann ^. annType
         d   = ann ^. domain
@@ -193,7 +190,7 @@ eMax :: Expr -> Expr -> Expr
 eMax = Max empty
 
 eMin :: Expr -> Expr -> Expr
-eMin = Min empty 
+eMin = Min empty
 
 eMul :: Expr -> Expr -> Expr
 eMul = Mul empty
@@ -226,8 +223,8 @@ getAnn :: Expr -> Ann
 getAnn x = head $ x ^.. annLens
 
 -- | A traversal for accessing the annotation of a term
-annLens :: Traversal' Expr Ann
-annLens = template
+annLens :: Lens' Expr Ann
+annLens = singular $ (partsOf template) . _head
 
 -- | Turns all `And`s to a list, 
 -- starting from the root of the expression

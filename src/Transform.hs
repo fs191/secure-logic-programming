@@ -13,8 +13,6 @@ import Data.Generics.Uniplate.Operations as U
 import Data.List
 import Data.Maybe
 
-import Debug.Trace
-
 import Control.Applicative
 import Control.Lens as L
 import Control.Monad.State
@@ -33,15 +31,15 @@ deriveAllGroundRules program n = program'
     -- Input program but db clauses are converted to rules
     program' = program
     f :: [Rule] -> [Rule]
-    f x = foldl (.) id (replicate n pipeline) x
-    pipeline = 
+    f = foldl (.) id $ replicate n pipeline
+    pipeline =
       removeDuplicateFacts .
       removeFalseFacts .
-      liftA simplify . 
+      fmap simplify .
       (traversed . ruleTail %~ simplifyAnds) .
-      (liftA $ refreshRule "X_") .
+      fmap (refreshRule "X_") .
       --(traversed . ruleTail %~ flip evalState 0 . (U.transformM bindArgColumns)) .
-      (traversed %~ simplifyVars) . 
+      (traversed %~ simplifyVars) .
       inlineOnce
 
 -- | Tries to unify each predicate in each rule body with an appropriate rule
@@ -53,7 +51,7 @@ inlineOnce rs =
     let shd = src ^. ruleHead
     let stl = src ^. ruleTail
     let ttl = tgt ^. ruleTail
-    (p@(Pred _ _ _), mut) <- U.contexts ttl
+    (p@Pred {}, mut) <- U.contexts ttl
     let subst = unify shd p
     s <- maybeToList subst
     return . applySubst s $ tgt & ruleTail .~ mut stl
@@ -61,7 +59,7 @@ inlineOnce rs =
 -- | Rewrites constant terms to simpler terms
 simplify :: Rule -> Rule
 simplify r = r & ruleTail %~ U.rewrite f
-  where 
+  where
     f (And _ (ConstBool _ True) x) = Just x
     f (And _ x (ConstBool _ True)) = Just x
     f (And _ (ConstBool _ False) _) = Just $ constBool False
@@ -92,8 +90,8 @@ simplifyVars r = applySubst subst r
 
 -- | Removes any unnecessary variable equalities (e.g. X=Y)
 simplifyVars' :: Expr -> Subst
-simplifyVars' r = compress . mconcat . catMaybes $ f <$> (U.universe r)
-  where f (Eq _ (Var _ v) x) 
+simplifyVars' r = compress . mconcat . catMaybes $ f <$> U.universe r
+  where f (Eq _ (Var _ v) x)
           | isLeaf x  = Just $ v |-> x
           | otherwise = Nothing
         f (Eq _ x (Var _ v))
@@ -107,11 +105,11 @@ simplifyAnds :: Expr -> Expr
 simplifyAnds x = foldr1 eAnd . nub . filter (not . isAnd) $ simplifyAnds' x
 
 simplifyAnds' :: Expr -> [Expr]
-simplifyAnds' (And _ x y) = (simplifyAnds' x) <> (simplifyAnds' y)
+simplifyAnds' (And _ x y) = simplifyAnds' x <> simplifyAnds' y
 simplifyAnds' x = [x]
 
 isAnd :: Expr -> Bool
-isAnd (And _ _ _) = True
+isAnd And {} = True
 isAnd _ = False
 
 -- | Removes facts that always evaluate to False
@@ -125,10 +123,10 @@ removeDuplicateFacts = nub
 
 -- | Binds constants that are arguments of some predicate to a new variable
 bindArgColumns :: Expr -> State Int Expr
-bindArgColumns (Pred ann n as) = 
+bindArgColumns (Pred ann n as) =
   do
     let freshVar :: State Int Expr
-        freshVar = 
+        freshVar =
           do
             i <- get
             put $ i + 1
@@ -137,7 +135,7 @@ bindArgColumns (Pred ann n as) =
     vars <- sequenceA $ replicate (length cols) freshVar
     let cvs   = cols `zip` vars
         lkp :: Expr -> Expr
-        lkp x = fromMaybe x $ lookup x $ cvs
+        lkp x = fromMaybe x $ lookup x cvs
         newAs = lkp <$> as
         eqs   = uncurry equal <$> cvs
         newPred = Pred ann n newAs

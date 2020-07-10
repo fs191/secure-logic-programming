@@ -52,7 +52,7 @@ type AdornM =
 makeLenses ''Adornable
 makeLenses ''AdornState
 
-goalStr :: [Char]
+goalStr :: String
 goalStr = "$goal"
 
 runAdornM :: AdornM a -> Either AdornmentException a
@@ -64,14 +64,16 @@ adornProgram :: DatalogProgram -> Either AdornmentException DatalogProgram
 adornProgram p = runAdornM $
   do
     let _gRule = goalToRule $ p ^. dpGoal
+    -- Initialize the state
     gsRules .= p ^. dpRules
     gsRules %= L.insert _gRule
     gsQueue .= [allBound _gRule]
     gsDBClauses .= p ^.. dpDBClauses 
 
+    -- Begin iterating through the rules starting from the goal
     _adornables <- graphLoop
     let _rules = [r & ruleHead %~ suffixPredicate bp 
-                    & ruleHead . annLens . bindings .~ Just bp 
+                    & ruleHead . annLens . bindings ?~ bp 
                     | (Adornable r bp) <- _adornables]
 
     let isGoal :: Rule -> Bool
@@ -119,6 +121,8 @@ adornRule a@(Adornable r bp) =
     -- Reorder the terms in rule body
     let _terms = andsToList $ r ^. ruleTail
     _reordered <- reorderTerms _terms
+
+    -- Suffix any predicates in rule body that are not database facts
     let _suffixNotEDB x =
           do
             _isEDB <- isPredEDB x
@@ -140,12 +144,12 @@ adornRule a@(Adornable r bp) =
     let _newPairs :: [Adornable]
         _newPairs = do
           let toPair (ann, n, _) = (ann, n)
-          (ann, n) <- nub $ _reordered ^.. folded . _Pred . to(toPair)
+          (ann, n) <- nub $ _reordered ^.. folded . _Pred . to toPair
           let _rs  = findRulesByName _rules n
               _bindings = repeat . fromJust $ ann ^. bindings
               _ads  = uncurry Adornable <$> zip _rs _bindings
           L.filter (not . isVisited _visQueue) _ads
-    _notEDB <- filterM (liftM not . isEDB . _aRule) _newPairs
+    _notEDB <- filterM (fmap not . isEDB . _aRule) _newPairs
     gsQueue %= (<> _newPairs)
 
     return ()
@@ -154,7 +158,7 @@ findRulesByName :: [Rule] -> String -> [Rule]
 findRulesByName rs n = L.filter (\x -> n == ruleName x) rs
 
 isQueueEmpty :: AdornM Bool
-isQueueEmpty = use $ gsQueue . to(L.null)
+isQueueEmpty = use $ gsQueue . to L.null
 
 isVisited :: [Adornable] -> Adornable -> Bool
 isVisited visited (Adornable r bp) = anyOf folded f visited
@@ -169,8 +173,8 @@ predPattern :: Set String -> Expr -> BindingPattern
 predPattern bound (Pred _ _ as) = BindingPattern $ f <$> as
   where
     f :: Expr -> Binding
-    f (Var _ n) | elem n bound = Bound
-                | otherwise    = Free
+    f (Var _ n) | n `elem` bound = Bound
+                | otherwise      = Free
     f _ = Bound
 predPattern _ _ = BindingPattern []
 
@@ -195,18 +199,18 @@ reorderTerms l  =
     modify $ gsBound %~ S.union (S.fromList _newBound)
     _t <- reorderTerms $ tail _best
     let _pat = predPattern _bound _headBest
-        _ad = _headBest & annLens . bindings .~ Just _pat
+        _ad = _headBest & annLens . bindings ?~ _pat
     return $ _ad:_t
 
 comp :: S.Set String -> Expr -> Expr -> Ordering
 comp bound l r = 
   compare (f ys) $ f xs
-    where f x = x ^.. folded . _Var . _2 . filtered(flip elem bound)
+    where f x = x ^.. folded . _Var . _2 . filtered(`elem` bound)
           xs  = [v | v@(Var _ _)<- U.universeBi l]
           ys  = [v | v@(Var _ _)<- U.universeBi r]
 
 allBound :: Rule -> Adornable
-allBound r = Adornable r . BindingPattern $ const Bound <$> args r
+allBound r = Adornable r . BindingPattern $ Bound <$ args r
 
 -- | Suffixes the predicate based on its annotations
 suffixExpr :: Expr -> Expr
@@ -219,11 +223,12 @@ suffixExpr = U.transform f
     f x = x
 
 goalToRule :: Expr -> Rule
-goalToRule g = rule goalStr [] g
+goalToRule = rule goalStr []
 
 isPredEDB :: Expr -> AdornM Bool
-isPredEDB x = use $ gsDBClauses . to (any (\c -> name c == n))
-  where n = x ^. _Pred . _2
+isPredEDB x = use $ gsDBClauses . to (any f)
+  where n = x ^? _Pred . _2
+        f c = maybe False (name c ==) n
 
 -- | Returns true if rule is an extensional database fact
 isEDB :: Rule -> AdornM Bool

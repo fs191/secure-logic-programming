@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c7a9869e578898e93c63ca4e01d7385f5ee374aaff299556dc153f25dc055a97
+-- hash: dc8bdf98a6571481210742b8e5b60f929295d2cfa17e87af46b4feaf02b2a788
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -43,6 +43,7 @@ library
       Parser.DatalogParser.Lexer
       PostProcessing
       Rule
+      Semantics
       Substitution
       Table
       Transform

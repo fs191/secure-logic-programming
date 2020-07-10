@@ -46,6 +46,7 @@ instance Pretty SCDomain where
   pretty (SCDynamic Nothing)  = "D"
   pretty (SCDynamic (Just i)) = "D" <> pretty i
 
+angled :: [Doc ann] -> Doc ann
 angled prettyContent = encloseSep (langle <> space) (rangle <> space) comma prettyContent
 
 data SCType
@@ -332,10 +333,10 @@ funTdbCloseConnection = FunCall "tdbCloseConnection"
 strDataset = SCConstStr "DS1"
 
 -- type rewrite function
-scDomain :: Maybe Int -> Maybe PPDomain -> SCDomain
-scDomain _ (Just Private) = SCShared3p
-scDomain _ (Just Public)  = SCPublic
-scDomain i Nothing        = SCDynamic i
+scDomain :: Maybe Int -> PPDomain -> SCDomain
+scDomain _ Private = SCShared3p
+scDomain _ Public  = SCPublic
+scDomain i Unknown = SCDynamic i
 
 scDomainFromAnn :: Ann -> SCDomain
 scDomainFromAnn ann = scDomain Nothing (ann ^. domain)
@@ -345,12 +346,12 @@ scStructType f i ann =
   let dom    = ann ^. domain in
   let dtype  = ann ^. annType in
   case (dtype, dom) of
-      (Just PPBool, _) -> f (scDomain i dom) SCBool  SCBool
-      (Just PPInt,  _) -> f (scDomain i dom) SCInt32 SCInt32
-      (Just PPStr,  Just Private) -> f (scDomain i dom) SCXorUInt32 SCXorUInt8
-      (Just PPStr,  Just Public)  -> f (scDomain i dom) SCUInt32    SCUInt8
-      (Just PPStr,  Nothing)      -> error $ "cannot determine data type for a string of unknown domain"
-      (Nothing,     _)            -> f (scDomain i dom) (SCDynamicT i) (SCDynamicS i)
+      (PPBool, _) -> f (scDomain i dom) SCBool  SCBool
+      (PPInt,  _) -> f (scDomain i dom) SCInt32 SCInt32
+      (PPStr,  Private) -> f (scDomain i dom) SCXorUInt32 SCXorUInt8
+      (PPStr,  Public)  -> f (scDomain i dom) SCUInt32    SCUInt8
+      (PPStr,  Unknown)      -> error $ "cannot determine data type for a string of unknown domain"
+      (PPAuto,     _)            -> f (scDomain i dom) (SCDynamicT i) (SCDynamicS i)
 
 scColTypeI :: Int -> Ann -> SCType
 scColTypeI i = scStructType SCColumn (Just i)
@@ -581,7 +582,7 @@ concreteGoal rules xs ys (Pred _ p zs) = (xis, mainFun $
 
     -- if the truthness condition of at least one rule has private type, then so has the final answer
     doms = map (\r -> let q = r ^. ruleTail in ((getAnn q) ^.) domain) rules
-    outDomain = if elem (Just Private) doms then SCShared3p else SCPublic
+    outDomain = if elem Private doms then SCShared3p else SCPublic
 
 
 --------------------------------------------------
