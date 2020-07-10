@@ -119,7 +119,7 @@ adornRule a@(Adornable r bp) =
     _bound <- use gsBound
 
     -- Reorder the terms in rule body
-    let _terms = andsToList $ r ^. ruleTail
+    let _terms = (andsToList $ r ^. ruleTail)
     _reordered <- reorderTerms _terms
 
     -- Suffix any predicates in rule body that are not database facts
@@ -188,19 +188,22 @@ reorderTerms l  =
     _bound <- use gsBound
     -- Might be inefficient to sort again every time
     -- for longer rule bodies
-    let _best        = sortBy (comp _bound) l
-        _headBest = head _best
+    let _best = sortBy (comp _bound) l
+    let _headBest = head _best
     -- Bind all the variables that are parameters of the best candidate
-    let _vars = case _headBest of
-                  (Pred _ _ x) -> x
-                  x            -> [v | v@(Var _ _) <- U.universe x]
-
+        _vars = [v | v@(Var _ _) <- U.universe _headBest]
         _newBound = [n | (Var _ n) <- _vars]
-    modify $ gsBound %~ S.union (S.fromList _newBound)
-    _t <- reorderTerms $ tail _best
     let _pat = predPattern _bound _headBest
-        _ad = _headBest & annLens . bindings ?~ _pat
+        _ad = U.transform (bindVars _bound) $ _headBest & annLens . bindings ?~ _pat
+    modify $ gsBound %~ S.union (S.fromList _newBound)
+    _t <- reorderTerms $ tail $ _best
     return $ _ad:_t
+
+bindVars :: Set String -> Expr -> Expr
+bindVars bs expr = f expr
+  where f (Var e n) | n `S.member` bs = Var (e & annBound .~ True) n
+                    | otherwise       = Var e n
+        f x = x
 
 comp :: S.Set String -> Expr -> Expr -> Ordering
 comp bound l r = 

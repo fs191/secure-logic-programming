@@ -90,9 +90,9 @@ data Expr
 makePrisms ''Expr
 
 instance Pretty Expr where
-  pretty e@(Var _ x)      = pretty x -- <> prettyType e
+  pretty (Var e x)        = pretty x <+> (pretty $ show e)
   pretty (ConstInt _ x)   = pretty x
-  pretty e@(ConstStr _ x) = pretty x -- <> prettyType e
+  pretty (ConstStr e x)   = pretty x <+> (pretty $ show e)
   pretty (ConstBool _ x)  = pretty x
   pretty (ConstFloat _ x) = pretty x
   pretty (Pred _ n args)  = pretty n <> tupled (pretty <$> args)
@@ -148,10 +148,12 @@ isVar (Var _ _) = True
 isVar _       = False
 
 constStr :: String -> Expr
-constStr = ConstStr empty
+constStr = ConstStr (empty & annBound .~ True)
 
 constInt :: Int -> Expr
-constInt = ConstInt empty
+constInt = ConstInt (empty & annBound .~ True
+                           & annType  .~ PPInt
+                           & domain   .~ Public)
 
 constTrue :: Expr
 constTrue = ConstBool empty True
@@ -160,7 +162,9 @@ constFalse :: Expr
 constFalse = ConstBool empty False
 
 constBool :: Bool -> Expr
-constBool = ConstBool empty
+constBool = ConstBool (empty & annBound .~ True
+                             & annType  .~ PPBool
+                             & domain   .~ Public)
 
 var :: String -> Expr
 var = Var empty

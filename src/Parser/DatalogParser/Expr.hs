@@ -92,7 +92,7 @@ strParse =
     t <- optional typing
     let f = case t of
           Just (dom, dat) -> typeExpr dom dat
-          Nothing         -> id
+          Nothing         -> typeExpr Public PPStr
     return . f $ constStr s
 
 rule :: Parser R.Rule

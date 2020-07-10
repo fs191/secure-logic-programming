@@ -6,11 +6,13 @@ module Annotation
   , Binding(..), BindingPattern(..)
   , empty
   , annType, domain, bindings
+  , annBound
   ) where
 
 import Control.Lens
 
 import Data.Data
+import Data.Foldable
 
 import Language.SecreC.Types
 
@@ -42,11 +44,22 @@ data Ann = Ann
     -- Security domain of the term
   , _domain   :: PPDomain
   , _bindings :: Maybe BindingPattern
+  , _annBound :: Bool
   }
-  deriving (Ord, Show, Eq, Data, Typeable)
-
-empty :: Ann
-empty = Ann PPAuto Unknown Nothing
+  deriving (Ord, Eq, Data, Typeable)
 
 makeLenses ''Ann
+
+instance Show Ann where
+  show x = "{" <> s <> "}"
+    where s = asum 
+            [ x ^. annType . to show
+            , ", "
+            , x ^. domain . to show
+            , maybe "" (\a -> (", " <>) $ show a) $ x ^. bindings
+            , if x ^. annBound then ", bound" else ""
+            ]
+
+empty :: Ann
+empty = Ann PPAuto Unknown Nothing False
 
