@@ -73,6 +73,7 @@ evalTheta (Th theta) x =
     else var x
 
 -- | Apply a substitution to an expression
+-- TODO: unify type and donmain as well
 applyToExpr :: Subst -> Expr -> Expr
 applyToExpr theta bexpr = removeSafePrefixes . transform f $ safePrefix _bexpr
   where theta'      = mapKeys (safeStr<>) theta

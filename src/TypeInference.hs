@@ -7,8 +7,6 @@ module TypeInference
 
 import Control.Lens
 import Control.Monad.State
-import Control.Monad.Except
-import Control.Exception
 
 import Data.List as L
 import Data.Map as M
@@ -21,17 +19,16 @@ import Rule
 import DatalogProgram as DP
 import Language.SecreC.Types
 
-data InferenceException
-  = TypeMismatch String
-  | RuleNotFound String
-  deriving (Show, Exception)
-
 data InferenceState = InferenceState
   { _istProg  :: DatalogProgram
   }
 
 type InferenceM = State InferenceState
+
+-- TODO replace this with regular substitution once it can properly unify
+-- types
 data TypeSubstitution = TypeSubstitution (Map String PPDomain)
+  deriving (Show)
 
 makeLenses ''InferenceState
 
@@ -44,12 +41,12 @@ instance Monoid TypeSubstitution where
 
 applyTypeSubst :: TypeSubstitution -> Rule -> Rule
 applyTypeSubst (TypeSubstitution ts) r = 
-  r & ruleHead %~ f
-    & ruleTail %~ f
+  r & ruleHead %~ U.transform f
+    & ruleTail %~ U.transform f
   where
     t v@(Var _ n) = fromMaybe (exprTyping v) $ M.lookup n ts
+    t x = exprTyping x
     f v = applyTyping (t v) v
-applyTypeSubst (TypeSubstitution _) x = x
 
 (|->) :: String -> PPDomain -> TypeSubstitution
 (|->) x y = TypeSubstitution $ M.singleton x y
@@ -74,9 +71,7 @@ inferRule :: Rule -> InferenceM Rule
 inferRule r =
   do
     _scope <- traverse inferFromDB . U.universe $ r ^. ruleTail
-    let app v = applyTypeSubst (mconcat _scope) v
-        _applied  = U.transformBi app r
-    return _applied
+    return $ applyTypeSubst (mconcat _scope) r
 
 inferFromDB :: Expr -> InferenceM TypeSubstitution
 inferFromDB (Pred _ n xs) =
@@ -86,23 +81,22 @@ inferFromDB (Pred _ n xs) =
     let ext :: [Rule]
         ext = extensionalFacts dp
         matches = L.filter (\x -> ruleName x == n) ext
-        _args = case L.null matches of
-          True  -> []
-          False -> head matches ^. ruleHead . _Pred . _3 
-    -- Unify the parameter typings in the database fact and the predicate
-    let unified = (uncurry unifyExprTypes) <$> (xs `zip` _args)
+        _dbargs = matches ^. _head . ruleHead . _Pred . _3 
+    -- Unify the argument typings in the database fact and the predicate
+    let unified :: [PPDomain]
+        unified = (uncurry unifyExprTypes) <$> (xs `zip` _dbargs)
     -- Take bound and unbound variables into account
     let inferParams :: (Expr, PPDomain) -> TypeSubstitution
-        inferParams (v@(Var e n'), x) 
-          | e ^. annBound = n' |-> exprTyping v
+        inferParams ((Var e n'), x) 
+          | e ^. annBound = mempty
           | otherwise     = n' |-> x
         newParams' = inferParams <$> (xs `zip` unified)
     -- Unify the new type substitutions with existing substitutions
     return $ mconcat newParams'
 inferFromDB _ = return mempty
 
-inferFromGoal :: Expr -> [Rule] -> InferenceM TypeSubstitution
-inferFromGoal g rs =
+inferFromGoal :: Rule -> InferenceM TypeSubstitution
+inferFromGoal r =
   do
     undefined
 

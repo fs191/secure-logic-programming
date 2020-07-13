@@ -71,7 +71,7 @@ adornProgram p = runAdornM $
     -- Begin iterating through the rules starting from the goal
     _adornables <- graphLoop
     let _rules = [r & ruleHead %~ suffixPredicate bp 
-                    & ruleHead . bindings .~ bp 
+                    & ruleHead . paramBindings .~ bp 
                     | (Adornable r bp) <- _adornables]
 
     let isGoal :: Rule -> Bool
@@ -144,7 +144,7 @@ adornRule a@(Adornable r _bp) =
               toPair _ = Nothing
           (p, n) <- nub $ _reordered ^.. folded . to toPair . _Just
           let _rs  = findRulesByName _rules n
-              _bindings = repeat $ p ^. bindings
+              _bindings = repeat $ p ^. paramBindings
               _ads  = uncurry Adornable <$> zip _rs _bindings
           L.filter (not . isVisited _visQueue) _ads
     _notEDB <- filterM (fmap not . isEDB . _aRule) _newPairs
@@ -192,7 +192,7 @@ reorderTerms l  =
         _vars = [v | v@(Var _ _) <- U.universe _headBest]
         _newBound = [n | (Var _ n) <- _vars]
     let _pat = predPattern _bound _headBest
-        _ad = U.transform (annotateWithBindings _bound) $ _headBest & bindings .~ _pat
+        _ad = U.transform (annotateWithBindings _bound) $ _headBest & paramBindings .~ _pat
     modify $ gsBound %~ S.union (S.fromList _newBound)
     _t <- reorderTerms $ tail $ _best
     return $ _ad:_t
@@ -211,7 +211,7 @@ allBound r = Adornable r $ True <$ args r
 suffixExpr :: Expr -> Expr
 suffixExpr = U.transform f
   where
-    f p@(Pred _ _ _) = suffixPredicate (p ^. bindings) p
+    f p@(Pred _ _ _) = suffixPredicate (p ^. paramBindings) p
     f x = x
 
 goalToRule :: Expr -> Rule
@@ -226,8 +226,8 @@ isPredEDB x = use $ gsDBClauses . to (any f)
 isEDB :: Rule -> AdornM Bool
 isEDB = view $ ruleHead . to isPredEDB
 
-bindings :: Lens' Expr [Bool]
-bindings = partsOf $ _Pred . _3 . traversed . annLens . annBound
+paramBindings :: Lens' Expr [Bool]
+paramBindings = partsOf $ _Pred . _3 . traversed . annLens . annBound
 
 showBindings :: [Bool] -> String
 showBindings [] = ""
