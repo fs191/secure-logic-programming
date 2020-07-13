@@ -27,12 +27,17 @@ data InferenceException
   | RuleNotFound String
   deriving (Show, Exception)
 
-data Typing = Typing PPDomain PPType
+data Typing = Typing 
+  { _tDom  :: PPDomain 
+  , _tType :: PPType
+  }
 
 data InferenceState = InferenceState
   { _istProg  :: DatalogProgram
   , _istScope :: [Map String Typing]
   }
+
+makeLenses ''Typing
 makeLenses ''InferenceState
 
 type InferenceM = StateT InferenceState (Except InferenceException)
@@ -75,23 +80,21 @@ inferRule r =
                   True  -> []
                   False -> head matches ^. ruleHead . _Pred . _3 
             let zipped = xs `zip` _args
-            unified <- case sequence $ uncurry unifyExprTypes <$> zipped of
+            unified <- case traverse (uncurry unifyExprTypes) zipped of
                               Just x  -> return x
                               Nothing -> throwError $ TypeMismatch ""
             let newParams  = xs `zip` unified
-                newParams' = inferParams <$> newParams
+                newParams' = fromMaybe (throw $ TypeMismatch "") $ traverse inferParams newParams
                 unifier :: Typing -> Typing -> Typing
                 unifier a b = fromMaybe (throw $ TypeMismatch "") $ unifyTypings a b
-            -- TODO: Ensure that variable name collisions in the map also get
-            -- unified rather than overwritten
             istScope . _head %= M.unionWith unifier (M.fromList newParams')
             return ()
         f _ = return ()
 
-inferParams :: (Expr, Typing) -> (String, Typing)
-inferParams (v@(Var e n), x) 
-  | e ^. annBound = (n, exprTyping v)
-  | otherwise     = (n, x)
+inferParams :: (Expr, Typing) -> Maybe (String, Typing)
+inferParams (v@(Var e n), x@(Typing _ t)) 
+  | e ^. annBound = (n, exprTyping v) & _2 . tType %%~ unifyTypes t
+  | otherwise     = Just (n, x)
 
 applyTyping :: Typing -> Expr -> Either String Expr
 applyTyping (Typing d t) e =
