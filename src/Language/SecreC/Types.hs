@@ -3,7 +3,8 @@
 
 module Language.SecreC.Types 
   ( PPType(..), PPDomain(..)
-  , join
+  , unifyTypes
+  , unifyDomains
   ) where
 
 import Data.Text.Prettyprint.Doc
@@ -34,8 +35,15 @@ instance Pretty PPDomain where
   pretty Private = "private"
   pretty Unknown = "unknown"
 
-join :: PPDomain -> PPDomain -> PPDomain
-join Private _ = Private
-join _ Private = Private
-join _ _       = Public
+unifyTypes :: PPType -> PPType -> Maybe PPType
+unifyTypes x y
+  | x == PPAuto = Just y
+  | y == PPAuto || x == y
+                = Just x
+  | otherwise   = Nothing
 
+unifyDomains :: PPDomain -> PPDomain -> PPDomain
+unifyDomains Public Public = Public
+unifyDomains Unknown x     = x
+unifyDomains x Unknown     = x
+unifyDomains _ _           = Private

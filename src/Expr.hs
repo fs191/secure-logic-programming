@@ -41,6 +41,7 @@ module Expr
   , predicateVarNames
   , predicateName
   , predicateArity
+  , annotateWithBindings
   ) where
 
 ---------------------------------------------------------
@@ -52,6 +53,9 @@ import Control.Lens hiding (transform, children, List)
 
 import Data.Data
 import Data.Data.Lens
+import Data.Generics.Uniplate.Data as U
+import Data.List as L
+import Data.Set as S hiding (empty)
 import Data.Text.Prettyprint.Doc
 
 import Language.SecreC.Types
@@ -90,9 +94,9 @@ data Expr
 makePrisms ''Expr
 
 instance Pretty Expr where
-  pretty (Var e x)        = pretty x <+> (pretty $ show e)
+  pretty (Var e x)        = pretty x -- <+> (pretty $ show e)
   pretty (ConstInt _ x)   = pretty x
-  pretty (ConstStr e x)   = pretty x <+> (pretty $ show e)
+  pretty (ConstStr e x)   = pretty x -- <+> (pretty $ show e)
   pretty (ConstBool _ x)  = pretty x
   pretty (ConstFloat _ x) = pretty x
   pretty (Pred _ n args)  = pretty n <> tupled (pretty <$> args)
@@ -123,12 +127,6 @@ instance PrologSource Expr where
 data EvaluationException a
   = NonConstantTerm Expr
   deriving (Show, Exception)
-
-prettyType :: Expr -> Doc ann
-prettyType e = " :" <+> pretty d <+> pretty t
-  where ann = head $ e ^. partsOf annLens
-        t   = ann ^. annType
-        d   = ann ^. domain
 
 --------------------------
 -- is the expression constant (i.e. does not contain any variables)?
@@ -251,4 +249,20 @@ predicateArity _ = error "Expecting a predicate"
 getVarName :: Expr -> String
 getVarName (Var _ n) = n
 getVarName _ = error "Expecting a variable"
+
+annotateWithBindings :: Set String -> Expr -> Expr
+annotateWithBindings s = L.foldl1 eAnd
+                       . annotateWithBindings' s 
+                       . andsToList
+
+annotateWithBindings' :: Set String -> [Expr] -> [Expr]
+annotateWithBindings' _ [] = []
+annotateWithBindings' s (e:et) = e' : annotateWithBindings' s' et
+  where
+    f v@(Var a n) 
+      | n `S.member` s = Var (a & annBound .~ True) n
+      | otherwise      = v
+    f x = x
+    e' = U.transform f e
+    s' = fromList [n | (Var _ n) <- U.universe e] <> s
 
