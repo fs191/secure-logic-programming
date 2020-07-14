@@ -5,6 +5,8 @@ module TypeInference
   ( typeInference
   ) where
 
+import Control.Arrow
+import Control.Exception
 import Control.Lens
 import Control.Monad.State
 
@@ -64,7 +66,11 @@ typeInference = evalInferenceM act
   where
     act = do
       _dp <- use istProg
-      _dp & dpRules . traversed %%~ inferRule
+      _dp & dpRules . traversed %%~ (inferRule >=> inferFromGoalAction)
+    inferFromGoalAction :: Rule -> InferenceM Rule
+    inferFromGoalAction x = do
+      s <- inferFromGoal x
+      return $ applyTypeSubst s x
 
 -- | Infers types and domains from database facts
 inferRule :: Rule -> InferenceM Rule
@@ -98,7 +104,19 @@ inferFromDB _ = return mempty
 inferFromGoal :: Rule -> InferenceM TypeSubstitution
 inferFromGoal r =
   do
-    undefined
+    g <- use $ istProg . dpGoal
+    let subst =
+          do
+            rn <- r ^? ruleHead . _Pred . _2
+            gn <- g ^? _Pred . _2
+            guard $ rn == gn
+            rxs <- r ^? ruleHead . _Pred . _3 :: Maybe [Expr]
+            gxs <- g ^? _Pred . _3 :: Maybe [Expr]
+            let unified = (uncurry unifyExprTypes) <$> (rxs `zip` gxs)
+                paramNames = rxs ^.. folded . _Var . _2
+            assert (length paramNames == length rxs) $ return ()
+            return . mconcat $ (uncurry (|->)) <$> paramNames `zip` unified
+    return $ fromMaybe mempty subst
 
 inferFromExpr :: InferenceM [Rule]
 inferFromExpr = undefined
