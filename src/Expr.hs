@@ -43,6 +43,7 @@ module Expr
   , predicateArity
   , annotateWithBindings
   , identifier
+  , unifyVars
   ) where
 
 ---------------------------------------------------------
@@ -95,9 +96,9 @@ data Expr
 makePrisms ''Expr
 
 instance Pretty Expr where
-  pretty (Var e x)        = pretty x <+> (pretty $ show e)
+  pretty (Var e x)        = pretty x -- <+> (pretty $ show e)
   pretty (ConstInt _ x)   = pretty x
-  pretty (ConstStr e x)   = pretty x <+> (pretty $ show e)
+  pretty (ConstStr e x)   = pretty x -- <+> (pretty $ show e)
   pretty (ConstBool _ x)  = pretty x
   pretty (ConstFloat _ x) = pretty x
   pretty (Pred _ n args)  = pretty n <> tupled (pretty <$> args)
@@ -272,3 +273,7 @@ identifier (Var _ n)      = Just n
 identifier (ConstStr _ n) = Just n
 identifier _ = Nothing
 
+
+unifyVars :: Expr -> Expr -> Maybe Expr
+unifyVars x y = x & annLens . domain  %~  unifyDomains (y ^. annLens . domain)
+                  & annLens . annType %%~ unifyTypes (y ^. annLens . annType)

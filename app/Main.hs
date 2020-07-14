@@ -8,7 +8,7 @@ import Language.SecreC
 import Data.Text.Prettyprint.Doc
 import Transform
 import PostProcessing
-import TypeInference
+import PrivacyInference
 
 main :: IO ()
 main = do
@@ -24,7 +24,7 @@ main = do
   program <- parseDatalogFromFile inFileName
   let _trans = deriveAllGroundRules program _ite
   let _postProc = postProcess _trans
-  let _domained = typeInference _postProc
+  let _domained = privacyInference _postProc
 
   -- create a Sharemind script that can be used to upload the tables used in given program
   -- WARNING: this is used for testing only, do not apply it to actual private data!

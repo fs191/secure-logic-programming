@@ -39,9 +39,9 @@ instance Show Subst where
 instance Pretty Subst where
   pretty (Th s) = tupled $ (\(a, b) -> pretty a <+> "->" <+> pretty b) <$> M.toList s
 
-
+-- | A very safe string
 safeStr :: String
-safeStr = "$"
+safeStr = "$!!?"
 
 -- | Compresses the substitution using union-find.
 compress :: Subst -> Subst
@@ -49,21 +49,24 @@ compress (Th m) = runIdentity . runUnionFind $
   do
     let joins = [(k, v) | (k, Var _ v) <- M.toList m]
         vs = nub $ (M.keys m) <> [v | Var _ v <- M.elems m]
-    points <- sequenceA $ fresh <$> vs
+    points <- traverse fresh vs
     let pointMap = M.fromList $ vs `zip` points
         joins' = [(pointMap M.! x, pointMap M.! y) | (x,y) <- joins]
-    sequence_ $ uncurry union <$> joins'
-    reprMap <- sequenceA $ repr <$> pointMap 
-    descMap <- sequenceA $ descriptor <$> reprMap
-    return . Th $ (\k -> fromMaybe (var k) $ M.lookup k m) <$> descMap
+    traverse (uncurry union) joins'
+    reprMap <- traverse repr pointMap 
+    descMap <- traverse descriptor reprMap
+    let toMap k = M.singleton k <$> M.lookup k m
+    return . Th . mconcat $ descMap ^.. folded . to toMap . _Just
 
 -- | Unit substitution
 emptyTheta :: Subst
 emptyTheta = Th $ M.empty
 
 -- | Substitute variable `x` with term `y`
-(|->) :: String -> Expr -> Subst
-x |-> y = Th $ M.singleton x y
+(|->) :: Expr -> Expr -> Maybe Subst
+v@(Var _ x) |-> y = Th <$> (M.singleton x <$> t)
+  where t = unifyVars y v
+_ |-> _ = Nothing
 
 -- | Get the substitution term for variable `x`
 evalTheta :: Subst -> String -> Expr
@@ -97,13 +100,14 @@ mapKeys f (Th theta) = Th $ M.mapKeys f theta
 refreshExpr :: String -> Expr -> Subst
 refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
   where 
-    substs = sequenceA $ f <$> nub [v | v@(Var _ _) <- universe e]
-    f (Var _ v) =
+    substs = traverse f $ nub [v | v@(Var _ _) <- universe e]
+    f v@(Var _ _) =
       do
         i <- get
         modify (+1)
         let n = prefix <> show i
-        return $ v |-> (var n)
+        -- This should succeed, because the type remains the same
+        return . fromMaybe undefined $ v |-> var n
     f _ = error "Expected a variable, got something else"
 
 safePrefix :: Expr -> Expr
@@ -122,12 +126,12 @@ unify x y = unify' [(x, y)]
 -- See: https://en.wikipedia.org/wiki/Unification_(computer_science)#A_unification_algorithm
 unify' :: [(Expr, Expr)] -> Maybe Subst
 -- Eliminate
-unify' g@((v@(Var _ x), y):t)
+unify' g@((v@(Var _ _), y):t)
   | v `elem` vars g = 
     do
-      let s = applyToExpr $ x |-> y
+      s <- applyToExpr <$> v |-> y
       rest <- unify' $ (t & traversed . both %~ s)
-      return $ (x |-> y) <> rest
+      (v |-> y) <> return rest
 -- Decompose
 unify' ((Pred _ n xs, Pred _ m ys):t)
   | n == m && length xs == length ys = unify' $ xs `zip` ys <> t

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: dc8bdf98a6571481210742b8e5b60f929295d2cfa17e87af46b4feaf02b2a788
+-- hash: d27007d1aa289fc029625a372704f792d19874c7f724eb299a0a69474df8f6e2
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -42,12 +42,12 @@ library
       Parser.DatalogParser.Expr
       Parser.DatalogParser.Lexer
       PostProcessing
+      PrivacyInference
       Rule
       Semantics
       Substitution
       Table
       Transform
-      TypeInference
   other-modules:
       Paths_secure_logic_programming
   hs-source-dirs:

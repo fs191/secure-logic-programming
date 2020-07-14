@@ -91,11 +91,11 @@ simplifyVars r = applySubst subst r
 -- | Removes any unnecessary variable equalities (e.g. X=Y)
 simplifyVars' :: Expr -> Subst
 simplifyVars' r = compress . mconcat . catMaybes $ f <$> U.universe r
-  where f (Eq _ (Var _ v) x)
-          | isLeaf x  = Just $ v |-> x
+  where f (Eq _ v x)
+          | isLeaf x  = v |-> x
           | otherwise = Nothing
-        f (Eq _ x (Var _ v))
-          | isLeaf x  = Just $ v |-> x
+        f (Eq _ x v)
+          | isLeaf x  = v |-> x
           | otherwise = Nothing
         f _ = Nothing
 

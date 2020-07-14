@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module TypeInference
-  ( typeInference
+module PrivacyInference
+  ( privacyInference
   ) where
 
 import Control.Lens
@@ -61,8 +61,8 @@ defaultState dp = InferenceState dp
 
 -- Assuming all rules are ground rules and all rule heads are annotated with
 -- binding patterns
-typeInference :: DatalogProgram -> DatalogProgram
-typeInference = evalInferenceM act
+privacyInference :: DatalogProgram -> DatalogProgram
+privacyInference = evalInferenceM act
   where
     act = do
       _prog <- use istProg
