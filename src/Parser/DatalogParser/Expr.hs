@@ -13,7 +13,7 @@ import Data.Void (Void)
 import Data.Foldable
 
 import Parser.DatalogParser.Lexer
-import Expr as E
+import Expr as E hiding (identifier)
 import qualified Rule as R
 
 type Parser = Parsec Void String

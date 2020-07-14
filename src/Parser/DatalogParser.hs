@@ -14,7 +14,7 @@ import Parser.DatalogParser.Lexer
 import Parser.DatalogParser.Expr
 
 import qualified DatalogProgram as DP
-import Expr
+import Expr hiding (identifier)
 import qualified Rule as R
 
 type Parser = Parsec Void String
@@ -66,9 +66,9 @@ inputDir =
     void impliedBy
     void $ symbol "inputs"
     _ins <- parens . brackets $ do
-      sepBy term comma
+      sepBy identifier comma
     void $ symbol "."
-    return $ DP.inputDirective _ins
+    return . DP.inputDirective $ var <$> _ins
 
 outputDir :: Parser DP.Directive
 outputDir = 

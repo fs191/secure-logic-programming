@@ -42,6 +42,7 @@ module Expr
   , predicateName
   , predicateArity
   , annotateWithBindings
+  , identifier
   ) where
 
 ---------------------------------------------------------
@@ -265,4 +266,9 @@ annotateWithBindings' s (e:et) = e' : annotateWithBindings' s' et
     f x = x
     e' = U.transform f e
     s' = fromList [n | (Var _ n) <- U.universe e] <> s
+
+identifier :: Expr -> Maybe String
+identifier (Var _ n)      = Just n
+identifier (ConstStr _ n) = Just n
+identifier _ = Nothing
 

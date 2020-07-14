@@ -9,6 +9,6 @@ bargain(Buyer,Seller,Product) :-
     findPotentialBargain(Buyer,Seller,Product,Price1,Price2),
     Price1 >= Price2.
 
-:-inputs([x1]).
+:-inputs([X1]).
 :-outputs([Y]).
-bargain(x1, Y, X2)?
+bargain(X1, Y, X2)?

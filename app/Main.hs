@@ -8,6 +8,7 @@ import Language.SecreC
 import Data.Text.Prettyprint.Doc
 import Transform
 import PostProcessing
+import TypeInference
 
 main :: IO ()
 main = do
@@ -23,6 +24,7 @@ main = do
   program <- parseDatalogFromFile inFileName
   let _trans = deriveAllGroundRules program _ite
   let _postProc = postProcess _trans
+  let _domained = typeInference _postProc
 
   -- create a Sharemind script that can be used to upload the tables used in given program
   -- WARNING: this is used for testing only, do not apply it to actual private data!
@@ -36,7 +38,7 @@ main = do
 
 
   -- we can output either only yes/no answer, or also valuations of free variables
-  let secrec = show (pretty (secrecCode _postProc))
+  let secrec = show (pretty (secrecCode _domained))
 
   -- Output the results
   if outFilePath /= ""

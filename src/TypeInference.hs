@@ -5,8 +5,6 @@ module TypeInference
   ( typeInference
   ) where
 
-import Control.Arrow
-import Control.Exception
 import Control.Lens
 import Control.Monad.State
 
@@ -42,12 +40,14 @@ instance Monoid TypeSubstitution where
   mempty = TypeSubstitution mempty
 
 applyTypeSubst :: TypeSubstitution -> Rule -> Rule
-applyTypeSubst (TypeSubstitution ts) r = 
-  r & ruleHead %~ U.transform f
-    & ruleTail %~ U.transform f
+applyTypeSubst ts r = 
+  r & ruleHead %~ applyTypeSubstToExpr ts
+    & ruleTail %~ applyTypeSubstToExpr ts
+
+applyTypeSubstToExpr :: TypeSubstitution -> Expr -> Expr
+applyTypeSubstToExpr (TypeSubstitution ts) = U.transform f
   where
-    t v@(Var _ n) = fromMaybe (exprTyping v) $ M.lookup n ts
-    t x = exprTyping x
+    t v = fromMaybe (exprTyping v) $ identifier v >>= (`M.lookup` ts)
     f v = applyTyping (t v) v
 
 (|->) :: String -> PPDomain -> TypeSubstitution
@@ -65,8 +65,10 @@ typeInference :: DatalogProgram -> DatalogProgram
 typeInference = evalInferenceM act
   where
     act = do
-      _dp <- use istProg
-      _dp & dpRules . traversed %%~ (inferRule >=> inferFromGoalAction)
+      _prog <- use istProg
+      _p <- _prog & dpRules . traversed %%~ 
+        (inferRule >=> inferFromGoalAction)
+      return $ inferGoal _p
     inferFromGoalAction :: Rule -> InferenceM Rule
     inferFromGoalAction x = do
       s <- inferFromGoal x
@@ -93,9 +95,9 @@ inferFromDB (Pred _ n xs) =
         unified = (uncurry unifyExprTypes) <$> (xs `zip` _dbargs)
     -- Take bound and unbound variables into account
     let inferParams :: (Expr, PPDomain) -> TypeSubstitution
-        inferParams ((Var e n'), x) 
-          | e ^. annBound = mempty
-          | otherwise     = n' |-> x
+        inferParams (v, x) 
+          | v ^. annLens . annBound = mempty
+          | otherwise     = (fromMaybe undefined $ identifier v) |-> x
         newParams' = inferParams <$> (xs `zip` unified)
     -- Unify the new type substitutions with existing substitutions
     return $ mconcat newParams'
@@ -113,13 +115,27 @@ inferFromGoal r =
             rxs <- r ^? ruleHead . _Pred . _3 :: Maybe [Expr]
             gxs <- g ^? _Pred . _3 :: Maybe [Expr]
             let unified = (uncurry unifyExprTypes) <$> (rxs `zip` gxs)
-                paramNames = rxs ^.. folded . _Var . _2
-            assert (length paramNames == length rxs) $ return ()
-            return . mconcat $ (uncurry (|->)) <$> paramNames `zip` unified
+                f (x, y) = (,) <$> (maybeToList $ identifier x) <*> [y]
+                paramNames = concat $ traverse f $ rxs `zip` unified
+            return . mconcat $ (uncurry (|->)) <$> paramNames
     return $ fromMaybe mempty subst
 
-inferFromExpr :: InferenceM [Rule]
-inferFromExpr = undefined
+inferGoal :: DatalogProgram -> DatalogProgram
+inferGoal dp = dp & dpGoal              %~ f
+                  & outputs . traversed %~ f
+                  & inputs  . traversed %~ f
+  where 
+    gxs = dp ^.. dpGoal . _Pred . _3 . folded . to identifier
+    n = dp ^. dpGoal . _Pred . _2
+    goalRules = zip gxs . transpose $ dp ^.. dpRules 
+                  . folded 
+                  . filtered (\x -> ruleName x == n) 
+                  . ruleHead 
+                  . _Pred 
+                  . _3
+    foldUnify x = foldl1 unifyDomains $ x ^.. folded . annLens . domain
+    f = applyTypeSubstToExpr $ 
+          mconcat [x |-> foldUnify y | (Just x, y) <- goalRules]
 
 applyTyping :: PPDomain -> Expr -> Expr
 applyTyping d e = e & annLens . domain  %~  unifyDomains d
@@ -130,7 +146,9 @@ unifyExprTypes x y = unifyDomains xd yd
     xd = head $ x ^.. annLens . domain
     yd = head $ y ^.. annLens . domain
 
-
 exprTyping :: Expr -> PPDomain
 exprTyping e = e ^. annLens . domain
+
+toTypeSubst :: Expr -> Maybe TypeSubstitution
+toTypeSubst x = (|-> (x ^. annLens . domain)) <$> identifier x
 

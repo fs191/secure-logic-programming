@@ -70,7 +70,7 @@ instance Pretty DatalogProgram where
 instance PrologSource DatalogProgram where
   prolog dp = vsep
     [ vsep $ prolog <$> dp ^. dpRules
-    , prologGoal (_dpGoal dp) (inputs dp) (outputs dp)
+    , prologGoal (_dpGoal dp) (dp ^. inputs) $ dp ^. outputs
     ]
 
 
@@ -100,11 +100,11 @@ dirToDBC _ = Nothing
 goal :: DatalogProgram -> Expr
 goal = _dpGoal
 
-inputs :: DatalogProgram -> [Expr]
-inputs = toListOf $ dpDirectives . folded . _InputDirective . folded
+inputs :: Traversal' DatalogProgram [Expr]
+inputs = dpDirectives . traversed . _InputDirective
 
-outputs :: DatalogProgram -> [Expr]
-outputs = toListOf $ dpDirectives . folded . _OutputDirective . folded
+outputs :: Traversal' DatalogProgram [Expr]
+outputs = dpDirectives . traversed . _OutputDirective
 
 prologGoal :: Expr -> [Expr] -> [Expr] -> Doc ann
 prologGoal formula ins outs = hcat
