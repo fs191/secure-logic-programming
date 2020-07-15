@@ -1,5 +1,9 @@
 module PostProcessingSpec where
 
+import Control.Monad
+
+import Data.Maybe
+
 import Test.Hspec
 
 import Swipl
@@ -15,6 +19,6 @@ spec =
     postProcPreserveSem "examples/prolog/employee.pl"
 
 postProcPreserveSem :: String -> Spec
-postProcPreserveSem f = preservesSemantics _fun f
-  where _fun = postProcess . flip deriveAllGroundRules 3
+postProcPreserveSem f = preservesSemantics (fromJust . _fun) f
+  where _fun = (flip deriveAllGroundRules 3) >=> (return . postProcess)
 

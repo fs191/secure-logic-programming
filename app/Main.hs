@@ -6,6 +6,7 @@ import Language.SecreC
 --import CSVImport(generateDataToDBscript)
 
 import Data.Text.Prettyprint.Doc
+import Data.Maybe
 import Transform
 import PostProcessing
 import PrivacyInference
@@ -22,7 +23,8 @@ main = do
 
   -- parse the input datalog program
   program <- parseDatalogFromFile inFileName
-  let _trans = deriveAllGroundRules program _ite
+  let _trans = fromMaybe (error "failed to derive ground rules") $ 
+                 deriveAllGroundRules program _ite
   let _postProc = postProcess _trans
   let _domained = privacyInference _postProc
 

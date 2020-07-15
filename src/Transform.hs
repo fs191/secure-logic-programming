@@ -14,6 +14,7 @@ import Data.List
 import Data.Maybe
 
 import Control.Lens as L
+import Control.Monad
 
 import Rule
 import Expr
@@ -22,24 +23,24 @@ import Annotation
 import qualified DatalogProgram as DP
 
 -- | Generates all possible ground rules for n iterations
-deriveAllGroundRules :: DP.DatalogProgram -> Int -> DP.DatalogProgram
+deriveAllGroundRules :: DP.DatalogProgram -> Int -> Maybe DP.DatalogProgram
 deriveAllGroundRules program n = program'
                                    -- & fromMaybe program' . adornProgram
-                                   & DP.ruleLens %~ f
+                                   & DP.ruleLens %%~ f
   where
     -- Input program but db clauses are converted to rules
     program' = program
-    f :: [Rule] -> [Rule]
-    f = foldl (.) id $ replicate n pipeline
-    pipeline =
-      removeDuplicateFacts .
-      removeFalseFacts .
-      fmap simplify .
-      (traversed . ruleTail %~ simplifyAnds) .
-      fmap (refreshRule "X_") .
-      --(traversed . ruleTail %~ flip evalState 0 . (U.transformM bindArgColumns)) .
-      (traversed %~ simplifyVars) .
-      inlineOnce
+    f :: [Rule] -> Maybe [Rule]
+    f = foldl (>=>) return $ replicate n pipeline
+    pipeline :: [Rule] -> Maybe [Rule]
+    pipeline 
+      =   Just . removeDuplicateFacts 
+      >=> Just . removeFalseFacts 
+      >=> Just . map simplify 
+      >=> Just . (traversed . ruleTail %~ simplifyAnds :: [Rule] -> [Rule]) 
+      >=> Just . map (refreshRule "X_") 
+      >=> (traversed %%~ simplifyVars) 
+      >=> inlineOnce
 
 -- | Tries to unify each predicate in each rule body with an appropriate rule
 inlineOnce :: [Rule] -> Maybe [Rule]
@@ -93,7 +94,7 @@ binarySimplifyBool :: (Int -> Int -> Bool) -> Expr -> Expr -> Maybe Expr
 binarySimplifyBool f (ConstInt a x) (ConstInt b y) = 
   (\ann -> ConstBool ann (f x y)) <$> (a <^ b)
 
-simplifyVars :: Rule -> Rule
+simplifyVars :: Rule -> Maybe Rule
 simplifyVars r = applySubst subst r
   where subst = simplifyVars' $ r ^. ruleTail
 

@@ -83,7 +83,7 @@ unifien't a b = it desc $
 
 refreshes :: Expr -> Expr -> Spec
 refreshes e e' = it desc $
-  refreshAndApply "X_" e `shouldBe` e'
+  refreshAndApply "X_" e `shouldBe` Just e'
   where desc = "Refreshes " <> (show $ pretty e) <> " to " <> (show $ pretty e')
 
 compresses :: [Subst] -> [Subst] -> Spec

@@ -4,9 +4,7 @@ module TransformSpec where
 
 import Test.Hspec
 
-import Data.Text
-
-import Control.Monad.IO.Class
+import Data.Maybe
 
 import Parser.DatalogParser
 
@@ -40,7 +38,7 @@ spec =
     runsSuccessfullyDB "examples/ppdatalog/employee.pl" transform employeeRes employeeDB
     
 transform :: DatalogProgram -> DatalogProgram
-transform = flip deriveAllGroundRules 2
+transform = fromJust . flip deriveAllGroundRules 2
 
 canDeriveOn :: String -> Int -> Spec
 canDeriveOn file n = it desc $ action `shouldReturn` ()
@@ -53,11 +51,11 @@ canDeriveOn file n = it desc $ action `shouldReturn` ()
      
 transPreserveSem :: String -> Int -> Spec
 transPreserveSem f n = 
-  preservesSemantics (flip deriveAllGroundRules n) f
+  preservesSemantics (fromJust . flip deriveAllGroundRules n) f
 
 transPreserveSemDB :: String -> Int -> [Expr] -> Spec
 transPreserveSemDB f n db = 
-  preservesSemanticsDB (flip deriveAllGroundRules n) f db
+  preservesSemanticsDB (fromJust . flip deriveAllGroundRules n) f db
 
 --
 -- Expected results
