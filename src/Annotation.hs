@@ -6,6 +6,7 @@ module Annotation
   , empty
   , annType, domain
   , annBound
+  , (<^)
   ) where
 
 import Control.Lens
@@ -38,4 +39,9 @@ instance Show Ann where
 
 empty :: Ann
 empty = Ann PPAuto Unknown False
+
+-- | Unify types and domains
+(<^) :: Ann -> Ann -> Maybe Ann
+x <^ y = x & domain  %~  unifyDomains (y ^. domain)
+           & annType %%~ unifyTypes (y ^. annType)
 

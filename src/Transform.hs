@@ -13,13 +13,12 @@ import Data.Generics.Uniplate.Operations as U
 import Data.List
 import Data.Maybe
 
-import Control.Applicative
 import Control.Lens as L
-import Control.Monad.State
 
 import Rule
 import Expr
 import Substitution
+import Annotation
 import qualified DatalogProgram as DP
 
 -- | Generates all possible ground rules for n iterations
@@ -43,18 +42,20 @@ deriveAllGroundRules program n = program'
       inlineOnce
 
 -- | Tries to unify each predicate in each rule body with an appropriate rule
-inlineOnce :: [Rule] -> [Rule]
+inlineOnce :: [Rule] -> Maybe [Rule]
 inlineOnce rs =
-  rs <> do
-    tgt <- refreshRule "T_" <$> rs
-    src <- rs
-    let shd = src ^. ruleHead
-    let stl = src ^. ruleTail
-    let ttl = tgt ^. ruleTail
-    (p@Pred {}, mut) <- U.contexts ttl
-    let subst = unify shd p
-    s <- maybeToList subst
-    return . applySubst s $ tgt & ruleTail .~ mut stl
+  Just rs <> inlined
+  where
+    inlined = sequenceA $ do
+      tgt <- refreshRule "T_" <$> rs
+      src <- rs
+      let shd = src ^. ruleHead
+      let stl = src ^. ruleTail
+      let ttl = tgt ^. ruleTail
+      (p@Pred {}, mut) <- U.contexts ttl
+      let subst = unify shd p
+      s <- maybeToList subst
+      return . applySubst s $ tgt & ruleTail .~ mut stl
 
 -- | Rewrites constant terms to simpler terms
 simplify :: Rule -> Rule
@@ -68,21 +69,29 @@ simplify r = r & ruleTail %~ U.rewrite f
     f (Or _ _ (ConstBool _ True)) = Just $ constBool True
     f (Or _ (ConstBool _ False) x) = Just x
     f (Or _ x (ConstBool _ False)) = Just x
-    f (Add _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x + y
-    f (Sub _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x - y
-    f (Mul _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x * y
-    f (Min _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x `min` y
-    f (Max _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x `max` y
-    f (Lt _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x < y
-    f (Gt _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x > y
-    f (Le _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x <= y
-    f (Ge _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x >= y
-    f (Eq _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x == y
-    f (Eq _ (ConstStr _ x) (ConstStr _ y)) = Just . constBool $ x == y
+    f (Add _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplify (+) x y
+    f (Sub _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplify (-) x y
+    f (Mul _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplify (*) x y
+    f (Min _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplify min x y
+    f (Max _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplify max x y
+    f (Lt _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplifyBool (<) x y
+    f (Gt _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplifyBool (>) x y
+    f (Le _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplifyBool (<=) x y
+    f (Ge _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplifyBool (>=) x y
+    f (Eq _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplifyBool (==) x y
+    f (Eq _ x@(ConstStr _ _) y@(ConstStr _ _)) = Just . constBool $ x == y
     f (Eq _ (Var _ x) (Var _ y))
       | x == y    = Just $ constBool True
       | otherwise = Nothing
     f _ = Nothing
+
+binarySimplify :: (Int -> Int -> Int) -> Expr -> Expr -> Maybe Expr
+binarySimplify f (ConstInt a x) (ConstInt b y) = 
+  (\ann -> ConstInt ann (f x y)) <$> (a <^ b)
+
+binarySimplifyBool :: (Int -> Int -> Bool) -> Expr -> Expr -> Maybe Expr
+binarySimplifyBool f (ConstInt a x) (ConstInt b y) = 
+  (\ann -> ConstBool ann (f x y)) <$> (a <^ b)
 
 simplifyVars :: Rule -> Rule
 simplifyVars r = applySubst subst r
@@ -122,23 +131,23 @@ removeDuplicateFacts :: [Rule] -> [Rule]
 removeDuplicateFacts = nub
 
 -- | Binds constants that are arguments of some predicate to a new variable
-bindArgColumns :: Expr -> State Int Expr
-bindArgColumns (Pred ann n as) =
-  do
-    let freshVar :: State Int Expr
-        freshVar =
-          do
-            i <- get
-            put $ i + 1
-            return . var $ "_CONST_" <> show i
-    let cols = [x | x@(ConstStr _ _) <- as]
-    vars <- sequenceA $ replicate (length cols) freshVar
-    let cvs   = cols `zip` vars
-        lkp :: Expr -> Expr
-        lkp x = fromMaybe x $ lookup x cvs
-        newAs = lkp <$> as
-        eqs   = uncurry equal <$> cvs
-        newPred = Pred ann n newAs
-    return $ foldr eAnd newPred eqs
-bindArgColumns x = return x
+--bindArgColumns :: Expr -> State Int Expr
+--bindArgColumns (Pred ann n as) =
+--  do
+--    let freshVar :: State Int Expr
+--        freshVar =
+--          do
+--            i <- get
+--            put $ i + 1
+--            return . var $ "_CONST_" <> show i
+--    let cols = [x | x@(ConstStr _ _) <- as]
+--    vars <- sequenceA $ replicate (length cols) freshVar
+--    let cvs   = cols `zip` vars
+--        lkp :: Expr -> Expr
+--        lkp x = fromMaybe x $ lookup x cvs
+--        newAs = lkp <$> as
+--        eqs   = uncurry equal <$> cvs
+--        newPred = Pred ann n newAs
+--    return $ foldr eAnd newPred eqs
+--bindArgColumns x = return x
 

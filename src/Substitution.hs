@@ -29,6 +29,7 @@ import Control.Monad.State
 import Control.Monad.Trans.UnionFind
 
 import Expr
+import Annotation
 
 newtype Subst = Th (M.Map String Expr)
   deriving (Semigroup, Monoid, Eq)
@@ -39,7 +40,8 @@ instance Show Subst where
 instance Pretty Subst where
   pretty (Th s) = tupled $ (\(a, b) -> pretty a <+> "->" <+> pretty b) <$> M.toList s
 
--- | A very safe string
+-- | A very safe string that is prepended to variable names to keep track
+-- of which variables have already been substituted. Only used internally.
 safeStr :: String
 safeStr = "$!!?"
 
@@ -69,22 +71,24 @@ v@(Var _ x) |-> y = Th <$> (M.singleton x <$> t)
 _ |-> _ = Nothing
 
 -- | Get the substitution term for variable `x`
-evalTheta :: Subst -> String -> Expr
-evalTheta (Th theta) x = 
-  if M.member x theta 
-    then theta M.! x 
-    else var x
+evalTheta :: Subst -> Expr -> Maybe Expr
+evalTheta (Th theta) v@(Var a n) = 
+  if M.member n theta 
+    then 
+      case theta M.! n of
+        Var a' n' -> (\x -> Var x n') <$> (a <^ a')
+    else Just v
 
 -- | Apply a substitution to an expression
--- TODO: unify type and donmain as well
-applyToExpr :: Subst -> Expr -> Expr
-applyToExpr theta bexpr = removeSafePrefixes . transform f $ safePrefix _bexpr
+-- TODO: unify type and domain as well
+applyToExpr :: Subst -> Expr -> Maybe Expr
+applyToExpr theta bexpr = removeSafePrefixes <$> (transformM f $ safePrefix _bexpr)
   where theta'      = mapKeys (safeStr<>) theta
-        f (Var _ x) = evalTheta theta' x
-        f x         = x
+        f v@(Var _ _) = evalTheta theta' v
+        f x         = Just x
         _vars       = [b | (Var _ b) <- universe bexpr]
-        -- Ensure that no variables begin with '#' before application
-        _bexpr      = assert (all (not . isPrefixOf "#") _vars) bexpr
+        -- Ensure that no variables begin with the safe string before application
+        _bexpr      = assert (all (not . isPrefixOf safeStr) _vars) bexpr
 
 removeSafePrefixes :: Expr -> Expr
 removeSafePrefixes = transform f
@@ -101,13 +105,13 @@ refreshExpr :: String -> Expr -> Subst
 refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
   where 
     substs = traverse f $ nub [v | v@(Var _ _) <- universe e]
-    f v@(Var _ _) =
+    f v@(Var a _) =
       do
         i <- get
         modify (+1)
         let n = prefix <> show i
         -- This should succeed, because the type remains the same
-        return . fromMaybe undefined $ v |-> var n
+        return . fromMaybe undefined $ v |-> Var a n
     f _ = error "Expected a variable, got something else"
 
 safePrefix :: Expr -> Expr
@@ -116,7 +120,7 @@ safePrefix = transform f
         f x = x
 
 -- | Immediately refreshes variable names in `e`
-refreshAndApply :: String -> Expr -> Expr
+refreshAndApply :: String -> Expr -> Maybe Expr
 refreshAndApply prefix e = applyToExpr (refreshExpr prefix e) e
 
 -- | Attempt to unify the two expressions. Will return Nothing if the expressions cannot be unified
@@ -130,32 +134,29 @@ unify' g@((v@(Var _ _), y):t)
   | v `elem` vars g = 
     do
       s <- applyToExpr <$> v |-> y
-      rest <- unify' $ (t & traversed . both %~ s)
-      (v |-> y) <> return rest
+      rest <- unify' <$> (t & traversed . both %%~ s)
+      (v |-> y) <> rest
 -- Decompose
 unify' ((Pred _ n xs, Pred _ m ys):t)
   | n == m && length xs == length ys = unify' $ xs `zip` ys <> t
   | otherwise = Nothing
-
 unify' ((Expr.List _ xs, Expr.List _ ys):t)
   | length xs == length ys = unify' $ xs `zip` ys <> t
   | otherwise = Nothing
-
 unify' ((Add _ x1 x2, Add _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
 unify' ((Sub _ x1 x2, Sub _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
 unify' ((Mul _ x1 x2, Mul _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
 unify' ((Div _ x1 x2, Div _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
 unify' ((Min _ x1 x2, Min _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
 unify' ((Max _ x1 x2, Max _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
-
 unify' ((Not _ x, Not _ y):t) = unify' $ [x] `zip` [y] <> t
 unify' ((Neg _ x, Neg _ y):t) = unify' $ [x] `zip` [y] <> t
 unify' ((Inv _ x, Inv _ y):t) = unify' $ [x] `zip` [y] <> t
-
 -- Swap
-unify' ((x, Var _ y):t) = unify' ((var y, x):t)
+unify' ((x, y@(Var _ _)):t) = unify' $ (y, x):t
 -- Delete / conflict
 unify' ((x,y):t) 
+  -- TODO find a better way to compare the expressions
   | x == y    = unify' t
   | otherwise = Nothing
 unify' [] = Just emptyTheta

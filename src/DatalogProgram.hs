@@ -9,7 +9,6 @@ module DatalogProgram
   , DBClause
   , fromRulesAndGoal
   , ruleLens
-  --, dbClauseLens
   , ppDatalogProgram
   , programGoalExpr
   , dpRules
