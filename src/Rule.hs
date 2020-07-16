@@ -67,15 +67,13 @@ isFact r = _ruleTail r == constTrue
 
 -- | Refresh all variable names in the rule
 refreshRule :: String -> Rule -> Rule
-refreshRule prefix r = fromJust undefined applySubst s r
+refreshRule prefix r = applySubst s r
   where
     s = refreshExpr prefix . eAnd (r ^. ruleHead) $ r ^. ruleTail
 
-applySubst :: Subst -> Rule -> Maybe Rule
-applySubst s r = 
-  do
-    a <- r & ruleHead %%~ applyToExpr s
-    a & ruleTail %%~ applyToExpr s
+applySubst :: Subst -> Rule -> Rule
+applySubst s r = r & ruleHead %~ applyToExpr s
+                   & ruleTail %~ applyToExpr s
 
 dbClauseToRule :: DBClause -> Rule
 dbClauseToRule dbc = Rule (predicate (name dbc) $ vars dbc) constTrue

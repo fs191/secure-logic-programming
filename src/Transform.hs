@@ -39,7 +39,7 @@ deriveAllGroundRules program n = program'
       >=> Just . map simplify 
       >=> Just . (traversed . ruleTail %~ simplifyAnds :: [Rule] -> [Rule]) 
       >=> Just . map (refreshRule "X_") 
-      >=> (traversed %%~ simplifyVars) 
+      >=> Just . (traversed %~ simplifyVars) 
       >=> inlineOnce
 
 -- | Tries to unify each predicate in each rule body with an appropriate rule
@@ -55,8 +55,7 @@ inlineOnce rs =
       let ttl = tgt ^. ruleTail
       (p@Pred {}, mut) <- U.contexts ttl
       let subst = unify shd p
-      s <- maybeToList subst
-      return . applySubst s $ tgt & ruleTail .~ mut stl
+      [flip applySubst (tgt & ruleTail .~ mut stl) <$> subst]
 
 -- | Rewrites constant terms to simpler terms
 simplify :: Rule -> Rule
@@ -94,7 +93,7 @@ binarySimplifyBool :: (Int -> Int -> Bool) -> Expr -> Expr -> Maybe Expr
 binarySimplifyBool f (ConstInt a x) (ConstInt b y) = 
   (\ann -> ConstBool ann (f x y)) <$> (a <^ b)
 
-simplifyVars :: Rule -> Maybe Rule
+simplifyVars :: Rule -> Rule
 simplifyVars r = applySubst subst r
   where subst = simplifyVars' $ r ^. ruleTail
 

@@ -75,17 +75,17 @@ evalTheta :: Subst -> Expr -> Maybe Expr
 evalTheta (Th theta) v@(Var a n) = 
   if M.member n theta 
     then 
-      case theta M.! n of
-        Var a' n' -> (\x -> Var x n') <$> (a <^ a')
+      theta M.! n & annLens %%~ (a <^)
     else Just v
 
 -- | Apply a substitution to an expression
 -- TODO: unify type and domain as well
-applyToExpr :: Subst -> Expr -> Maybe Expr
-applyToExpr theta bexpr = removeSafePrefixes <$> (transformM f $ safePrefix _bexpr)
+applyToExpr :: Subst -> Expr -> Expr
+applyToExpr theta bexpr = removeSafePrefixes . transform f $ safePrefix _bexpr
   where theta'      = mapKeys (safeStr<>) theta
-        f v@(Var _ _) = evalTheta theta' v
-        f x         = Just x
+        f v@(Var _ _) = fromMaybe err $ evalTheta theta' v
+        f x         = x
+        err         = error "could not evaluate theta"
         _vars       = [b | (Var _ b) <- universe bexpr]
         -- Ensure that no variables begin with the safe string before application
         _bexpr      = assert (all (not . isPrefixOf safeStr) _vars) bexpr
@@ -111,7 +111,8 @@ refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
         modify (+1)
         let n = prefix <> show i
         -- This should succeed, because the type remains the same
-        return . fromMaybe undefined $ v |-> Var a n
+        let err = error "A variable does not unify types with itself?"
+        return . fromMaybe err $ v |-> Var a n
     f _ = error "Expected a variable, got something else"
 
 safePrefix :: Expr -> Expr
@@ -120,7 +121,7 @@ safePrefix = transform f
         f x = x
 
 -- | Immediately refreshes variable names in `e`
-refreshAndApply :: String -> Expr -> Maybe Expr
+refreshAndApply :: String -> Expr -> Expr
 refreshAndApply prefix e = applyToExpr (refreshExpr prefix e) e
 
 -- | Attempt to unify the two expressions. Will return Nothing if the expressions cannot be unified
@@ -134,7 +135,7 @@ unify' g@((v@(Var _ _), y):t)
   | v `elem` vars g = 
     do
       s <- applyToExpr <$> v |-> y
-      rest <- unify' <$> (t & traversed . both %%~ s)
+      let rest = unify' (t & traversed . both %~ s)
       (v |-> y) <> rest
 -- Decompose
 unify' ((Pred _ n xs, Pred _ m ys):t)

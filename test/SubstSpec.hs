@@ -66,10 +66,9 @@ spec = parallel $
       refreshes (f [x1, x1, x0]) $ f [x0, x0, x1]
       refreshes (f [x2, x1, x0]) $ f [x0, x1, x2]
     describe "Substitution.compress" $ do
-      compresses [x |->! y, y |->! c1] [x |->! c1, y |->! c1]
+      compresses [x |->! y , y |->! c1] [x |->! c1, y |->! c1]
       compresses [x |->! c2, y |->! c1] [x |->! c2, y |->! c1]
-      compresses [x |->! y, y |->! z] [x |->! z, y |->! z, z |->! z]
-      
+      compresses [x |->! y , y |->! z ] [x |->! z , y |->! z , z |->! z]
 
 unifies :: Expr -> Expr -> Spec
 unifies a b = it desc $
@@ -83,7 +82,7 @@ unifien't a b = it desc $
 
 refreshes :: Expr -> Expr -> Spec
 refreshes e e' = it desc $
-  refreshAndApply "X_" e `shouldBe` Just e'
+  refreshAndApply "X_" e `shouldBe` e'
   where desc = "Refreshes " <> (show $ pretty e) <> " to " <> (show $ pretty e')
 
 compresses :: [Subst] -> [Subst] -> Spec
@@ -93,3 +92,4 @@ compresses input output = it desc $
 
 (|->!) :: Expr -> Expr -> Subst
 a |->! b = fromJust $ a |-> b
+

@@ -45,7 +45,7 @@ identifier = asum
   [ try $ between sQuote sQuote identifier'
   , try $ between dQuote dQuote identifier'
   , identifier'
-  ]
+  ] <?> "identifier"
 
 sQuote :: Parser String
 sQuote = symbol "'"
