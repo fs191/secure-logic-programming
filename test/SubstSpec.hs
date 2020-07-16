@@ -77,7 +77,7 @@ unifies a b = it desc $
 
 unifien't :: Expr -> Expr -> Spec
 unifien't a b = it desc $
-  (isJust $ a `unify` b) `shouldBe` False
+  (a `unify` b) `shouldBe` Nothing
   where desc = "Does not unify " <> (show $ pretty a) <> " and " <> (show $ pretty b)
 
 refreshes :: Expr -> Expr -> Spec

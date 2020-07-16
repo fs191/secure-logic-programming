@@ -145,12 +145,13 @@ unify x y = unify' [(x, y)]
 -- See: https://en.wikipedia.org/wiki/Unification_(computer_science)#A_unification_algorithm
 unify' :: [(Expr, Expr)] -> Maybe Subst
 -- Eliminate
-unify' g@((v@(Var _ _), y):t)
+unify' g@((v@(Var{}), y):t)
   | v `elem` vars g = 
     do
-      s <- applyToExpr <$> v |-> y
-      let rest = unify' (t & traversed . both %~ s)
-      (v |-> y) <> rest
+      subst <- v |-> y
+      let s = applyToExpr subst
+      rest <- unify' (t & traversed . both %~ s)
+      return $ subst <> rest
 -- Decompose
 unify' ((Pred _ n xs, Pred _ m ys):t)
   | n == m && length xs == length ys = unify' $ xs `zip` ys <> t
@@ -168,13 +169,20 @@ unify' ((Not _ x, Not _ y):t) = unify' $ [x] `zip` [y] <> t
 unify' ((Neg _ x, Neg _ y):t) = unify' $ [x] `zip` [y] <> t
 unify' ((Inv _ x, Inv _ y):t) = unify' $ [x] `zip` [y] <> t
 -- Swap
-unify' ((x, y@(Var _ _)):t) = unify' $ (y, x):t
+unify' ((x, y@(Var{})):t) = unify' $ (y, x):t
 -- Delete / conflict
 unify' ((x,y):t) 
   -- TODO find a better way to compare the expressions
-  | x == y    = unify' t
+  | x `valEq` y    = unify' t
   | otherwise = Nothing
 unify' [] = Just emptyTheta
+
+valEq :: Expr -> Expr -> Bool
+valEq (ConstInt _ x) (ConstInt _ y)   = x == y
+valEq (ConstStr _ x) (ConstStr _ y)   = x == y
+valEq (ConstBool _ x) (ConstBool _ y) = x == y
+valEq (Var _ x) (Var _ y)             = x == y
+valEq _ _                             = False
 
 --
 -- Utils
