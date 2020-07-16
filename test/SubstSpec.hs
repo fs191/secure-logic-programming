@@ -68,7 +68,7 @@ spec = parallel $
     describe "Substitution.compress" $ do
       compresses [x |->! y , y |->! c1] [x |->! c1, y |->! c1]
       compresses [x |->! c2, y |->! c1] [x |->! c2, y |->! c1]
-      compresses [x |->! y , y |->! z ] [x |->! z , y |->! z , z |->! z]
+      compresses [x |->! y , y |->! z ] [x |->! z , y |->! z]
 
 unifies :: Expr -> Expr -> Spec
 unifies a b = it desc $

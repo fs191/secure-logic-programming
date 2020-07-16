@@ -20,16 +20,19 @@ import qualified Data.Map as M
 
 import Data.Generics.Uniplate.Data
 import Data.Maybe
-import Data.List (nub, stripPrefix, isPrefixOf)
+import Data.List (nub, stripPrefix, isPrefixOf, find)
 import Data.Text.Prettyprint.Doc
 
 import Control.Exception (assert)
 import Control.Lens hiding (universe, transform, transformM)
 import Control.Monad.State
 import Control.Monad.Trans.UnionFind
+import Control.Applicative
 
 import Expr
 import Annotation
+
+import Debug.Trace
 
 newtype Subst = Th (M.Map String Expr)
   deriving (Semigroup, Monoid, Eq)
@@ -52,13 +55,24 @@ compress (Th m) = runIdentity . runUnionFind $
     let joins = [(k, v) | (k, Var _ v) <- M.toList m]
         vs = nub $ (M.keys m) <> [v | Var _ v <- M.elems m]
     points <- traverse fresh vs
-    let pointMap = M.fromList $ vs `zip` points
+    let pointMap :: M.Map String (Point String)
+        pointMap = M.fromList $ vs `zip` points
         joins' = [(pointMap M.! x, pointMap M.! y) | (x,y) <- joins]
     traverse (uncurry union) joins'
     reprMap <- traverse repr pointMap 
+    -- Map from initial var names to representative var names
     descMap <- traverse descriptor reprMap
-    let toMap k = M.singleton k <$> M.lookup k m
-    return . Th . mconcat $ descMap ^.. folded . to toMap . _Just
+    let varByName :: String -> Maybe Expr
+        varByName n = m ^? to M.elems 
+                         . folded 
+                         . filtered (\x -> fromMaybe False $ x ^? _Var . _2 . to (==n))
+    let mapper :: Expr -> Expr
+        mapper v@(Var _ n) = fromMaybe v $
+          do
+            n' <- M.lookup n descMap
+            M.lookup n' m <|> varByName n'
+        mapper x = x
+    return . Th $ M.map mapper m
 
 -- | Unit substitution
 emptyTheta :: Subst
