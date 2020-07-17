@@ -68,30 +68,30 @@ import Annotation
 -- artihmetic expressions
 -- associative operations are represented with lists
 data Expr
-  = ConstInt   Ann Int
-  | ConstFloat Ann Float
-  | ConstStr   Ann String
-  | ConstBool  Ann Bool
-  | Var  Ann String
-  | Not  Ann Expr
-  | Neg  Ann Expr
-  | Inv  Ann Expr
-  | Div  Ann Expr Expr
-  | Sub  Ann Expr Expr
-  | Lt   Ann Expr Expr
-  | Le   Ann Expr Expr
-  | Eq   Ann Expr Expr
-  | Is   Ann Expr Expr
-  | Gt   Ann Expr Expr
-  | Ge   Ann Expr Expr
-  | Mul  Ann Expr Expr
-  | Add  Ann Expr Expr
-  | Min  Ann Expr Expr
-  | Max  Ann Expr Expr
-  | And  Ann Expr Expr
-  | Or   Ann Expr Expr
-  | Pred Ann String [Expr]
-  | List Ann [Expr]
+  = ConstInt   !Ann !Int
+  | ConstFloat !Ann !Float
+  | ConstStr   !Ann !String
+  | ConstBool  !Ann !Bool
+  | Var  !Ann !String
+  | Not  !Ann !Expr
+  | Neg  !Ann !Expr
+  | Inv  !Ann !Expr
+  | Div  !Ann !Expr !Expr
+  | Sub  !Ann !Expr !Expr
+  | Lt   !Ann !Expr !Expr
+  | Le   !Ann !Expr !Expr
+  | Eq   !Ann !Expr !Expr
+  | Is   !Ann !Expr !Expr
+  | Gt   !Ann !Expr !Expr
+  | Ge   !Ann !Expr !Expr
+  | Mul  !Ann !Expr !Expr
+  | Add  !Ann !Expr !Expr
+  | Min  !Ann !Expr !Expr
+  | Max  !Ann !Expr !Expr
+  | And  !Ann !Expr !Expr
+  | Or   !Ann !Expr !Expr
+  | Pred !Ann !String ![Expr]
+  | List !Ann ![Expr]
   deriving (Ord,Show,Eq,Data,Typeable)
 makePrisms ''Expr
 
@@ -127,7 +127,7 @@ instance PrologSource Expr where
   prolog x = pretty x
 
 data EvaluationException a
-  = NonConstantTerm Expr
+  = NonConstantTerm !Expr
   deriving (Show, Exception)
 
 --------------------------

@@ -34,26 +34,26 @@ deriveAllGroundRules program n = program'
     f = foldl (>=>) return $ replicate n pipeline
     pipeline :: [Rule] -> Maybe [Rule]
     pipeline 
-      =   Just . removeDuplicateFacts 
-      >=> Just . removeFalseFacts 
-      >=> Just . map simplify 
-      >=> Just . (traversed . ruleTail %~ simplifyAnds :: [Rule] -> [Rule]) 
-      >=> Just . map (refreshRule "X_") 
-      >=> Just . (traversed %~ simplifyVars) 
-      >=> inlineOnce
+      = Just . removeDuplicateFacts 
+      . removeFalseFacts 
+      . map simplify 
+      . (traversed . ruleTail %~ simplifyAnds :: [Rule] -> [Rule]) 
+      . map (refreshRule "X_") 
+      . (traversed %~ simplifyVars) 
+      . inlineOnce
 
 -- | Tries to unify each predicate in each rule body with an appropriate rule
-inlineOnce :: [Rule] -> Maybe [Rule]
+inlineOnce :: [Rule] -> [Rule]
 inlineOnce rs =
-  Just rs <> inlined
+  rs <> inlined
   where
-    inlined = sequenceA $ do
+    inlined = catMaybes $ do
       tgt <- refreshRule "T_" <$> rs
       src <- rs
       let shd = src ^. ruleHead
       let stl = src ^. ruleTail
       let ttl = tgt ^. ruleTail
-      (p@Pred {}, mut) <- U.contexts ttl
+      (p@Pred{}, mut) <- U.contexts ttl
       let subst = unify shd p
       [flip applySubst (tgt & ruleTail .~ mut stl) <$> subst]
 
@@ -109,7 +109,6 @@ simplifyVars' r = compress . mconcat . catMaybes $ f <$> U.universe r
         f _ = Nothing
 
 -- Removes duplicate terms from AND operations at the root expression
--- TODO: find out what's causing it to do weird substitutions in the market.pl example
 simplifyAnds :: Expr -> Expr
 simplifyAnds x = foldr1 eAnd . nub . filter (not . isAnd) $ simplifyAnds' x
 
@@ -118,8 +117,8 @@ simplifyAnds' (And _ x y) = simplifyAnds' x <> simplifyAnds' y
 simplifyAnds' x = [x]
 
 isAnd :: Expr -> Bool
-isAnd And {} = True
-isAnd _ = False
+isAnd And{} = True
+isAnd _     = False
 
 -- | Removes facts that always evaluate to False
 removeFalseFacts :: [Rule] -> [Rule]

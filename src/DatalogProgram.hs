@@ -36,9 +36,9 @@ import           DBClause
 import           Language.Prolog.PrologSource
 
 data Directive
-  = InputDirective [Expr]
-  | OutputDirective [Expr]
-  | DBDirective String [Expr]
+  = InputDirective ![Expr]
+  | OutputDirective ![Expr]
+  | DBDirective String ![Expr]
   deriving (Show)
 
 instance Pretty Directive where
@@ -50,9 +50,9 @@ instance Pretty Directive where
     where _ps = cat . punctuate ", " $ pretty <$> as
 
 data DatalogProgram = DatalogProgram
-  { _dpRules      :: [Rule]
-  , _dpGoal       :: Expr
-  , _dpDirectives :: [Directive]
+  { _dpRules      :: ![Rule]
+  , _dpGoal       :: !Expr
+  , _dpDirectives :: ![Directive]
   }
   deriving (Show)
 
@@ -108,11 +108,11 @@ outputs = dpDirectives . traversed . _OutputDirective
 prologGoal :: Expr -> [Expr] -> [Expr] -> Doc ann
 prologGoal formula ins outs = hcat
   [ "goal(["
-  , cat . punctuate ", " $ prolog <$> ins
+  , cat . punctuate ", " $ prolog . variablize <$> ins
   , "],["
   , cat . punctuate ", " $ prolog <$> outs
   , "]) :- "
-  , prolog formula
+  , prolog . variablizeInputs (catMaybes $ identifier <$> ins) $ formula
   , "."
   ]
 
@@ -142,4 +142,15 @@ dbDirective = DBDirective
 findRules :: DatalogProgram -> String -> [Rule]
 findRules dp n = dp ^.. dpRules . folded . filtered f
   where f x = fromMaybe False $ x ^? ruleHead . _Pred . _2 . to (==n)
+
+variablize :: Expr -> Expr
+variablize (Var _ n) = var $ "IN" <> n
+
+variablizeInputs :: [String] -> Expr -> Expr
+variablizeInputs ins (Pred _ n xs) = predicate n $ f <$> xs
+  where 
+    f v@(ConstStr _ n') 
+      | elem n' ins = var $ "IN" <> n'
+      | otherwise  = v
+    f x = x
 

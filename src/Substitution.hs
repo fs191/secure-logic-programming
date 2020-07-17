@@ -20,7 +20,7 @@ import qualified Data.Map as M
 
 import Data.Generics.Uniplate.Data
 import Data.Maybe
-import Data.List (nub, stripPrefix, isPrefixOf, find)
+import Data.List (nub, stripPrefix, isPrefixOf)
 import Data.Text.Prettyprint.Doc
 
 import Control.Exception (assert)
@@ -144,11 +144,12 @@ unify x y = unify' [(x, y)]
 
 -- See: https://en.wikipedia.org/wiki/Unification_(computer_science)#A_unification_algorithm
 unify' :: [(Expr, Expr)] -> Maybe Subst
+unify' [] = Just emptyTheta
 -- Eliminate
 unify' g@((v@(Var{}), y):t)
   | v `elem` vars g = 
     do
-      subst <- v |-> y
+      let subst = fromMaybe (error "type mismatch") $ v |-> y
       let s = applyToExpr subst
       rest <- unify' (t & traversed . both %~ s)
       return $ subst <> rest
@@ -172,10 +173,8 @@ unify' ((Inv _ x, Inv _ y):t) = unify' $ [x] `zip` [y] <> t
 unify' ((x, y@(Var{})):t) = unify' $ (y, x):t
 -- Delete / conflict
 unify' ((x,y):t) 
-  -- TODO find a better way to compare the expressions
   | x `valEq` y    = unify' t
   | otherwise = Nothing
-unify' [] = Just emptyTheta
 
 valEq :: Expr -> Expr -> Bool
 valEq (ConstInt _ x) (ConstInt _ y)   = x == y

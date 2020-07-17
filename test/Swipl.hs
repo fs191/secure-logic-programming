@@ -30,15 +30,15 @@ import Rule
 
 data SwiplException
   = SwiplException String
-  deriving (Exception)
+  deriving (Exception, Eq)
 
 instance Show SwiplException where
-  show (SwiplException s) = "Failed to run swipl program: " ++ s
+  show (SwiplException s) = "Failed to run swipl program:\n" ++ s
 
-runDatalogFromFile :: FilePath -> IO [Text]
+runDatalogFromFile :: FilePath -> IO (Either SwiplException [Text])
 runDatalogFromFile p = shelly $ runDatalogFromFile' p
 
-runDatalogFromFile' :: FilePath -> Sh [Text]
+runDatalogFromFile' :: FilePath -> Sh (Either SwiplException [Text])
 runDatalogFromFile' p = silently $
   do
     let _path = T.pack p
@@ -53,15 +53,15 @@ runDatalogFromFile' p = silently $
     let _num = ((("\n"++) . (++"\t") . show) <$> ([1..] :: [Int]))
     let _numSource = concat $ (uncurry (++)) <$> _num `zip` lines _source
     res <- handleany_sh 
-      (\e -> throw $ SwiplException (show e ++ "\nSource:\n" ++ _numSource)) 
-      _action
-    return $ T.lines res
+      (\e -> return . Left . SwiplException $ show e) $
+      Right <$> _action
+    return $ T.lines <$> res
 
 -- | Runs the program `dp` using swipl. 
-runDatalogProgram :: DatalogProgram -> IO [Text]
+runDatalogProgram :: DatalogProgram -> IO (Either SwiplException [Text])
 runDatalogProgram dp = shelly $ withTmpDir action
   where 
-    action :: FilePath -> Sh [Text]
+    action :: FilePath -> Sh (Either SwiplException [Text])
     action tmp =
       do
         let _path = tmp <> "/dprog"
@@ -84,7 +84,13 @@ preservesSemanticsDB f p db = it desc $
     _prog <- parseDatalogFromFile p
     _pre  <- runDatalogProgram $ insertDB db _prog
     _post <- runDatalogProgram . insertDB db $ f _prog
-    S.fromList _pre `shouldBe` S.fromList _post
+    if (S.fromList <$> _pre) == (S.fromList <$> _post)
+      then return ()
+      else expectationFailure $ 
+        "\nORIGINAL:\n" <> (show $ prolog _prog)     <> "\n\n" <>
+        "MODIFIED:\n"   <> (show . prolog $ f _prog) <> "\n\n" <>
+        "expected:\n"   <> show _pre                 <> "\n\n" <>
+        "got:\n"        <> show _post
   where
     desc = "preserves semantics of " <> p
 
@@ -95,8 +101,15 @@ runsSuccessfullyDB :: String -> (DatalogProgram -> DatalogProgram) -> [Text] -> 
 runsSuccessfullyDB n p res db = it desc $
   do
     _prog <- parseDatalogFromFile n
-    _res <- runDatalogProgram $ insertDB db . p $ _prog
-    S.fromList _res `shouldBe` S.fromList res
+    let p' = insertDB db . p $ _prog
+    _res <- runDatalogProgram p'
+    if (S.fromList <$> _res) == (Right $ S.fromList res)
+      then return ()
+      else expectationFailure $ 
+        "\nORIGINAL:\n" <> (show $ prolog _prog) <> "\n\n" <>
+        "MODIFIED:\n" <> (show $ prolog p') <> "\n\n" <>
+        "expected: " <> show res <> "\n" <>
+        "got: " <> show _res
   where
     desc = "evaluating " <> n <> " outputs " <> show res
 

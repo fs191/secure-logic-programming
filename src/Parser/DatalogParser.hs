@@ -30,6 +30,7 @@ data Clause
 datalogParser :: Parser DP.DatalogProgram
 datalogParser =
   do
+    void sc
     st  <- manyTill clause eof
     let rs   = [x | RC x <- st]
     let dirs = [x | DC x <- st]

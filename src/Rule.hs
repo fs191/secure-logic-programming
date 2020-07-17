@@ -36,8 +36,8 @@ import           DBClause
 -- a rule has a list of arguments and a formula that represents rule premise
 
 data Rule = Rule
-  { _ruleHead :: Expr
-  , _ruleTail :: Expr
+  { _ruleHead :: !Expr
+  , _ruleTail :: !Expr
   }
   deriving (Eq, Ord, Show, Typeable, Data)
 makeLenses ''Rule

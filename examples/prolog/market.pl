@@ -1,3 +1,4 @@
+
 buys('alice','garlic',40).
 buys('bob','carrots',70).
 
@@ -17,3 +18,4 @@ bargain(Buyer,Seller,Product) :-
 :-inputs([x1,x2]).
 :-outputs([Y]).
 bargain(x1, Y, x2)?
+
