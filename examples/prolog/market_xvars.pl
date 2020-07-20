@@ -14,6 +14,6 @@ bargain(X_1,X_2,X_3) :-
     findPotentialBargain(X_1,X_2,X_3,X_4,X_5),
     X_4 >= X_5.
 
-:-inputs([x1,x2]).
+:-inputs([@x1:public string,@x2:public string]).
 :-outputs([Y]).
 bargain(x1, Y, x2)?

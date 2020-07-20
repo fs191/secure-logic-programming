@@ -1,4 +1,4 @@
-:-type(par, [child:private string, parent:private string]).
+:-type(par, [@child:private string, @parent:private string]).
 
 parents(X,Y) :-
   par(Z,X),

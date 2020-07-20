@@ -67,9 +67,9 @@ inputDir =
     void impliedBy
     void $ symbol "inputs"
     _ins <- parens . brackets $ do
-      sepBy identifier comma
+      sepBy attributeParse comma
     void $ symbol "."
-    return . DP.inputDirective $ var <$> _ins
+    return . DP.inputDirective $ _ins
 
 outputDir :: Parser DP.Directive
 outputDir = 
@@ -90,7 +90,7 @@ dbDir =
       _id <- identifier
       void comma
       _ins <- brackets $ do
-        sepBy term comma
+        sepBy attributeParse comma
       return $ DP.dbDirective _id _ins
     void $ symbol "."
     return _dir

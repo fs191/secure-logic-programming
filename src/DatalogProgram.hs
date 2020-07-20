@@ -144,7 +144,7 @@ findRules dp n = dp ^.. dpRules . folded . filtered f
   where f x = fromMaybe False $ x ^? ruleHead . _Pred . _2 . to (==n)
 
 variablize :: Expr -> Expr
-variablize (Var _ n) = var $ "IN" <> n
+variablize (Attribute _ n) = var $ "IN" <> n
 
 variablizeInputs :: [String] -> Expr -> Expr
 variablizeInputs ins (Pred _ n xs) = predicate n $ f <$> xs

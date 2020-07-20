@@ -2,7 +2,7 @@ module Parser.DatalogParser.Expr
   ( aExpr, bPredExpr
   , term
   , rule
-  , attribute
+  , attributeParse
   ) where
 
 import Text.Megaparsec

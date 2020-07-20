@@ -35,12 +35,12 @@ instance Pretty PPDomain where
   pretty Private = "private"
   pretty Unknown = "unknown"
 
-unifyTypes :: PPType -> PPType -> Maybe PPType
+unifyTypes :: PPType -> PPType -> PPType
 unifyTypes x y
-  | x == PPAuto = Just y
+  | x == PPAuto = y
   | y == PPAuto || x == y
-                = Just x
-  | otherwise   = Nothing
+                = x
+  | otherwise   = error $ "Cannot unify types " ++ show x ++ " and " ++ show y
 
 unifyDomains :: PPDomain -> PPDomain -> PPDomain
 unifyDomains Public Public = Public

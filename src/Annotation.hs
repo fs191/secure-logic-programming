@@ -43,9 +43,9 @@ empty :: Ann
 empty = Ann PPAuto Unknown False
 
 -- | Unify types and domains. Return Nothing if the types do not unify.
-unifyAnns :: Ann -> Ann -> Maybe Ann
+unifyAnns :: Ann -> Ann -> Ann
 unifyAnns x y = x & domain  %~  unifyDomains (y ^. domain)
-                  & annType %%~ ty
+                  & annType %~ ty
   where
     ty a = unifyTypes (y ^. annType) a
 

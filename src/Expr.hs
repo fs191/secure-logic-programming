@@ -10,6 +10,7 @@
 module Expr
   ( Expr(..)
   , PPType(..), PPDomain(..)
+  , prettyTyped
   , Ann
   , isConstExpr, isLeaf
   , isVar
@@ -44,7 +45,7 @@ module Expr
   , predicateArity
   , annotateWithBindings
   , identifier
-  , unifyVars
+  , unifyExprAnns
   , unifyExprTypes
   , unifyExprDomains
   ) where
@@ -100,11 +101,12 @@ data Expr
 makePrisms ''Expr
 
 instance Pretty Expr where
-  pretty (Var e x)        = pretty x -- <> (pretty $ show e)
+  pretty (Var _ x)        = pretty x
   pretty (ConstInt _ x)   = pretty x
-  pretty (ConstStr e x)   = pretty x -- <> (pretty $ show e)
+  pretty (ConstStr _ x)   = pretty x
   pretty (ConstBool _ x)  = pretty x
   pretty (ConstFloat _ x) = pretty x
+  pretty (Attribute _ x)  = pretty x
   pretty (Pred _ n args)  = pretty n <> tupled (pretty <$> args)
   pretty (Not _ e)        = "!" <> pretty e
   pretty (Neg _ e)        = "-" <> pretty e
@@ -126,13 +128,17 @@ instance Pretty Expr where
   pretty (List _ x)       = list $ pretty <$> x
 
 instance PrologSource Expr where
-  prolog (Var _ x) = pretty x
-  prolog (ConstStr _ x) = pretty x
   prolog x = pretty x
 
 data EvaluationException a
   = NonConstantTerm !Expr
   deriving (Show, Exception)
+
+prettyTyped e = pretty $ U.transform f e
+  where
+    f (Var e x) = constStr $ x ++ show e
+    f (ConstStr e x) = constStr $ x ++ show e
+    f (Attribute e x) = constStr $ x ++ show e
 
 --------------------------
 -- is the expression constant (i.e. does not contain any variables)?
@@ -273,19 +279,20 @@ annotateWithBindings' s (e:et) = e' : annotateWithBindings' s' et
     s' = fromList [n | (Var _ n) <- U.universe e] <> s
 
 identifier :: Expr -> Maybe String
-identifier (Var _ n)      = Just n
-identifier (ConstStr _ n) = Just n
-identifier (Pred _ n _)   = Just n
+identifier (Var _ n)       = Just n
+identifier (ConstStr _ n)  = Just n
+identifier (Pred _ n _)    = Just n
+identifier (Attribute _ n) = Just n
 identifier _ = Nothing
 
 attribute :: String -> Expr
 attribute = Attribute empty
 
-unifyVars :: Expr -> Expr -> Maybe Expr
-unifyVars x y = x & annLens %%~ (unifyAnns a)
+unifyExprAnns :: Expr -> Expr -> Expr
+unifyExprAnns x y = x & annLens %~ (unifyAnns a)
   where a = y ^. annLens
 
-unifyExprTypes :: Expr -> Expr -> Maybe PPType
+unifyExprTypes :: Expr -> Expr -> PPType
 unifyExprTypes x y = unifyTypes xd yd
   where
     xd = head $ x ^.. annLens . annType

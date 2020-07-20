@@ -69,29 +69,29 @@ simplify r = r & ruleTail %~ U.rewrite f
     f (Or _ _ (ConstBool _ True)) = Just $ constBool True
     f (Or _ (ConstBool _ False) x) = Just x
     f (Or _ x (ConstBool _ False)) = Just x
-    f (Add _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplify (+) x y
-    f (Sub _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplify (-) x y
-    f (Mul _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplify (*) x y
-    f (Min _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplify min x y
-    f (Max _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplify max x y
-    f (Lt _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplifyBool (<) x y
-    f (Gt _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplifyBool (>) x y
-    f (Le _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplifyBool (<=) x y
-    f (Ge _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplifyBool (>=) x y
-    f (Eq _ x@(ConstInt _ _) y@(ConstInt _ _)) = binarySimplifyBool (==) x y
-    f (Eq _ x@(ConstStr _ _) y@(ConstStr _ _)) = Just . constBool $ x == y
+    f (Add _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify (+) x y
+    f (Sub _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify (-) x y
+    f (Mul _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify (*) x y
+    f (Min _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify min x y
+    f (Max _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify max x y
+    f (Lt _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (<) x y
+    f (Gt _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (>) x y
+    f (Le _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (<=) x y
+    f (Ge _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (>=) x y
+    f (Eq _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (==) x y
+    f (Eq _ x@(ConstStr _ _) y@(ConstStr _ _)) = Just $ constBool $ x == y
     f (Eq _ (Var _ x) (Var _ y))
       | x == y    = Just $ constBool True
       | otherwise = Nothing
     f _ = Nothing
 
-binarySimplify :: (Int -> Int -> Int) -> Expr -> Expr -> Maybe Expr
+binarySimplify :: (Int -> Int -> Int) -> Expr -> Expr -> Expr
 binarySimplify f (ConstInt a x) (ConstInt b y) = 
-  (\ann -> ConstInt ann (f x y)) <$> (unifyAnns a b)
+  (\ann -> ConstInt ann (f x y)) (unifyAnns a b)
 
-binarySimplifyBool :: (Int -> Int -> Bool) -> Expr -> Expr -> Maybe Expr
+binarySimplifyBool :: (Int -> Int -> Bool) -> Expr -> Expr -> Expr
 binarySimplifyBool f (ConstInt a x) (ConstInt b y) = 
-  (\ann -> ConstBool ann (f x y)) <$> (unifyAnns a b)
+  (\ann -> ConstBool ann (f x y)) (unifyAnns a b)
 
 simplifyVars :: Rule -> Rule
 simplifyVars r = applySubst subst r
@@ -99,14 +99,14 @@ simplifyVars r = applySubst subst r
 
 -- | Removes any unnecessary variable equalities (e.g. X=Y)
 simplifyVars' :: Expr -> Subst
-simplifyVars' r = compress . mconcat . catMaybes $ f <$> U.universe r
+simplifyVars' r = compress . mconcat $ f <$> U.universe r
   where f (Eq _ v x)
           | isLeaf x  = v |-> x
-          | otherwise = Nothing
+          | otherwise = mempty
         f (Eq _ x v)
           | isLeaf x  = v |-> x
-          | otherwise = Nothing
-        f _ = Nothing
+          | otherwise = mempty
+        f _ = mempty
 
 -- Removes duplicate terms from AND operations at the root expression
 simplifyAnds :: Expr -> Expr

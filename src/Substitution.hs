@@ -32,8 +32,6 @@ import Control.Applicative
 import Expr
 import Annotation
 
-import Debug.Trace
-
 newtype Subst = Th (M.Map String Expr)
   deriving (Semigroup, Monoid, Eq)
 
@@ -79,25 +77,26 @@ emptyTheta :: Subst
 emptyTheta = Th $ M.empty
 
 -- | Substitute variable `x` with term `y`
-(|->) :: Expr -> Expr -> Maybe Subst
-v@(Var _ x) |-> y = Th <$> (M.singleton x <$> t)
-  where t = unifyVars y v
-_ |-> _ = Nothing
+(|->) :: Expr -> Expr -> Subst
+v |-> y = Th (M.singleton x t)
+  where x = fromMaybe err $ identifier v
+        t = unifyExprAnns y v
+        err =  error $ show v ++ "does not have an identifier"
 
 -- | Get the substitution term for variable `x`
-evalTheta :: Subst -> Expr -> Maybe Expr
+evalTheta :: Subst -> Expr -> Expr
 evalTheta (Th theta) v@(Var a n) = 
   if M.member n theta 
     then 
-      theta M.! n & annLens %%~ (unifyAnns a)
-    else Just v
+      theta M.! n & annLens %~ (unifyAnns a)
+    else v
 
 -- | Apply a substitution to an expression
 -- TODO: unify type and domain as well
 applyToExpr :: Subst -> Expr -> Expr
 applyToExpr theta bexpr = removeSafePrefixes . transform f $ safePrefix _bexpr
   where theta'      = mapKeys (safeStr<>) theta
-        f v@(Var _ _) = fromMaybe err $ evalTheta theta' v
+        f v@(Var _ _) = evalTheta theta' v
         f x         = x
         err         = error "could not evaluate theta"
         _vars       = [b | (Var _ b) <- universe bexpr]
@@ -126,7 +125,7 @@ refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
         let n = prefix <> show i
         -- This should succeed, because the type remains the same
         let err = error "A variable does not unify types with itself?"
-        return . fromMaybe err $ v |-> Var a n
+        return $ v |-> Var a n
     f _ = error "Expected a variable, got something else"
 
 safePrefix :: Expr -> Expr
@@ -149,7 +148,7 @@ unify' [] = Just emptyTheta
 unify' g@((v@(Var{}), y):t)
   | v `elem` vars g = 
     do
-      let subst = fromMaybe (error "type mismatch") $ v |-> y
+      let subst = v |-> y
       let s = applyToExpr subst
       rest <- unify' (t & traversed . both %~ s)
       return $ subst <> rest

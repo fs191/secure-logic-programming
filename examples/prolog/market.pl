@@ -15,7 +15,7 @@ bargain(Buyer,Seller,Product) :-
     findPotentialBargain(Buyer,Seller,Product,Price1,Price2),
     Price1 >= Price2.
 
-:-inputs([x1,x2]).
+:-inputs([@x1:public string,@x2:public string]).
 :-outputs([Y]).
 bargain(x1, Y, x2)?
 

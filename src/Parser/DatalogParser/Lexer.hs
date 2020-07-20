@@ -39,7 +39,7 @@ variable = lexeme $
   do
     h <- upperChar
     t <- many $ alphaNumChar <|> identifierSymbols
-    return $ h:t
+    (return $ h:t) <?> "variable"
 
 identifier :: Parser String
 identifier = asum
@@ -52,7 +52,7 @@ attributeIdentifier :: Parser String
 attributeIdentifier = 
   do
     void $ char '@'
-    ('@':) <$> identifier
+    identifier <?> "attribute"
 
 sQuote :: Parser String
 sQuote = symbol "'"
@@ -92,12 +92,14 @@ domainType :: Parser PPDomain
 domainType =
       (try $ symbol "public"  *> return Public)
   <|> (symbol "private" *> return Private)
+  <?> "privacy type"
 
 dataType :: Parser PPType
 dataType =
       try (symbol "bool"   *> return PPBool)
   <|> try (symbol "int"    *> return PPInt)
   <|> (symbol "string" *> return PPStr)
+  <?> "data type"
 
 typing :: Parser (PPDomain, PPType)
 typing =
@@ -105,5 +107,5 @@ typing =
     void $ symbol ":"
     dom <- domainType
     dat <- dataType
-    return (dom, dat)
+    return (dom, dat) <?> "typing"
 
