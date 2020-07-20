@@ -100,13 +100,13 @@ data Expr
 makePrisms ''Expr
 
 instance Pretty Expr where
-  pretty (Var e x)        = pretty x -- <+> (pretty $ show e)
+  pretty (Var e x)        = pretty x <+> (pretty $ show e)
   pretty (ConstInt _ x)   = pretty x
-  pretty (ConstStr e x)   = pretty x -- <+> (pretty $ show e)
+  pretty (ConstStr e x)   = pretty x <+> (pretty $ show e)
   pretty (ConstBool _ x)  = pretty x
   pretty (ConstFloat _ x) = pretty x
-  pretty (Attribute e x)  = pretty x -- <+> (pretty $ show e)
-  pretty (Pred _ n args)  = pretty n <> tupled (pretty <$> args)
+  pretty (Attribute e x)  = pretty x <+> (pretty $ show e)
+  pretty (Pred e n args)  = pretty n <> tupled (pretty <$> args) <+> (pretty $ show e)
   pretty (Not _ e)        = "!" <> pretty e
   pretty (Neg _ e)        = "-" <> pretty e
   pretty (Inv _ e)        = "(" <> pretty e <> ")^(-1)"
@@ -127,11 +127,36 @@ instance Pretty Expr where
   pretty (List _ x)       = list $ pretty <$> x
 
 instance PrologSource Expr where
-  prolog x = pretty x
+  prolog (Var _ x)        = pretty x
+  prolog (ConstInt _ x)   = pretty x
+  prolog (ConstStr _ x)   = pretty x
+  prolog (ConstBool _ x)  = pretty x
+  prolog (ConstFloat _ x) = pretty x
+  prolog (Attribute _ x)  = pretty x
+  prolog (Pred _ n args)  = pretty n <> tupled (prolog <$> args) -- <+> (prolog $ show e)
+  prolog (Not _ e)        = "!" <> prolog e
+  prolog (Neg _ e)        = "-" <> prolog e
+  prolog (Inv _ e)        = "(" <> prolog e <> ")^(-1)"
+  prolog (Div _ x y)      = prolog x <+> "/" <+> prolog y
+  prolog (Sub _ x y)      = prolog x <+> "-" <+> prolog y
+  prolog (Lt _ x y)       = prolog x <+> "<" <+> prolog y
+  prolog (Le _ x y)       = prolog x <+> "=<" <+> prolog y
+  prolog (Eq _ x y)       = prolog x <+> "=" <+> prolog y
+  prolog (Is _ x y)       = prolog x <+> "is" <+> prolog y
+  prolog (Gt _ x y)       = prolog x <+> ">" <+> prolog y
+  prolog (Ge _ x y)       = prolog x <+> ">=" <+> prolog y
+  prolog (Mul _ x y)      = prolog x <+> "*" <+> prolog y
+  prolog (Add _ x y)      = prolog x <+> "+" <+> prolog y
+  prolog (Min _ x y)      = "min(" <> prolog x <> ", " <> prolog y <> ")"
+  prolog (Max _ x y)      = "max(" <> prolog x <> ", " <> prolog y <> ")"
+  prolog (Or _ x y)       = prolog x <> ";\n" <> prolog y
+  prolog (And _ x y)      = prolog x <> ",\n" <> prolog y
+  prolog (List _ x)       = list $ prolog <$> x
 
 data EvaluationException a
   = NonConstantTerm !Expr
   deriving (Show, Exception)
+
 
 --------------------------
 -- is the expression constant (i.e. does not contain any variables)?

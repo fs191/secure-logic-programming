@@ -27,10 +27,6 @@ import Data.Set as S
 import Data.List as L
 import Data.Maybe
 
-data AdornmentException
-  = NoGoal
-  deriving (Show, Exception)
-
 data Adornable = Adornable 
   { _aRule  :: Rule 
   , _aBound :: [Bool]
@@ -45,7 +41,7 @@ data AdornState = AdornState
   , _gsDBClauses :: [DBClause]
   }
 type AdornM = 
-  StateT AdornState (Except AdornmentException)
+  State AdornState 
 
 makeLenses ''Adornable
 makeLenses ''AdornState
@@ -53,12 +49,12 @@ makeLenses ''AdornState
 goalStr :: String
 goalStr = "$goal"
 
-runAdornM :: AdornM a -> Either AdornmentException a
-runAdornM x = runExcept $ evalStateT x (AdornState [] [] S.empty [] [])
+runAdornM :: AdornM a -> a
+runAdornM x = evalState x (AdornState [] [] S.empty [] [])
 
 -- | Suffixes rules with parameter bindings and optimizes each rule to
 -- fail as early as possible
-adornProgram :: DatalogProgram -> Either AdornmentException DatalogProgram
+adornProgram :: DatalogProgram -> DatalogProgram
 adornProgram p = runAdornM $
   do
     let _gRule = goalToRule $ p ^. dpGoal

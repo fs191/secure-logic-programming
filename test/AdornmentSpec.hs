@@ -15,17 +15,14 @@ spec = describe "Adornment.adornProgram" $ do
   adornPreserveSem "examples/prolog/fib.pl"
   adornPreserveSem "examples/prolog/employee.pl"
   adornPreserveSem "examples/prolog/auction.pl"
-  runsSuccessfully "examples/prolog/market.pl"        adorn marketRes
-  runsSuccessfully "examples/prolog/employee.pl"      adorn employeeRes
-  runsSuccessfully "examples/prolog/auction.pl"       adorn marketRes
-  runsSuccessfullyDB "examples/ppdatalog/market.pl"   adorn marketRes marketDB
-  runsSuccessfullyDB "examples/ppdatalog/employee.pl" adorn employeeRes employeeDB
-  runsSuccessfullyDB "examples/ppdatalog/auction.pl"  adorn marketRes marketDB
-
-adorn :: DatalogProgram -> DatalogProgram
-adorn = fromRight undefined . adornProgram
+  runsSuccessfully "examples/prolog/market.pl"        adornProgram marketRes
+  runsSuccessfully "examples/prolog/employee.pl"      adornProgram employeeRes
+  runsSuccessfully "examples/prolog/auction.pl"       adornProgram marketRes
+  runsSuccessfullyDB "examples/ppdatalog/market.pl"   adornProgram marketRes marketDB
+  runsSuccessfullyDB "examples/ppdatalog/employee.pl" adornProgram employeeRes employeeDB
+  runsSuccessfullyDB "examples/ppdatalog/auction.pl"  adornProgram marketRes marketDB
 
 adornPreserveSem :: String -> Spec
 adornPreserveSem f = 
-  preservesSemantics (fromRight (error "adornment failed") . adornProgram) f
+  preservesSemantics adornProgram f
 

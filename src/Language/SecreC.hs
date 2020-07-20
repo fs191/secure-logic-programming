@@ -364,7 +364,8 @@ scConstType (ConstInt   _ c) = SCConstInt c
 scConstType (ConstFloat _ c) = SCConstFloat c
 scConstType (ConstBool  _ c) = SCConstBool c
 scConstType (ConstStr   _ c) = SCConstStr c
-scConstType e                 = error $ "Expecting a constant, not" ++ show e
+scConstType (Attribute  _ c) = SCConstStr c
+scConstType e                 = error $ "Expecting a constant, not " ++ show e
 
 scSubstType :: Int -> Ann -> SCType
 scSubstType i ann = SCSubst (scDomain (Just i) (ann ^. domain)) (scColTypeI i ann)

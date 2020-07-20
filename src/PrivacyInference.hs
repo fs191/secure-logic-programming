@@ -98,9 +98,14 @@ inferFromDB (Pred _ n xs) =
         inferParams (v, x) 
           | v ^. annLens . annBound = mempty
           | otherwise     = (fromMaybe undefined $ identifier v) |-> x
-        newParams' = inferParams <$> (xs `zip` unified)
+        zipped = xs `zip` unified
+        newParams' = mconcat $ inferParams <$> zipped
+        boundAndPrivate (e, d) = e ^. annLens . annBound && d == Private
+        predType = n |-> case any boundAndPrivate zipped of
+          True -> Private
+          _    -> Public
     -- Unify the new type substitutions with existing substitutions
-    return $ mconcat newParams'
+    return $ predType <> newParams'
 inferFromDB _ = return mempty
 
 inferFromGoal :: Rule -> InferenceM TypeSubstitution
