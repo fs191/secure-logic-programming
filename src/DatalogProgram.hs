@@ -69,7 +69,7 @@ instance Pretty DatalogProgram where
 instance PrologSource DatalogProgram where
   prolog dp = vsep
     [ vsep $ prolog <$> dp ^. dpRules
-    , prologGoal (_dpGoal dp) (dp ^. inputs) $ dp ^. outputs
+    , prologGoal (_dpGoal dp) (dp ^.. inputs) $ dp ^.. outputs
     ]
 
 
@@ -99,11 +99,14 @@ dirToDBC _ = Nothing
 goal :: DatalogProgram -> Expr
 goal = _dpGoal
 
-inputs :: Traversal' DatalogProgram [Expr]
-inputs = dpDirectives . traversed . _InputDirective
+inputs :: Traversal' DatalogProgram Expr
+inputs = dpDirectives . traversed . _InputDirective . traversed . attrToVar
 
-outputs :: Traversal' DatalogProgram [Expr]
-outputs = dpDirectives . traversed . _OutputDirective
+outputs :: Traversal' DatalogProgram Expr
+outputs = dpDirectives . traversed . _OutputDirective . traversed
+
+attrToVar :: Iso' Expr Expr
+attrToVar = iso (\(Attribute e x) -> Var e x) (\(Var e x) -> Attribute e x)
 
 prologGoal :: Expr -> [Expr] -> [Expr] -> Doc ann
 prologGoal formula ins outs = hcat
@@ -144,13 +147,15 @@ findRules dp n = dp ^.. dpRules . folded . filtered f
   where f x = fromMaybe False $ x ^? ruleHead . _Pred . _2 . to (==n)
 
 variablize :: Expr -> Expr
-variablize (Attribute _ n) = var $ "IN" <> n
+variablize (Var e n) = Var e $ "IN" <> n
+variablize x = error $ "Attempting to variablize " ++ show x
 
 variablizeInputs :: [String] -> Expr -> Expr
-variablizeInputs ins (Pred _ n xs) = predicate n $ f <$> xs
+variablizeInputs ins (Pred e n xs) = Pred e n $ f <$> xs
   where 
-    f v@(ConstStr _ n') 
-      | elem n' ins = var $ "IN" <> n'
+    f v@(Attribute ann n') 
+      | elem n' ins = Attribute ann $ "IN" <> n'
       | otherwise  = v
     f x = x
+variablizeInputs _ x = error $ "Attempting to variablize " ++ show x
 

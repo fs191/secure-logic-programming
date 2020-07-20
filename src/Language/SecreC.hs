@@ -402,7 +402,7 @@ secrecCode dp = program $
   ++ [Funct goal]
  where
    rules = dp ^. DP.dpRules
-   (xis,goal) = concreteGoal rules (dp ^. DP.inputs) (dp ^. DP.outputs) (DP.goal dp)
+   (xis,goal) = concreteGoal rules (dp ^.. DP.inputs) (dp ^.. DP.outputs) (DP.goal dp)
    extPreds = dp ^.. DP.dpDBClauses
    (intPredPs, intPredNs) = unzip $ nub $ map (\p -> (predicateName p, predicateArity p)) $ map (\r -> r ^. ruleHead) rules
 
@@ -430,7 +430,7 @@ extPredDecl dbc = struct (SCTemplateDecl Nothing) (nameTableStruct p) (y:ys)
     xs = vars dbc
     y  = variable SCPublic (SCArray 1 SCBool) nameBB
     is = [0..length xs - 1]
-    ys = zipWith (\x i -> case x of {(ConstStr pptype _) -> variable SCPublic (scColTypeI i pptype) (nameArg i) ; _ -> error $ "Expected a ConstStr, but see " ++ show x}) xs is
+    ys = zipWith (\x i -> case x of {(Attribute pptype _) -> variable SCPublic (scColTypeI i pptype) (nameArg i) ; _ -> error $ "Expected an attribute, but got " ++ show x}) xs is
 
 extPredGet :: DBClause -> FunctionDecl
 extPredGet dbc = function (SCTemplateDecl Nothing) returnType fname fargs fbody

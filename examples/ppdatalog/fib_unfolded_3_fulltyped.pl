@@ -72,7 +72,7 @@ fib(N: private int, F: public int) : private bool :-
 % Note that the output y is "public", but the satisfiability bit "b" is private.
 % That is, privately computing fibonacci number with index 'x' in fact matches 'x' against
 % pre-computed pairs [(0,1),(1,1),(2,2),(3,3),(4,5),...] and takes the corresponding 'y'.
-:-input([x : private int])
-:-output([y])
-fib(x : private int,y : public int) : private bool?
+:-input([@x : private int])
+:-output([Y])
+fib(@x : private int,y : public int) : private bool?
 

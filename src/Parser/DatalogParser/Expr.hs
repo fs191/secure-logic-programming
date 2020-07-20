@@ -67,6 +67,7 @@ term = asum
   [ try $ var      <$> variable 
   , try strParse
   , try $ constInt <$> signedInteger
+  , try $ attributeParse
   , list
   ] <?> "term"
 
@@ -111,6 +112,9 @@ attributeParse :: Parser Expr
 attributeParse =
   do
     s <- attributeIdentifier
-    t <- typing
-    return . typeExpr t $ E.attribute s
+    t <- optional typing
+    let f = case t of
+          Just p  -> typeExpr p
+          Nothing -> typeExpr (Public, PPStr)
+    return . f $ E.attribute s
 

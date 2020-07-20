@@ -8,6 +8,6 @@ bargain(X0,X1,X2) :-
 
 % question: what Alice can buy for her money?
 % the seller's name is a free variable
-:-input([x : private string]).
+:-input([@x : private string]).
 :-output([Y]).
-bargain(x, Y, Z)?
+bargain(@x, Y, Z)?

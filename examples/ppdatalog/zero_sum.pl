@@ -13,4 +13,4 @@ zeroSum(AliceBefore,AliceAfter,BobBefore,BobAfter) :-
 
 :-inputs([@x1,@y1]).
 :-outputs([X2,Y2]).
-zeroSum(X1, X2, Y1, Y2)?
+zeroSum(@x1, X2, @y1, Y2)?

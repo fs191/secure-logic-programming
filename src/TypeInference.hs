@@ -83,9 +83,8 @@ inferFromGoal g r = fromMaybe mempty subst
 (|->) x y = TypeSubstitution $ M.singleton x y
 
 inferGoal :: DatalogProgram -> DatalogProgram
-inferGoal dp = dp & dpGoal              %~ f
-                  & outputs . traversed %~ f
-                  & inputs  . traversed %~ f
+inferGoal dp = dp & dpGoal  %~ U.transform f
+                  & outputs %~ f
   where 
     gxs = dp ^.. dpGoal . _Pred . _3 . folded . to identifier
     n = dp ^. dpGoal . _Pred . _2
@@ -96,12 +95,12 @@ inferGoal dp = dp & dpGoal              %~ f
                   . _Pred 
                   . _3
     foldUnify x = foldl1 unifyTypes $ x ^.. folded . annLens . annType
-    f = applyTypeSubstToExpr $ 
-          mconcat [x |-> foldUnify y | (Just x, y) <- goalRules]
+    f = applyTypeSubstToExpr .
+          mconcat $ [x |-> foldUnify y | (Just x, y) <- goalRules]
 
 
 applyTypeSubstToExpr :: TypeSubstitution -> Expr -> Expr
-applyTypeSubstToExpr sub@(TypeSubstitution ts) e = U.transform f e
+applyTypeSubstToExpr (TypeSubstitution ts) e = U.transform f e
   where
     t v = fromMaybe (exprTyping v) $ identifier v >>= (`M.lookup` ts)
     f v = applyTyping (t v) v

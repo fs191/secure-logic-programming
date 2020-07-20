@@ -37,7 +37,7 @@ sg_bf(X:public string,Y:private string) : private bool :-
   par(_Y1:private string,__Y1:private string) : private bool,
   __X1:private string = __Y1:private string   : private bool.
 
-:- inputs([x1 : public string]).
+:- inputs([@x1 : public string]).
 :- outputs([Y : public string]).
-sg_bf(x1:public string, Y:public string) : private bool?
+sg_bf(@x1:public string, Y:public string) : private bool?
 

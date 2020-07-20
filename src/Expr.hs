@@ -10,7 +10,6 @@
 module Expr
   ( Expr(..)
   , PPType(..), PPDomain(..)
-  , prettyTyped
   , Ann
   , isConstExpr, isLeaf
   , isVar
@@ -101,12 +100,12 @@ data Expr
 makePrisms ''Expr
 
 instance Pretty Expr where
-  pretty (Var _ x)        = pretty x
+  pretty (Var e x)        = pretty x -- <+> (pretty $ show e)
   pretty (ConstInt _ x)   = pretty x
-  pretty (ConstStr _ x)   = pretty x
+  pretty (ConstStr e x)   = pretty x -- <+> (pretty $ show e)
   pretty (ConstBool _ x)  = pretty x
   pretty (ConstFloat _ x) = pretty x
-  pretty (Attribute _ x)  = pretty x
+  pretty (Attribute e x)  = pretty x -- <+> (pretty $ show e)
   pretty (Pred _ n args)  = pretty n <> tupled (pretty <$> args)
   pretty (Not _ e)        = "!" <> pretty e
   pretty (Neg _ e)        = "-" <> pretty e
@@ -133,12 +132,6 @@ instance PrologSource Expr where
 data EvaluationException a
   = NonConstantTerm !Expr
   deriving (Show, Exception)
-
-prettyTyped e = pretty $ U.transform f e
-  where
-    f (Var e x) = constStr $ x ++ show e
-    f (ConstStr e x) = constStr $ x ++ show e
-    f (Attribute e x) = constStr $ x ++ show e
 
 --------------------------
 -- is the expression constant (i.e. does not contain any variables)?

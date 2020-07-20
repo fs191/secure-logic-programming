@@ -52,6 +52,6 @@ fib(N, F) :-
 
         F is F1+F2.
 
-:-input([x : private int])
+:-input([@x : private int])
 :-output([y])
-fib(x,y)?
+fib(@x,y)?

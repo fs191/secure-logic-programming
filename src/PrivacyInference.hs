@@ -121,9 +121,9 @@ inferFromGoal r =
     return $ fromMaybe mempty subst
 
 inferGoal :: DatalogProgram -> DatalogProgram
-inferGoal dp = dp & dpGoal              %~ f
-                  & outputs . traversed %~ f
-                  & inputs  . traversed %~ f
+inferGoal dp = dp & dpGoal  %~ f
+                  & outputs %~ f
+                  & inputs  %~ f
   where 
     gxs = dp ^.. dpGoal . _Pred . _3 . folded . to identifier
     n = dp ^. dpGoal . _Pred . _2

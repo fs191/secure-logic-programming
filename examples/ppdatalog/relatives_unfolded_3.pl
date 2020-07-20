@@ -29,6 +29,6 @@ sg(X,Y) :-
   par(_Y1,__Y1),
   __X1 = __Y1.
 
-:- inputs([x : public string]).
+:- inputs([@x : public string]).
 :- outputs([Y]).
-sg(x,Y)?
+sg(@x,Y)?
