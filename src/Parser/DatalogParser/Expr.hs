@@ -2,6 +2,7 @@ module Parser.DatalogParser.Expr
   ( aExpr, bPredExpr
   , term
   , rule
+  , attribute
   ) where
 
 import Text.Megaparsec
@@ -91,8 +92,8 @@ strParse =
     s <- identifier
     t <- optional typing
     let f = case t of
-          Just (dom, dat) -> typeExpr dom dat
-          Nothing         -> typeExpr Public PPStr
+          Just p  -> typeExpr p
+          Nothing -> typeExpr (Public, PPStr)
     return . f $ constStr s
 
 rule :: Parser R.Rule
@@ -102,7 +103,14 @@ rule =
     terms <- option [] . parens $ sepBy1 term comma
     return $ R.fact psym terms
 
-typeExpr :: PPDomain -> PPType -> Expr -> Expr
-typeExpr dom dat e = e & annLens . domain  .~ dom
+typeExpr :: (PPDomain, PPType) -> Expr -> Expr
+typeExpr (dom, dat) e = e & annLens . domain  .~ dom
                        & annLens . annType .~ dat
+
+attributeParse :: Parser Expr
+attributeParse =
+  do
+    s <- attributeIdentifier
+    t <- typing
+    return . typeExpr t $ E.attribute s
 

@@ -20,6 +20,7 @@ module Expr
   , constTrue, constFalse
   , var
   , predicate
+  , attribute
   , less, lessEqual
   , greater, greaterEqual
   , equal
@@ -44,6 +45,8 @@ module Expr
   , annotateWithBindings
   , identifier
   , unifyVars
+  , unifyExprTypes
+  , unifyExprDomains
   ) where
 
 ---------------------------------------------------------
@@ -72,6 +75,7 @@ data Expr
   | ConstFloat !Ann !Float
   | ConstStr   !Ann !String
   | ConstBool  !Ann !Bool
+  | Attribute  !Ann !String
   | Var  !Ann !String
   | Not  !Ann !Expr
   | Neg  !Ann !Expr
@@ -271,10 +275,25 @@ annotateWithBindings' s (e:et) = e' : annotateWithBindings' s' et
 identifier :: Expr -> Maybe String
 identifier (Var _ n)      = Just n
 identifier (ConstStr _ n) = Just n
+identifier (Pred _ n _)   = Just n
 identifier _ = Nothing
 
+attribute :: String -> Expr
+attribute = Attribute empty
 
 unifyVars :: Expr -> Expr -> Maybe Expr
-unifyVars x y = x & annLens %%~ (<^ a)
+unifyVars x y = x & annLens %%~ (unifyAnns a)
   where a = y ^. annLens
+
+unifyExprTypes :: Expr -> Expr -> Maybe PPType
+unifyExprTypes x y = unifyTypes xd yd
+  where
+    xd = head $ x ^.. annLens . annType
+    yd = head $ y ^.. annLens . annType
+
+unifyExprDomains :: Expr -> Expr -> PPDomain
+unifyExprDomains x y = unifyDomains xd yd
+  where
+    xd = head $ x ^.. annLens . domain
+    yd = head $ y ^.. annLens . domain
 

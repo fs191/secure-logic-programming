@@ -1,6 +1,7 @@
 module Parser.DatalogParser.Lexer
   ( lexeme, symbol, sc
   , variable, identifier
+  , attributeIdentifier
   , signedInteger
   , comma, period, impliedBy
   , parens, brackets
@@ -46,6 +47,12 @@ identifier = asum
   , try $ between dQuote dQuote identifier'
   , identifier'
   ] <?> "identifier"
+
+attributeIdentifier :: Parser String
+attributeIdentifier = 
+  do
+    void $ char '@'
+    ('@':) <$> identifier
 
 sQuote :: Parser String
 sQuote = symbol "'"

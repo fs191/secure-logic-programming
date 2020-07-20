@@ -87,11 +87,11 @@ simplify r = r & ruleTail %~ U.rewrite f
 
 binarySimplify :: (Int -> Int -> Int) -> Expr -> Expr -> Maybe Expr
 binarySimplify f (ConstInt a x) (ConstInt b y) = 
-  (\ann -> ConstInt ann (f x y)) <$> (a <^ b)
+  (\ann -> ConstInt ann (f x y)) <$> (unifyAnns a b)
 
 binarySimplifyBool :: (Int -> Int -> Bool) -> Expr -> Expr -> Maybe Expr
 binarySimplifyBool f (ConstInt a x) (ConstInt b y) = 
-  (\ann -> ConstBool ann (f x y)) <$> (a <^ b)
+  (\ann -> ConstBool ann (f x y)) <$> (unifyAnns a b)
 
 simplifyVars :: Rule -> Rule
 simplifyVars r = applySubst subst r

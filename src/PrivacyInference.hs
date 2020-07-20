@@ -92,7 +92,7 @@ inferFromDB (Pred _ n xs) =
         _dbargs = matches ^. _head . ruleHead . _Pred . _3 
     -- Unify the argument typings in the database fact and the predicate
     let unified :: [PPDomain]
-        unified = (uncurry unifyExprTypes) <$> (xs `zip` _dbargs)
+        unified = (uncurry unifyExprDomains) <$> (xs `zip` _dbargs)
     -- Take bound and unbound variables into account
     let inferParams :: (Expr, PPDomain) -> TypeSubstitution
         inferParams (v, x) 
@@ -114,7 +114,7 @@ inferFromGoal r =
             guard $ rn == gn
             rxs <- r ^? ruleHead . _Pred . _3 :: Maybe [Expr]
             gxs <- g ^? _Pred . _3 :: Maybe [Expr]
-            let unified = (uncurry unifyExprTypes) <$> (rxs `zip` gxs)
+            let unified = (uncurry unifyExprDomains) <$> (rxs `zip` gxs)
                 f (x, y) = (,) <$> (maybeToList $ identifier x) <*> [y]
                 paramNames = concat $ traverse f $ rxs `zip` unified
             return . mconcat $ (uncurry (|->)) <$> paramNames
@@ -140,15 +140,6 @@ inferGoal dp = dp & dpGoal              %~ f
 applyTyping :: PPDomain -> Expr -> Expr
 applyTyping d e = e & annLens . domain  %~  unifyDomains d
 
-unifyExprTypes :: Expr -> Expr -> PPDomain
-unifyExprTypes x y = unifyDomains xd yd
-  where
-    xd = head $ x ^.. annLens . domain
-    yd = head $ y ^.. annLens . domain
-
 exprTyping :: Expr -> PPDomain
 exprTyping e = e ^. annLens . domain
-
-toTypeSubst :: Expr -> Maybe TypeSubstitution
-toTypeSubst x = (|-> (x ^. annLens . domain)) <$> identifier x
 

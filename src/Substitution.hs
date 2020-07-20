@@ -89,7 +89,7 @@ evalTheta :: Subst -> Expr -> Maybe Expr
 evalTheta (Th theta) v@(Var a n) = 
   if M.member n theta 
     then 
-      theta M.! n & annLens %%~ (a <^)
+      theta M.! n & annLens %%~ (unifyAnns a)
     else Just v
 
 -- | Apply a substitution to an expression
