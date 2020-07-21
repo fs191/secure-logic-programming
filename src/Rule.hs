@@ -23,7 +23,6 @@ module Rule
 
 import           Data.Data
 import           Data.Text.Prettyprint.Doc
-import           Data.Maybe
 
 import           Control.Lens hiding (transform)
 
@@ -51,7 +50,12 @@ instance Pretty Rule where
     indent 2 (pretty $ _ruleTail r)
 
 instance PrologSource Rule where
-  prolog x = pretty x <> "."
+  prolog (Rule h (ConstBool _ True)) = prolog h <> "."
+  prolog r = 
+    prolog (r ^. ruleHead) <+>
+    ":-" <+>
+    hardline <+>
+    indent 2 (prolog $ _ruleTail r) <> "."
 
 fact :: String -> [Expr] -> Rule
 fact n as = Rule (predicate n as) constTrue

@@ -7,6 +7,7 @@ import Test.Hspec
 
 import Expr
 import Substitution
+import DatalogProgram
 
 x :: Expr
 x = var "x"
@@ -73,17 +74,17 @@ spec = parallel $
 unifies :: Expr -> Expr -> Spec
 unifies a b = it desc $
   (isJust $ a `unify` b) `shouldBe` True
-  where desc = "Can unify " <> (show $ pretty a) <> " and " <> (show $ pretty b)
+  where desc = "Can unify " <> (show $ prolog a) <> " and " <> (show $ prolog b)
 
 unifien't :: Expr -> Expr -> Spec
 unifien't a b = it desc $
   (a `unify` b) `shouldBe` Nothing
-  where desc = "Does not unify " <> (show $ pretty a) <> " and " <> (show $ pretty b)
+  where desc = "Does not unify " <> (show $ prolog a) <> " and " <> (show $ prolog b)
 
 refreshes :: Expr -> Expr -> Spec
 refreshes e e' = it desc $
   refreshAndApply "X_" e `shouldBe` e'
-  where desc = "Refreshes " <> (show $ pretty e) <> " to " <> (show $ pretty e')
+  where desc = "Refreshes " <> (show $ prolog e) <> " to " <> (show $ prolog e')
 
 compresses :: [Subst] -> [Subst] -> Spec
 compresses input output = it desc $
