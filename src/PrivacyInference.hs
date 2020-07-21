@@ -5,7 +5,7 @@ module PrivacyInference
   ( privacyInference
   ) where
 
-import Control.Lens
+import Control.Lens as LE
 import Control.Monad.State
 
 import Data.List as L
@@ -18,6 +18,8 @@ import Expr
 import Rule
 import DatalogProgram as DP
 import Language.SecreC.Types
+
+import Debug.Trace
 
 data InferenceState = InferenceState
   { _istProg  :: DatalogProgram
@@ -68,7 +70,12 @@ privacyInference = evalInferenceM act
       _prog <- use istProg
       _p <- _prog & dpRules . traversed %%~ 
         (inferRule >=> inferFromGoalAction)
-      return $ inferGoal _p
+      let inferPredF e = do
+          _s <- inferPred e
+          return $ applyTypeSubstToExpr _s e
+      _pred <- _p & dpRules . traversed . ruleTail %%~ (U.transformM inferPredF)
+      _pred2 <- _pred & dpGoal %%~ (U.transformM inferPredF)
+      return $ inferGoal _pred2
     inferFromGoalAction :: Rule -> InferenceM Rule
     inferFromGoalAction x = do
       s <- inferFromGoal x
@@ -100,13 +107,19 @@ inferFromDB (Pred _ n xs) =
           | otherwise     = (fromMaybe undefined $ identifier v) |-> x
         zipped = xs `zip` unified
         newParams' = mconcat $ inferParams <$> zipped
-        boundAndPrivate (e, d) = e ^. annLens . annBound && d == Private
-        predType = n |-> case any boundAndPrivate zipped of
-          True -> Private
-          _    -> Public
     -- Unify the new type substitutions with existing substitutions
-    return $ predType <> newParams'
+    return $ newParams'
 inferFromDB _ = return mempty
+
+inferPred :: Expr -> InferenceM TypeSubstitution
+inferPred (Pred _ n xs) = 
+  case any boundAndPrivate xs of
+    True  -> return $ n |-> Private
+    False -> return $ n |-> Public
+  where
+    boundAndPrivate x = (x ^. annLens . annBound) 
+                     && (x ^. annLens . domain . to(==Private))
+inferPred _ = return mempty
 
 inferFromGoal :: Rule -> InferenceM TypeSubstitution
 inferFromGoal r =
