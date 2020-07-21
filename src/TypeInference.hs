@@ -28,12 +28,14 @@ instance Monoid TypeSubstitution where
   mempty = TypeSubstitution M.empty
 
 typeInference :: DatalogProgram -> DatalogProgram
-typeInference dp = inferGoal dp'
+typeInference dp =
+  dp & id %~ inferGoal
+     & dpRules . traversed %~ applyDBInfer dp
+     & dpRules . traversed %~ applyGoalInfer dp
+     & dpRules . traversed . ruleTail %~ predInf
+     & dpRules . traversed . ruleHead %~ predInf
+     & dpGoal %~ predInf
   where
-    dp' = dp & dpRules . traversed %~ applyDBInfer dp
-             & dpRules . traversed %~ applyGoalInfer dp
-             & dpRules . traversed . ruleTail %~ predInf
-             & dpGoal %~ predInf
     predInf e = applyTypeSubstToExpr (inferPred e) e
 
 applyDBInfer :: DatalogProgram -> Rule -> Rule
@@ -73,8 +75,8 @@ inferFromDB _ _ = mempty
 inferPred :: Expr -> TypeSubstitution
 inferPred (Pred _ n xs) = 
   case any boundAndPrivate xs of
-    True  -> n |-> Typing Private PPAuto
-    False -> n |-> Typing Public PPAuto
+    True  -> n |-> Typing Private PPBool
+    False -> n |-> Typing Public PPBool
   where
     boundAndPrivate x = (x ^. annLens . annBound) 
                      && (x ^. annLens . domain . to(==Private))
@@ -133,11 +135,6 @@ unifyExprTypings x y = Typing d t
 unifyTypings :: Typing -> Typing -> Typing
 unifyTypings (Typing xd xt) (Typing yd yt)
   =  Typing (unifyDomains xd yd) (unifyTypes xt yt)
-
-applyTyping :: Typing -> Expr -> Expr
-applyTyping (Typing d t) e = 
-  e & annLens . annType .~ t
-    & annLens . domain  .~ d
 
 exprTyping :: Expr -> Typing
 exprTyping e = Typing ed et

@@ -34,6 +34,7 @@ module Expr
   , eList
   , annLens
   , annType, domain
+  , applyTyping
   , getAnn
   , getVarName
   , _Var
@@ -195,7 +196,9 @@ constBool = ConstBool (empty & annBound .~ True
                              & domain   .~ Public)
 
 var :: String -> Expr
-var = Var empty
+var n = Var ann n 
+  where ann = empty & annType .~ PPAuto
+                    & domain  .~ Unknown
 
 predicate :: String -> [Expr] -> Expr
 predicate = Pred empty
@@ -321,4 +324,9 @@ unifyExprDomains x y = unifyDomains xd yd
   where
     xd = head $ x ^.. annLens . domain
     yd = head $ y ^.. annLens . domain
+
+applyTyping :: Typing -> Expr -> Expr
+applyTyping (Typing d t) e = 
+  e & annLens . annType .~ t
+    & annLens . domain  .~ d
 

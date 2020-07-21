@@ -7,6 +7,7 @@ import Control.Lens
 import Data.Generics.Uniplate.Data as U
 import Data.Text.Prettyprint.Doc
 
+import Adornment
 import Annotation
 import Expr
 import Rule
@@ -45,7 +46,7 @@ inferPreserveSem f =
 infersTypes :: String -> Spec
 infersTypes n = it desc $
   do
-    f <- parseDatalogFromFile n
+    f <- adornProgram <$> parseDatalogFromFile n
     let g = f & dpRules . traversed . ruleHead %~ clearTypings
               & dpGoal %~ clearTypings
     (wrap $ typeInference g) `shouldBe` 

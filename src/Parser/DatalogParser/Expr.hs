@@ -2,8 +2,10 @@ module Parser.DatalogParser.Expr
   ( aExpr
   , term
   , rule
+  , list
   , attributeParse
   , predParse
+  , varParse
   ) where
 
 import Text.Megaparsec
@@ -17,6 +19,7 @@ import Data.Foldable
 import Parser.DatalogParser.Lexer
 import Expr as E hiding (identifier)
 import qualified Rule as R
+import qualified Annotation as A
 
 type Parser = Parsec Void String
 
@@ -81,7 +84,7 @@ predParse =
   do
     n <- identifier
     args <- parens $ sepBy1 term comma
-    typable . return $ predicate n args
+    typable . return $ predicate n args & annLens . A.typing .~ A.emptyTyping
 
 intParse :: Parser Expr
 intParse =
@@ -108,10 +111,6 @@ rule =
     terms <- option [] . parens $ sepBy1 term comma
     return $ R.fact psym terms
 
-typeExpr :: (PPDomain, PPType) -> Expr -> Expr
-typeExpr (dom, dat) e = e & annLens . domain  .~ dom
-                       & annLens . annType .~ dat
-
 attributeParse :: Parser Expr
 attributeParse =
   do
@@ -124,8 +123,8 @@ typable e =
     e' <- e
     t <- try $ optional typing
     let f = case t of
-          Just p  -> typeExpr p
-          Nothing -> typeExpr (Public, PPStr)
+          Just p  -> applyTyping p
+          Nothing -> applyTyping A.emptyTyping
     return $ f e'
   <|> e
 

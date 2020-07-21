@@ -13,12 +13,14 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as C
 
+import Data.Maybe
 import Data.Foldable
 import Data.Void (Void)
 
 import Control.Monad (void)
 
 import Language.SecreC.Types
+import Annotation (Typing(..))
 
 type Parser = Parsec Void String
 
@@ -63,7 +65,7 @@ dQuote = symbol "\""
 identifier' :: Parser String
 identifier' = lexeme $
   do
-    h <- lowerChar <|> identifierSymbols
+    h <- lowerChar
     t <- many $ alphaNumChar <|> identifierSymbols
     return $ h:t
 
@@ -101,11 +103,11 @@ dataType =
   <|> (symbol "string" *> return PPStr)
   <?> "data type"
 
-typing :: Parser (PPDomain, PPType)
+typing :: Parser Typing
 typing =
   do
     void $ symbol ":"
-    dom <- domainType
+    dom <- optional domainType
     dat <- dataType
-    return (dom, dat) <?> "typing"
+    (return $ Typing (fromMaybe Unknown dom) dat) <?> "typing"
 

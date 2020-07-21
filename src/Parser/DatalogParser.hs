@@ -79,7 +79,7 @@ outputDir =
     void impliedBy
     void $ symbol "outputs"
     _ins <- parens . brackets $ do
-      sepBy term comma
+      sepBy varParse comma
     void $ symbol "."
     return $ DP.outputDirective _ins
 
