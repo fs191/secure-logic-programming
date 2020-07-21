@@ -27,28 +27,28 @@ instance Semigroup TypeSubstitution where
 instance Monoid TypeSubstitution where
   mempty = TypeSubstitution M.empty
 
+-- | Infers data types and privacy domains for expressions in the program.
 typeInference :: DatalogProgram -> DatalogProgram
 typeInference dp =
   dp & id %~ inferGoal
-     & dpRules . traversed %~ applyDBInfer dp
-     & dpRules . traversed %~ applyGoalInfer dp
+     & dpRules . traversed %~ applyDBInfer
+     & dpRules . traversed %~ applyGoalInfer
      & dpRules . traversed . ruleTail %~ predInf
-     & dpRules . traversed . ruleHead %~ predInf
+     & dpRules . traversed %~ applyRuleRetInfer
      & dpGoal %~ predInf
   where
     predInf e = applyTypeSubstToExpr (inferPred e) e
+    applyRuleRetInfer = undefined
+    applyDBInfer r = applyTypeSubst (mconcat subst) r
+      where
+        subst = inferFromDB dp <$> U.universe (r ^. ruleTail)
+    applyGoalInfer r = applyTypeSubst subst r
+      where
+        g = dp ^. dpGoal
+        subst = inferFromGoal g r
 
-applyDBInfer :: DatalogProgram -> Rule -> Rule
-applyDBInfer dp r = applyTypeSubst (mconcat subst) r
-  where
-    subst = inferFromDB dp <$> U.universe (r ^. ruleTail)
-
-applyGoalInfer :: DatalogProgram -> Rule -> Rule
-applyGoalInfer dp r = applyTypeSubst subst r
-  where
-    g = dp ^. dpGoal
-    subst = inferFromGoal g r
-
+-- | Infers typings for database predicate arguments from type directives.
+-- Takes variable bindings into account
 inferFromDB :: DatalogProgram -> Expr -> TypeSubstitution
 inferFromDB dp (Pred _ n xs) = mconcat newParams'
   where
@@ -72,6 +72,7 @@ inferFromDB dp (Pred _ n xs) = mconcat newParams'
     -- Unify the new type substitutions with existing substitutions
 inferFromDB _ _ = mempty
 
+-- | Infers typings for database facts
 inferPred :: Expr -> TypeSubstitution
 inferPred (Pred _ n xs) = 
   case any boundAndPrivate xs of
@@ -82,6 +83,7 @@ inferPred (Pred _ n xs) =
                      && (x ^. annLens . domain . to(==Private))
 inferPred _ = mempty
 
+-- | Infers rule types from the parameter typings in the goal predicate.
 inferFromGoal :: Expr -> Rule -> TypeSubstitution
 inferFromGoal g r = fromMaybe mempty subst
   where subst =
@@ -98,9 +100,12 @@ inferFromGoal g r = fromMaybe mempty subst
                 paramNames = concat $ traverse f $ rxs `zip` unified
             return . mconcat $ (uncurry (|->)) <$> paramNames
 
+-- | Creates a new type substitution from expression identifier and typing
 (|->) :: String -> Typing -> TypeSubstitution
 (|->) x y = TypeSubstitution $ M.singleton x y
 
+-- | Infers types in the program goal by looking at the argument types of
+-- rules which get called.
 inferGoal :: DatalogProgram -> DatalogProgram
 inferGoal dp = dp & dpGoal  %~ U.transform f
                   & outputs %~ f
@@ -118,7 +123,12 @@ inferGoal dp = dp & dpGoal  %~ U.transform f
     f = applyTypeSubstToExpr .
           mconcat $ [x |-> foldUnify y | (Just x, y) <- goalRules]
 
+-- | Decides the return type of a rule by looking at the return types of the
+-- predicates in its body
+inferRuleRet :: Rule -> TypeSubstitution
+inferRuleRet = undefined
 
+-- | Applies a type substitution to an expression
 applyTypeSubstToExpr :: TypeSubstitution -> Expr -> Expr
 applyTypeSubstToExpr (TypeSubstitution ts) e = U.transform f e
   where
@@ -126,23 +136,23 @@ applyTypeSubstToExpr (TypeSubstitution ts) e = U.transform f e
     t v = fromMaybe (exprTyping v) $ identifier v >>= (`M.lookup` ts)
     f v = applyTyping (t v) v
 
+-- | Gets the resulting typing from unifying two expressions
 unifyExprTypings :: Expr -> Expr -> Typing
 unifyExprTypings x y = Typing d t
   where
     d = unifyDomains (x ^. annLens . domain) (y ^. annLens . domain)
     t = unifyTypes (x ^. annLens . annType) (y ^. annLens . annType)
 
+-- | Unifies two typings
 unifyTypings :: Typing -> Typing -> Typing
 unifyTypings (Typing xd xt) (Typing yd yt)
   =  Typing (unifyDomains xd yd) (unifyTypes xt yt)
 
+-- | Extracts typing from an expression
 exprTyping :: Expr -> Typing
-exprTyping e = Typing ed et
-  where
-    ed = e ^. annLens . domain
-    et = e ^. annLens . annType
-              
+exprTyping e = e ^. annLens . typing
 
+-- | Applies type substitution to a rule
 applyTypeSubst :: TypeSubstitution -> Rule -> Rule
 applyTypeSubst ts r = 
   r & ruleHead %~ applyTypeSubstToExpr ts
