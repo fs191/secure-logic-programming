@@ -50,8 +50,8 @@ infersTypes n = it desc $
     let g = f & dpRules . traversed . ruleHead %~ clearTypings
               & dpRules . traversed . ruleTail %~ clearTypings
               & dpGoal %~ clearTypings
-    (wrap  g) `shouldBe` 
-      (wrap $ typeInference f)
+    (wrap $ typeInference g) `shouldBe` 
+      (wrap f)
   where desc = "infers types properly for " <> n
 
 clearTypings :: Expr -> Expr
