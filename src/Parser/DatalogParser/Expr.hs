@@ -84,7 +84,7 @@ predParse =
   do
     n <- identifier
     args <- parens $ sepBy1 term comma
-    typable . return $ predicate n args & annLens . A.typing .~ A.emptyTyping
+    typable . return $ predicate n args
 
 intParse :: Parser Expr
 intParse =

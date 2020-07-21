@@ -10,6 +10,7 @@ module Annotation
   , annType, domain
   , annBound
   , unifyAnns
+  , unifyTypings
   , typing
   ) where
 
@@ -53,10 +54,7 @@ emptyTyping = Typing Unknown PPAuto
 
 -- | Unify types and domains. Return Nothing if the types do not unify.
 unifyAnns :: Ann -> Ann -> Ann
-unifyAnns x y = x & domain  %~  unifyDomains (y ^. domain)
-                  & annType %~ ty
-  where
-    ty a = unifyTypes (y ^. annType) a
+unifyAnns x y = x & typing %~ unifyTypings (y ^. typing)
 
 typing :: Lens' Ann Typing
 typing = lens getter setter
@@ -65,3 +63,7 @@ typing = lens getter setter
     setter ann (Typing d t) = ann & domain  .~ d
                                   & annType .~ t
 
+-- | Unifies two typings
+unifyTypings :: Typing -> Typing -> Typing
+unifyTypings (Typing xd xt) (Typing yd yt)
+  =  Typing (unifyDomains xd yd) (unifyTypes xt yt)

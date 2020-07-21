@@ -48,9 +48,10 @@ infersTypes n = it desc $
   do
     f <- adornProgram <$> parseDatalogFromFile n
     let g = f & dpRules . traversed . ruleHead %~ clearTypings
+              & dpRules . traversed . ruleTail %~ clearTypings
               & dpGoal %~ clearTypings
-    (wrap $ typeInference g) `shouldBe` 
-      (wrap f)
+    (wrap  g) `shouldBe` 
+      (wrap $ typeInference f)
   where desc = "infers types properly for " <> n
 
 clearTypings :: Expr -> Expr

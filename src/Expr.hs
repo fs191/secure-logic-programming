@@ -1,9 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -177,12 +173,19 @@ isVar (Var _ _) = True
 isVar _       = False
 
 constStr :: String -> Expr
-constStr = ConstStr (empty & annBound .~ True)
+constStr = ConstStr ann
+  where
+    ann = empty & annBound .~ True
+                & annType  .~ PPStr
+                & domain   .~ Public
 
 constInt :: Int -> Expr
-constInt = ConstInt (empty & annBound .~ True
-                           & annType  .~ PPInt
-                           & domain   .~ Public)
+constInt = ConstInt ann
+  where
+    ann = empty & annBound .~ True
+                & annType  .~ PPInt
+                & domain   .~ Public
+
 
 constTrue :: Expr
 constTrue = ConstBool empty True
@@ -201,7 +204,11 @@ var n = Var ann n
                     & domain  .~ Unknown
 
 predicate :: String -> [Expr] -> Expr
-predicate = Pred empty
+predicate = Pred ann
+  where
+    ann = empty & annBound .~ True
+                & annType  .~ PPBool
+                & domain   .~ Unknown
 
 less :: Expr -> Expr -> Expr
 less = Lt empty
@@ -326,7 +333,5 @@ unifyExprDomains x y = unifyDomains xd yd
     yd = head $ y ^.. annLens . domain
 
 applyTyping :: Typing -> Expr -> Expr
-applyTyping (Typing d t) e = 
-  e & annLens . annType .~ t
-    & annLens . domain  .~ d
+applyTyping t e = e & annLens . typing %~ unifyTypings t
 

@@ -38,6 +38,6 @@ sg_bf(X:public string,Y:private string) : private bool :-
   XXX1:private string = YYY1:private string   : private bool.
 
 :- inputs([@x1 : public string]).
-:- outputs([Y : public string]).
-sg_bf(@x1:public string, Y:public string) : private bool?
+:- outputs([Y]).
+sg_bf(@x1:public string, Y:string) : private bool?
 

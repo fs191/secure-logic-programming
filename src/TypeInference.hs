@@ -30,22 +30,17 @@ instance Monoid TypeSubstitution where
 -- | Infers data types and privacy domains for expressions in the program.
 typeInference :: DatalogProgram -> DatalogProgram
 typeInference dp =
-  dp & id %~ inferGoal
+  dp & id %~ inferFromInputs
      & dpRules . traversed %~ applyDBInfer
-     & dpRules . traversed %~ applyGoalInfer
-     & dpRules . traversed . ruleTail %~ predInf
-     & dpRules . traversed %~ applyRuleRetInfer
-     & dpGoal %~ predInf
+     & id %~ inferFromGoal
+     -- & id %~ inferGoal
+     -- & dpRules . traversed . ruleTail %~ U.transform inferPred
+     -- & dpGoal %~ inferPred
+     -- & dpRules . traversed %~ inferRuleRet
   where
-    predInf e = applyTypeSubstToExpr (inferPred e) e
-    applyRuleRetInfer = undefined
     applyDBInfer r = applyTypeSubst (mconcat subst) r
       where
         subst = inferFromDB dp <$> U.universe (r ^. ruleTail)
-    applyGoalInfer r = applyTypeSubst subst r
-      where
-        g = dp ^. dpGoal
-        subst = inferFromGoal g r
 
 -- | Infers typings for database predicate arguments from type directives.
 -- Takes variable bindings into account
@@ -73,32 +68,35 @@ inferFromDB dp (Pred _ n xs) = mconcat newParams'
 inferFromDB _ _ = mempty
 
 -- | Infers typings for database facts
-inferPred :: Expr -> TypeSubstitution
-inferPred (Pred _ n xs) = 
+inferPred :: Expr -> Expr
+inferPred p@(Pred _ _ xs) = p & annLens . typing .~
   case any boundAndPrivate xs of
-    True  -> n |-> Typing Private PPBool
-    False -> n |-> Typing Public PPBool
+    True  -> Typing Private PPBool
+    False -> Typing Public PPBool
   where
     boundAndPrivate x = (x ^. annLens . annBound) 
                      && (x ^. annLens . domain . to(==Private))
-inferPred _ = mempty
+inferPred x = x
 
 -- | Infers rule types from the parameter typings in the goal predicate.
-inferFromGoal :: Expr -> Rule -> TypeSubstitution
-inferFromGoal g r = fromMaybe mempty subst
-  where subst =
-          do
-            rn <- r ^? ruleHead . _Pred . _2
-            gn <- g ^? _Pred . _2
-            guard $ rn == gn
-            rxs <- r ^? ruleHead . _Pred . _3 :: Maybe [Expr]
-            gxs <- g ^? _Pred . _3 :: Maybe [Expr]
-            let unified :: [Typing]
-                unified = (uncurry unifyExprTypings) <$> (rxs `zip` gxs)
-                f (x, y) = (,) <$> (maybeToList $ identifier x) <*> [y]
-                paramNames :: [(String, Typing)]
-                paramNames = concat $ traverse f $ rxs `zip` unified
-            return . mconcat $ (uncurry (|->)) <$> paramNames
+inferFromGoal :: DatalogProgram -> DatalogProgram
+inferFromGoal dp = dp & dpRules . traverse %~ subst
+  where 
+    g = dp ^. dpGoal
+    subst r = fromMaybe r $
+      do
+        rn <- r ^? ruleHead . _Pred . _2
+        gn <- g ^? _Pred . _2
+        guard $ rn == gn
+        rxs <- r ^? ruleHead . _Pred . _3 :: Maybe [Expr]
+        gxs <- g ^? _Pred . _3 :: Maybe [Expr]
+        let unified :: [Typing]
+            unified = (uncurry unifyExprTypings) <$> (rxs `zip` gxs)
+            f (x, y) = (,) <$> (maybeToList $ identifier x) <*> [y]
+            paramNames :: [(String, Typing)]
+            paramNames = concat $ traverse f $ rxs `zip` unified
+            s = mconcat $ (uncurry (|->)) <$> paramNames
+        return $ applyTypeSubst s r
 
 -- | Creates a new type substitution from expression identifier and typing
 (|->) :: String -> Typing -> TypeSubstitution
@@ -123,10 +121,18 @@ inferGoal dp = dp & dpGoal  %~ U.transform f
     f = applyTypeSubstToExpr .
           mconcat $ [x |-> foldUnify y | (Just x, y) <- goalRules]
 
+inferFromInputs :: DatalogProgram -> DatalogProgram
+inferFromInputs dp = dp & dpGoal %~ applyTypeSubstToExpr (mconcat inps)
+  where
+    inps = dp ^.. inputs . to(\v -> (fromJust $ identifier v) |-> (v ^. annLens . typing))
+
 -- | Decides the return type of a rule by looking at the return types of the
 -- predicates in its body
-inferRuleRet :: Rule -> TypeSubstitution
-inferRuleRet = undefined
+inferRuleRet :: Rule -> Rule
+inferRuleRet r = r & ruleHead . annLens . typing .~ unified
+  where
+    predTypings = [ ann ^. typing | (Pred ann _ _) <- andsToList (r ^. ruleTail) ]
+    unified = foldl unifyTypings (Typing Public PPBool) predTypings
 
 -- | Applies a type substitution to an expression
 applyTypeSubstToExpr :: TypeSubstitution -> Expr -> Expr
@@ -143,11 +149,6 @@ unifyExprTypings x y = Typing d t
     d = unifyDomains (x ^. annLens . domain) (y ^. annLens . domain)
     t = unifyTypes (x ^. annLens . annType) (y ^. annLens . annType)
 
--- | Unifies two typings
-unifyTypings :: Typing -> Typing -> Typing
-unifyTypings (Typing xd xt) (Typing yd yt)
-  =  Typing (unifyDomains xd yd) (unifyTypes xt yt)
-
 -- | Extracts typing from an expression
 exprTyping :: Expr -> Typing
 exprTyping e = e ^. annLens . typing
@@ -157,3 +158,4 @@ applyTypeSubst :: TypeSubstitution -> Rule -> Rule
 applyTypeSubst ts r = 
   r & ruleHead %~ applyTypeSubstToExpr ts
     & ruleTail %~ applyTypeSubstToExpr ts
+
