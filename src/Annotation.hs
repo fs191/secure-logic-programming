@@ -6,7 +6,7 @@
 module Annotation 
   ( Ann(..)
   , Typing(..)
-  , empty
+  , empty, emptyTyping
   , annType, domain
   , annBound
   , unifyAnns
@@ -47,6 +47,9 @@ instance Show Ann where
 
 empty :: Ann
 empty = Ann PPAuto Unknown False
+
+emptyTyping :: Typing
+emptyTyping = Typing Unknown PPAuto
 
 -- | Unify types and domains. Return Nothing if the types do not unify.
 unifyAnns :: Ann -> Ann -> Ann

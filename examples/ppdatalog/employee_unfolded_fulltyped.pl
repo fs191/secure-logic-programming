@@ -1,5 +1,5 @@
-:-type(eds(@employee:public string,@department:public string, @salary:private int)).
-:-type(dm(@department:public string, @manager:public string)).
+:-type(eds, [@employee:public string,@department:public string, @salary:private int]).
+:-type(dm, [@department:public string, @manager:public string]).
 
 % combining domain(x) and domain(y) into domain(f(x,y)):
 % public & private -> private
@@ -42,13 +42,12 @@ viewESM(X0 : public string, 0 : public int, X4 : public string) : private bool :
   eds(X0 : public string, X1 : public string, X2 : private int) : public bool,
   2500 : public int =< X2 : private int                         : private bool,
   % Comparisons are done between public columns, so result is public bool
-  dm(X3 : public string, X4 : public string),                   : public bool,
+  dm(X3 : public string, X4 : public string)                    : public bool,
   X1 : public string = X3 : public string                       : public bool.
 
 % the truth type is private since it is private for at least one viewWSM rule
 % the type of 'manager1' is public since it is a constant
 % the type of Y1 is public string since it is so for all viewESM rules
 % the type of Y2 is private string since it is so for at least one viewESM rule
-:- input([]).
-:- output([Y1, Y2]).
+:- outputs([Y1, Y2]).
 viewESM(Y1 : public string, Y2 : private int, 'manager1' : public string) : private bool?

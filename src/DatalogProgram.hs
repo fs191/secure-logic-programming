@@ -39,7 +39,7 @@ data Directive
   = InputDirective ![Expr]
   | OutputDirective ![Expr]
   | DBDirective String ![Expr]
-  deriving (Show)
+  deriving (Show, Eq)
 
 instance Pretty Directive where
   pretty (InputDirective as) = ":-inputs([" <> _ps <> "])"
@@ -54,7 +54,7 @@ data DatalogProgram = DatalogProgram
   , _dpGoal       :: !Expr
   , _dpDirectives :: ![Directive]
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 makeLenses ''DatalogProgram
 makePrisms ''Directive

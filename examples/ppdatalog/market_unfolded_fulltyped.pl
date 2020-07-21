@@ -31,6 +31,6 @@ bargain(X0 : private string,X1 : private string,X2 : private string)  : private 
 % the type of 'x' is private as was assigned by the user
 % the type of Y is private string, matched against 2nd arg of the bargain rule
 % the type of Z is private string, matched against 3rd arg of the bargain rule
-:-input([@x : private string]).
-:-output([Y]).
+:-inputs([@x : private string]).
+:-outputs([Y]).
 bargain(@x : private string, Y : private string, Z : private string) : private bool?

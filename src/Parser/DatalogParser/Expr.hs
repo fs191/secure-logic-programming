@@ -1,8 +1,9 @@
 module Parser.DatalogParser.Expr
-  ( aExpr, bPredExpr
+  ( aExpr
   , term
   , rule
   , attributeParse
+  , predParse
   ) where
 
 import Text.Megaparsec
@@ -18,24 +19,6 @@ import Expr as E hiding (identifier)
 import qualified Rule as R
 
 type Parser = Parsec Void String
-
------------------------
--- Predicate expressions
------------------------
-
-bPredExpr :: Parser Expr
-bPredExpr = asum
-  [ try $ opParse lessEqual    "=<"
-  , try $ opParse less         "<" 
-  , try $ opParse greaterEqual ">="
-  , try $ opParse greater      ">" 
-  , try $ opParse equal        "=" 
-  , try $ opParse eIs          "is"
-  , predParse
-  ]
-  where 
-    opParse :: (Expr -> Expr -> Expr) -> String -> Parser Expr
-    opParse f s = f <$> aExpr <*> (symbol s *> aExpr)
 
 -----------------------
 -- Numeric expressions
@@ -54,25 +37,34 @@ aExprTable =
   , [ binary "+" eAdd
     , binary "-" eSub
     ]
+  , [ binary "=<" lessEqual
+    , binary "<"  less
+    , binary ">=" greaterEqual
+    , binary ">"  greater
+    , binary "="  equal
+    , binary "is" eIs
+    ]
   ]
 
 aExpr :: Parser Expr
-aExpr = makeExprParser aTerm aExprTable <?> "expression"
+aExpr = typable $ makeExprParser aTerm aExprTable
 
 aTerm :: Parser Expr
-aTerm = try term <|> parens aExpr
+aTerm = try term
 
 term :: Parser Expr
 term = asum
-  [ try $ var      <$> variable 
+  [ try predParse
+  , try varParse
   , try strParse
-  , try $ constInt <$> signedInteger
-  , try $ attributeParse
-  , list
+  , try intParse
+  , try attributeParse
+  , try list
+  , parens aExpr
   ] <?> "term"
 
 list :: Parser Expr
-list = eList <$> (brackets $ sepBy term comma)
+list = eList <$> (brackets $ sepBy term comma) <?> "list"
 
 -----------------------
 -- Helper functions
@@ -85,17 +77,29 @@ prefix :: String -> (a -> a) -> Operator Parser a
 prefix n f = Prefix  (f <$ symbol n)
 
 predParse :: Parser Expr
-predParse = predicate <$> identifier <*> (parens $ sepBy1 term comma)
+predParse = 
+  do
+    n <- identifier
+    args <- parens $ sepBy1 term comma
+    typable . return $ predicate n args
+
+intParse :: Parser Expr
+intParse =
+  do
+    n <- signedInteger
+    typable . return $ constInt n
+
+varParse :: Parser Expr
+varParse =
+  do
+    n <- variable
+    typable . return $ var n
 
 strParse :: Parser Expr
 strParse = 
   do
     s <- identifier
-    t <- optional typing
-    let f = case t of
-          Just p  -> typeExpr p
-          Nothing -> typeExpr (Public, PPStr)
-    return . f $ constStr s
+    typable . return $ constStr s
 
 rule :: Parser R.Rule
 rule = 
@@ -112,9 +116,16 @@ attributeParse :: Parser Expr
 attributeParse =
   do
     s <- attributeIdentifier
-    t <- optional typing
+    typable . return $ E.attribute s
+
+typable :: Parser Expr -> Parser Expr
+typable e =
+  do
+    e' <- e
+    t <- try $ optional typing
     let f = case t of
           Just p  -> typeExpr p
           Nothing -> typeExpr (Public, PPStr)
-    return . f $ E.attribute s
+    return $ f e'
+  <|> e
 

@@ -9,6 +9,7 @@ import Data.Foldable
 import Data.Void (Void)
 
 import Control.Monad (void)
+import Control.Lens
 
 import Parser.DatalogParser.Lexer
 import Parser.DatalogParser.Expr
@@ -16,6 +17,7 @@ import Parser.DatalogParser.Expr
 import qualified DatalogProgram as DP
 import Expr hiding (identifier)
 import qualified Rule as R
+import Annotation as A
 
 type Parser = Parsec Void String
 
@@ -47,12 +49,12 @@ clause = asum
 ruleP :: Parser R.Rule
 ruleP = 
   do
-    h <- identifier
-    ps <- parens $ sepBy1 term comma
+    (Pred ann n xs) <- predParse
     b <- option [] $ impliedBy *> body
     void $ symbol "."
     let expr = joinExprs b
-    return $ R.rule h ps expr
+        t = ann ^. A.typing
+    return $ R.rule n xs expr & R.ruleHead . annLens . A.typing .~ t
 
 funCall :: Parser DP.Directive
 funCall = asum
@@ -96,15 +98,14 @@ dbDir =
     return _dir
 
 body :: Parser [Expr]
-body = sepBy1 bPredExpr comma
+body = sepBy1 aExpr comma
 
 goal :: Parser Expr
 goal = 
   do
-    h <- identifier
-    ps <- parens $ sepBy1 term comma
+    p <- predParse
     void $ symbol "?"
-    return $ predicate h ps
+    return p
 
 -----------------------
 -- Exports
