@@ -42,11 +42,11 @@ data Directive
   deriving (Show)
 
 instance Pretty Directive where
-  pretty (InputDirective as) = ":-inputs([" <> _ps <> "])."
+  pretty (InputDirective as) = ":-inputs([" <> _ps <> "])"
     where _ps = cat . punctuate ", " $ pretty <$> as
-  pretty (OutputDirective as) = ":-outputs([" <> _ps <> "])."
+  pretty (OutputDirective as) = ":-outputs([" <> _ps <> "])"
     where _ps = cat . punctuate ", " $ pretty <$> as
-  pretty (DBDirective n as) = ":-type(" <> pretty n <> ",[" <> _ps <> "])."
+  pretty (DBDirective n as) = ":-type(" <> pretty n <> ",[" <> _ps <> "])"
     where _ps = cat . punctuate ", " $ pretty <$> as
 
 data DatalogProgram = DatalogProgram

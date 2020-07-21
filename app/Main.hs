@@ -9,7 +9,6 @@ import Data.Text.Prettyprint.Doc
 import Data.Maybe
 import Transform
 import PostProcessing
-import PrivacyInference
 import TypeInference
 import Adornment
 
@@ -28,7 +27,7 @@ main = do
   let _trans = fromMaybe (error "failed to derive ground rules") $ 
                  deriveAllGroundRules (adornProgram program) _ite
   let _postProc = postProcess _trans
-  let _domained = typeInference $ privacyInference _postProc
+  let _domained = typeInference _postProc
 
   -- create a Sharemind script that can be used to upload the tables used in given program
   -- WARNING: this is used for testing only, do not apply it to actual private data!

@@ -5,10 +5,12 @@
 
 module Annotation 
   ( Ann(..)
+  , Typing(..)
   , empty
   , annType, domain
   , annBound
   , unifyAnns
+  , typing
   ) where
 
 import Control.Lens
@@ -17,6 +19,10 @@ import Data.Data
 import Data.Foldable
 
 import Language.SecreC.Types
+
+data Typing
+  = Typing PPDomain PPType
+  deriving (Show)
 
 data Ann = Ann
   { 
@@ -48,4 +54,11 @@ unifyAnns x y = x & domain  %~  unifyDomains (y ^. domain)
                   & annType %~ ty
   where
     ty a = unifyTypes (y ^. annType) a
+
+typing :: Lens' Ann Typing
+typing = lens getter setter
+  where 
+    getter ann = Typing (ann ^. domain) (ann ^. annType)
+    setter ann (Typing d t) = ann & domain  .~ d
+                                  & annType .~ t
 
