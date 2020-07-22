@@ -41,6 +41,7 @@ typeInference dp =
      -- & dpGoal %~ inferPred
      & dpRules . traversed %~ inferRuleRet
      & id %~ inferGoal
+     & id %~ inferGoalRet
   where
     applyDBInfer r = applyTypeSubst (mconcat subst) r
       where
@@ -137,13 +138,13 @@ inferBinRet e x y
 inferBinArgs :: Expr -> Expr -> Expr -> TypeSubstitution
 inferBinArgs e x y
   | xb && yb = mempty
-  | xb       = fromMaybe mempty $ (|-> Typing yd PPAuto) <$> identifier x
-  | yb       = fromMaybe mempty $ (|-> Typing xd PPAuto) <$> identifier y
+  | yb       = fromMaybe mempty $ (|-> yt) <$> identifier x
+  | xb       = fromMaybe mempty $ (|-> xt) <$> identifier y
   | otherwise = error $ "Uninitialized variables: " ++ show e
   where
-    xd = x ^. annLens . domain
+    xt = x ^. annLens . typing
     xb = x ^. annLens . annBound
-    yd = y ^. annLens . domain
+    yt = y ^. annLens . typing
     yb = y ^. annLens . annBound
 
 -- | Infers rule types from the parameter typings in the goal predicate.
@@ -208,6 +209,12 @@ inferRuleRet r = r & ruleHead . annLens . typing %~ unified
     unified
       | any (\(Typing d _) -> d == Unknown) predTypings = id
       | otherwise = const $ foldl unifyTypings (Typing Unknown PPBool) predTypings
+
+inferGoalRet :: DatalogProgram -> DatalogProgram
+inferGoalRet dp = dp & dpGoal . annLens . domain .~ d
+  where
+    doms = dp ^.. dpRules . folded . ruleHead . annLens . domain
+    d = foldl safelyUnifyDomains Unknown doms
 
 -- | Applies a type substitution to an expression
 applyTypeSubstToExpr :: TypeSubstitution -> Expr -> Expr

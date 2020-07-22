@@ -38,12 +38,12 @@ data Ann = Ann
 makeLenses ''Ann
 
 instance Show Ann where
-  show x = "{" <> s <> "}"
+  show x = ": " <> s
     where s = asum 
-            [ x ^. annType . to show
-            , ", "
+            [ if x ^. annBound then "*" else ""
             , x ^. domain . to show
-            , if x ^. annBound then ", bound" else ""
+            , " "
+            , x ^. annType . to show
             ]
 
 empty :: Ann

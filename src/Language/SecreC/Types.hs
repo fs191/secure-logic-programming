@@ -16,24 +16,30 @@ data PPType
   | PPInt
   | PPStr
   | PPAuto
-  deriving (Ord, Show, Eq, Data, Typeable)
+  deriving (Ord, Eq, Data, Typeable)
 
 data PPDomain
   = Public
   | Private
   | Unknown
-  deriving (Ord, Show, Eq, Data, Typeable)
+  deriving (Ord, Eq, Data, Typeable)
+
+instance Show PPType where
+  show PPBool = "bool"
+  show PPInt  = "int"
+  show PPStr  = "string"
+  show PPAuto = "auto"
 
 instance Pretty PPType where
-  pretty PPBool = "bool"
-  pretty PPInt  = "int"
-  pretty PPStr  = "string"
-  pretty PPAuto = "auto"
+  pretty = pretty . show
+
+instance Show PPDomain where
+  show Public  = "public"
+  show Private = "private"
+  show Unknown = "unknown"
 
 instance Pretty PPDomain where
-  pretty Public  = "public"
-  pretty Private = "private"
-  pretty Unknown = "unknown"
+  pretty = pretty . show
 
 unifyTypes :: PPType -> PPType -> PPType
 unifyTypes x y
