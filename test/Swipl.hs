@@ -84,13 +84,16 @@ preservesSemanticsDB f p db = it desc $
     _prog <- parseDatalogFromFile p
     _pre  <- runDatalogProgram $ insertDB db _prog
     _post <- runDatalogProgram . insertDB db $ f _prog
-    if (S.fromList <$> _pre) == (S.fromList <$> _post)
-      then return ()
-      else expectationFailure $ 
-        "\nORIGINAL:\n" <> (show $ prolog _prog)     <> "\n\n" <>
-        "MODIFIED:\n"   <> (show . prolog $ f _prog) <> "\n\n" <>
-        "expected:\n"   <> show _pre                 <> "\n\n" <>
-        "got:\n"        <> show _post
+    case _pre of
+      Left e -> expectationFailure $ show e
+      Right _ -> 
+        if (S.fromList <$> _pre) == (S.fromList <$> _post)
+          then return ()
+          else expectationFailure $ 
+            "\nORIGINAL:\n" <> (show $ prolog _prog)     <> "\n\n" <>
+            "MODIFIED:\n"   <> (show . prolog $ f _prog) <> "\n\n" <>
+            "expected:\n"   <> show _pre                 <> "\n\n" <>
+            "got:\n"        <> show _post
   where
     desc = "preserves semantics of " <> p
 

@@ -23,6 +23,7 @@ module DatalogProgram
   , outputDirective
   , dbDirective
   , findRules
+  , findDBFact
   ) where
 
 import           Control.Lens hiding (List)
@@ -158,4 +159,11 @@ variablizeInputs ins (Pred e n xs) = Pred e n $ f <$> xs
       | otherwise  = v
     f x = x
 variablizeInputs _ x = error $ "Attempting to variablize " ++ show x
+
+findDBFact :: DatalogProgram -> String -> Rule
+findDBFact dp n = fromMaybe err $ extensionalFacts dp 
+                    ^? folded 
+                     . filtered ((==n) . ruleName)
+  where
+    err = error $ "DB fact not found: " ++ show n
 

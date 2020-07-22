@@ -124,3 +124,30 @@ employeeDB =
     , constStr "manager3"
     ]
   ]
+
+relativesDB =
+  [ predicate "par"
+    [ constStr "chris"
+    , constStr "alice"
+    ]
+  , predicate "par"
+    [ constStr "chris"
+    , constStr "bob"
+    ]
+  , predicate "par"
+    [ constStr "dave"
+    , constStr "eve"
+    ]
+  , predicate "par"
+    [ constStr "dave"
+    , constStr "bob"
+    ]
+  , predicate "par"
+    [ constStr "bob"
+    , constStr "peggy"
+    ]
+  , predicate "par"
+    [ constStr "bob"
+    , constStr "victor"
+    ]
+  ]

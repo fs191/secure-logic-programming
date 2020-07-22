@@ -30,13 +30,17 @@ instance Monoid TypeSubstitution where
 -- | Infers data types and privacy domains for expressions in the program.
 typeInference :: DatalogProgram -> DatalogProgram
 typeInference dp =
-  dp & id %~ inferFromInputs
+  dp & dpRules . traversed . ruleHead %~ U.transform inferConstants
+     & dpRules . traversed . ruleTail %~ U.transform inferConstants
+     & dpGoal %~ U.transform inferConstants
+     & id %~ inferFromInputs
      & dpRules . traversed %~ applyDBInfer
      & id %~ inferFromGoal
-     -- & id %~ inferGoal
-     -- & dpRules . traversed . ruleTail %~ U.transform inferPred
+     & dpRules . traversed %~ inferBuiltins
+     & id %~ inferPred
      -- & dpGoal %~ inferPred
-     -- & dpRules . traversed %~ inferRuleRet
+     & dpRules . traversed %~ inferRuleRet
+     & id %~ inferGoal
   where
     applyDBInfer r = applyTypeSubst (mconcat subst) r
       where
@@ -67,16 +71,80 @@ inferFromDB dp (Pred _ n xs) = mconcat newParams'
     -- Unify the new type substitutions with existing substitutions
 inferFromDB _ _ = mempty
 
+inferConstants :: Expr -> Expr
+inferConstants (ConstStr _ x) = constStr x
+inferConstants (ConstInt _ x) = constInt x
+inferConstants (ConstBool _ x) = constBool x
+inferConstants (Pred _ n xs) = predicate n xs
+inferConstants x = x
+
 -- | Infers typings for database facts
-inferPred :: Expr -> Expr
-inferPred p@(Pred _ _ xs) = p & annLens . typing .~
-  case any boundAndPrivate xs of
-    True  -> Typing Private PPBool
-    False -> Typing Public PPBool
+inferPred :: DatalogProgram -> DatalogProgram
+inferPred dp = dp & dpRules . traversed . ruleTail %~ U.transform f
   where
-    boundAndPrivate x = (x ^. annLens . annBound) 
-                     && (x ^. annLens . domain . to(==Private))
-inferPred x = x
+    f p@(Pred _ n xs) 
+      | anyPC     = p & annLens . domain .~ Private
+      | anyUnk    = p
+      | otherwise = p & annLens . domain .~ Public
+      where
+        dbf = findDBFact dp n
+        (Pred _ _ ys) = dbf ^. ruleHead
+        -- See if a bound variable is compared to a private DB column
+        privateComp (x, y) = x ^. annLens . annBound && 
+                             y ^. annLens . domain . to (==Private)
+        anyPC = any privateComp $ xs `zip` ys
+        anyUnk = any (==Unknown) $ xs ^.. folded . annLens . domain
+    f x = x
+
+-----------------------------------------------
+-- Built-in predicate type and domain inference
+-----------------------------------------------
+
+appIfBinPred :: (Expr -> Expr -> Expr -> a) -> Expr -> Maybe a
+appIfBinPred f e@(Ge _ a b) = Just $ f e a b
+appIfBinPred f e@(Gt _ a b) = Just $ f e a b
+appIfBinPred f e@(Eq _ a b) = Just $ f e a b
+appIfBinPred f e@(Le _ a b) = Just $ f e a b
+appIfBinPred f e@(Lt _ a b) = Just $ f e a b
+appIfBinPred _ _ = Nothing
+
+inferBuiltins :: Rule -> Rule
+inferBuiltins r = applyTypeSubst subst' r'
+  where
+    ret x = fromMaybe x $ appIfBinPred inferBinRet x
+    r' = r & ruleTail %~ U.transform ret
+    subst x = fromMaybe mempty $ appIfBinPred inferBinArgs x
+    subst' = mconcat $ subst <$> r ^. ruleTail . to U.universe
+
+inferBinRet :: Expr -> Expr -> Expr -> Expr
+inferBinRet e x y
+  -- If both are bound then it is a comparison and privacy depends on subterms
+  | xb && yb  = e & annLens . annType %~ unifyTypes PPBool
+                  & annLens . domain  .~ safelyUnifyDomains xd yd
+  -- If only one variable is bound, then it is an assignment and will always
+  -- return true
+  | xb        = e & annLens . annType %~ unifyTypes PPBool
+                  & annLens . domain  .~ Public
+  | yb        = e & annLens . annType %~ unifyTypes PPBool
+                  & annLens . domain  .~ Public
+  | otherwise = error $ "Uninitialized variables: " ++ show e
+  where
+    xd = x ^. annLens . domain
+    xb = x ^. annLens . annBound
+    yd = y ^. annLens . domain
+    yb = y ^. annLens . annBound
+
+inferBinArgs :: Expr -> Expr -> Expr -> TypeSubstitution
+inferBinArgs e x y
+  | xb && yb = mempty
+  | xb       = fromMaybe mempty $ (|-> Typing yd PPAuto) <$> identifier x
+  | yb       = fromMaybe mempty $ (|-> Typing xd PPAuto) <$> identifier y
+  | otherwise = error $ "Uninitialized variables: " ++ show e
+  where
+    xd = x ^. annLens . domain
+    xb = x ^. annLens . annBound
+    yd = y ^. annLens . domain
+    yb = y ^. annLens . annBound
 
 -- | Infers rule types from the parameter typings in the goal predicate.
 inferFromGoal :: DatalogProgram -> DatalogProgram
@@ -116,10 +184,10 @@ inferGoal dp = dp & dpGoal  %~ U.transform f
                   . ruleHead 
                   . _Pred 
                   . _3
-    foldUnify :: [Expr] -> Typing
-    foldUnify x = foldl1 unifyTypings $ x ^.. folded . annLens . typing
+    foldUnify :: [Expr] -> PPType
+    foldUnify x = foldl1 unifyTypes $ x ^.. folded . annLens . annType
     f = applyTypeSubstToExpr .
-          mconcat $ [x |-> foldUnify y | (Just x, y) <- goalRules]
+          mconcat $ [x |-> (Typing Unknown $ foldUnify y) | (Just x, y) <- goalRules]
 
 inferFromInputs :: DatalogProgram -> DatalogProgram
 inferFromInputs dp = dp & dpGoal %~ applyTypeSubstToExpr (mconcat inps)
@@ -129,10 +197,17 @@ inferFromInputs dp = dp & dpGoal %~ applyTypeSubstToExpr (mconcat inps)
 -- | Decides the return type of a rule by looking at the return types of the
 -- predicates in its body
 inferRuleRet :: Rule -> Rule
-inferRuleRet r = r & ruleHead . annLens . typing .~ unified
+inferRuleRet r = r & ruleHead . annLens . typing %~ unified
   where
-    predTypings = [ ann ^. typing | (Pred ann _ _) <- andsToList (r ^. ruleTail) ]
-    unified = foldl unifyTypings (Typing Public PPBool) predTypings
+    isPred x = x ^. annLens . annType . to(==PPBool)
+    predTypings = catMaybes [ 
+      do 
+        guard (isPred x)
+        Just $ x ^. annLens . typing 
+      | x <- andsToList (r ^. ruleTail) ]
+    unified
+      | any (\(Typing d _) -> d == Unknown) predTypings = id
+      | otherwise = const $ foldl unifyTypings (Typing Unknown PPBool) predTypings
 
 -- | Applies a type substitution to an expression
 applyTypeSubstToExpr :: TypeSubstitution -> Expr -> Expr
@@ -158,4 +233,11 @@ applyTypeSubst :: TypeSubstitution -> Rule -> Rule
 applyTypeSubst ts r = 
   r & ruleHead %~ applyTypeSubstToExpr ts
     & ruleTail %~ applyTypeSubstToExpr ts
+
+safelyUnifyDomains :: PPDomain -> PPDomain -> PPDomain
+safelyUnifyDomains Private _ = Private
+safelyUnifyDomains _ Private = Private
+safelyUnifyDomains Unknown _ = Unknown
+safelyUnifyDomains _ Unknown = Unknown
+safelyUnifyDomains _ _       = Public
 

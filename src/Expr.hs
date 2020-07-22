@@ -98,30 +98,30 @@ makePrisms ''Expr
 
 instance Pretty Expr where
   pretty (Var e x)        = pretty x <+> (pretty $ show e)
-  pretty (ConstInt _ x)   = pretty x
+  pretty (ConstInt e x)   = pretty x <+> (pretty $ show e)
   pretty (ConstStr e x)   = pretty x <+> (pretty $ show e)
-  pretty (ConstBool _ x)  = pretty x
-  pretty (ConstFloat _ x) = pretty x
+  pretty (ConstBool e x)  = pretty x <+> (pretty $ show e)
+  pretty (ConstFloat e x) = pretty x <+> (pretty $ show e)
   pretty (Attribute e x)  = pretty x <+> (pretty $ show e)
   pretty (Pred e n args)  = pretty n <> tupled (pretty <$> args) <+> (pretty $ show e)
-  pretty (Not _ e)        = "!" <> pretty e
-  pretty (Neg _ e)        = "-" <> pretty e
-  pretty (Inv _ e)        = "(" <> pretty e <> ")^(-1)"
-  pretty (Div _ x y)      = pretty x <+> "/" <+> pretty y
-  pretty (Sub _ x y)      = pretty x <+> "-" <+> pretty y
-  pretty (Lt _ x y)       = pretty x <+> "<" <+> pretty y
-  pretty (Le _ x y)       = pretty x <+> "=<" <+> pretty y
-  pretty (Eq _ x y)       = pretty x <+> "=" <+> pretty y
-  pretty (Is _ x y)       = pretty x <+> "is" <+> pretty y
-  pretty (Gt _ x y)       = pretty x <+> ">" <+> pretty y
-  pretty (Ge _ x y)       = pretty x <+> ">=" <+> pretty y
-  pretty (Mul _ x y)      = pretty x <+> "*" <+> pretty y
-  pretty (Add _ x y)      = pretty x <+> "+" <+> pretty y
-  pretty (Min _ x y)      = "min(" <> pretty x <> ", " <> pretty y <> ")"
-  pretty (Max _ x y)      = "max(" <> pretty x <> ", " <> pretty y <> ")"
-  pretty (Or _ x y)       = pretty x <> ";\n" <> pretty y
+  pretty (Not e x)        = "!" <> pretty x <+> (pretty $ show e)
+  pretty (Neg e x)        = "-" <> pretty x <+> (pretty $ show e)
+  pretty (Inv e x)        = "(" <> pretty x <> ")^(-1)" <+> (pretty $ show e)
+  pretty (Div e x y)      = pretty x <+> "/" <+> pretty y <+> (pretty $ show e)
+  pretty (Sub e x y)      = pretty x <+> "-" <+> pretty y <+> (pretty $ show e)
+  pretty (Lt e x y)       = pretty x <+> "<" <+> pretty y <+> (pretty $ show e)
+  pretty (Le e x y)       = pretty x <+> "=<" <+> pretty y <+> (pretty $ show e)
+  pretty (Eq e x y)       = pretty x <+> "=" <+> pretty y <+> (pretty $ show e)
+  pretty (Is e x y)       = pretty x <+> "is" <+> pretty y <+> (pretty $ show e)
+  pretty (Gt e x y)       = pretty x <+> ">" <+> pretty y <+> (pretty $ show e)
+  pretty (Ge e x y)       = pretty x <+> ">=" <+> pretty y <+> (pretty $ show e)
+  pretty (Mul e x y)      = pretty x <+> "*" <+> pretty y <+> (pretty $ show e)
+  pretty (Add e x y)      = pretty x <+> "+" <+> pretty y <+> (pretty $ show e)
+  pretty (Min e x y)      = "min(" <> pretty x <> ", " <> pretty y <> ")" <+> (pretty $ show e)
+  pretty (Max e x y)      = "max(" <> pretty x <> ", " <> pretty y <> ")" <+> (pretty $ show e)
+  pretty (Or e x y)       = pretty x <> ";\n" <> pretty y <+> (pretty $ show e)
   pretty (And _ x y)      = pretty x <> ",\n" <> pretty y
-  pretty (List _ x)       = list $ pretty <$> x
+  pretty (List e x)       = (list $ pretty <$> x) <+> (pretty $ show e)
 
 instance PrologSource Expr where
   prolog (Var _ x)        = pretty x

@@ -19,8 +19,6 @@ import DBClause
 
 import Control.Lens
 import Control.Monad.State
-import Control.Monad.Except
-import Control.Exception
 
 import Data.Generics.Uniplate.Data as U
 import Data.Set as S
@@ -113,7 +111,7 @@ adornRule a@(Adornable r _bp) =
 
     -- Reorder the terms in rule body
     let _terms = (andsToList $ r ^. ruleTail)
-    _reordered <- reorderTerms _terms
+    _boundTerms <- bindTerms _terms
 
     -- Suffix any predicates in rule body that are not database facts
     let _suffixNotEDB x =
@@ -122,7 +120,7 @@ adornRule a@(Adornable r _bp) =
             if _isEDB
               then return x
               else return $ suffixExpr x
-    _suffixed <- traverse _suffixNotEDB _reordered
+    _suffixed <- traverse _suffixNotEDB _boundTerms
     let _folded = foldr1 eAnd _suffixed
 
     -- Add current rule to gsVisited
@@ -138,7 +136,7 @@ adornRule a@(Adornable r _bp) =
         _newPairs = do
           let toPair p@(Pred _ n _) = Just (p, n)
               toPair _ = Nothing
-          (p, n) <- nub $ _reordered ^.. folded . to toPair . _Just
+          (p, n) <- nub $ _boundTerms ^.. folded . to toPair . _Just
           let _rs  = findRulesByName _rules n
               _bindings = repeat $ p ^. paramBindings
               _ads  = uncurry Adornable <$> zip _rs _bindings
@@ -175,30 +173,22 @@ predPattern _ _ = []
 -- | Reorders the list of terms to maximize the number of
 -- bound variables at each predicate.
 -- The bindings annotations will be set for all predicates.
-reorderTerms :: [Expr] -> AdornM [Expr]
-reorderTerms [] = return []
-reorderTerms l  =
+bindTerms :: [Expr] -> AdornM [Expr]
+bindTerms [] = return []
+bindTerms l  =
   do
     _bound <- use gsBound
     -- Might be inefficient to sort again every time
     -- for longer rule bodies
-    let _best = sortBy (comp _bound) l
-    let _headBest = head _best
+    let _head = head l
     -- Bind all the variables that are parameters of the best candidate
-        _vars = [v | v@(Var _ _) <- U.universe _headBest]
+        _vars = [v | v@(Var _ _) <- U.universe _head]
         _newBound = [n | (Var _ n) <- _vars]
-    let _pat = predPattern _bound _headBest
-        _ad = U.transform (annotateWithBindings _bound) $ _headBest & paramBindings .~ _pat
+    let _pat = predPattern _bound _head
+        _ad = U.transform (annotateWithBindings _bound) $ _head & paramBindings .~ _pat
     modify $ gsBound %~ S.union (S.fromList _newBound)
-    _t <- reorderTerms $ tail $ _best
+    _t <- bindTerms $ tail l
     return $ _ad:_t
-
-comp :: S.Set String -> Expr -> Expr -> Ordering
-comp bound l r = 
-  compare (f ys) $ f xs
-    where f x = x ^.. folded . _Var . _2 . filtered(`elem` bound)
-          xs  = [v | v@(Var _ _)<- U.universeBi l]
-          ys  = [v | v@(Var _ _)<- U.universeBi r]
 
 allBound :: Rule -> Adornable
 allBound r = Adornable r $ True <$ args r
