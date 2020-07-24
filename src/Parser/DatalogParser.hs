@@ -15,7 +15,7 @@ import Parser.DatalogParser.Lexer
 import Parser.DatalogParser.Expr
 
 import qualified DatalogProgram as DP
-import Expr hiding (identifier)
+import Expr as E hiding (identifier)
 import qualified Rule as R
 import Annotation as A
 
@@ -49,12 +49,12 @@ clause = asum
 ruleP :: Parser R.Rule
 ruleP = 
   do
-    (Pred ann n xs) <- predParse
+    (Pred a n xs) <- predParse
     b <- option [] $ impliedBy *> body
     void $ symbol "."
     let expr = joinExprs b
-        t = ann ^. A.typing
-    return $ R.rule n xs expr & R.ruleHead . annLens . A.typing .~ t
+        t = a ^. A.typing
+    return $ R.rule n xs expr & R.ruleHead . ann . A.typing .~ t
 
 funCall :: Parser DP.Directive
 funCall = asum

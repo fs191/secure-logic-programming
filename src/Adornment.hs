@@ -213,7 +213,7 @@ isEDB :: Rule -> AdornM Bool
 isEDB = view $ ruleHead . to isPredEDB
 
 paramBindings :: Lens' Expr [Bool]
-paramBindings = partsOf $ _Pred . _3 . traversed . annLens . annBound
+paramBindings = partsOf $ _Pred . _3 . traversed . ann . annBound
 
 showBindings :: [Bool] -> String
 showBindings [] = ""

@@ -1,9 +1,5 @@
 module PostProcessingSpec where
 
-import Control.Monad
-
-import Data.Maybe
-
 import Test.Hspec
 
 import Swipl
@@ -20,6 +16,6 @@ spec =
     postProcPreserveSem "examples/ppdatalog/employee.pl" employeeDB
 
 postProcPreserveSem :: String -> [Expr] -> Spec
-postProcPreserveSem f db = preservesSemanticsDB (fromJust . _fun) f db
-  where _fun = (flip deriveAllGroundRules 3) >=> (return . postProcess)
+postProcPreserveSem f db = preservesSemanticsDB _fun f db
+  where _fun = postProcess . (deriveAllGroundRules 3) 
 

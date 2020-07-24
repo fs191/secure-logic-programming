@@ -38,7 +38,6 @@ typeInference dp =
      & id %~ inferFromGoal
      & dpRules . traversed %~ inferBuiltins
      & id %~ inferPred
-     -- & dpGoal %~ inferPred
      & dpRules . traversed %~ inferRuleRet
      & id %~ inferGoal
      & id %~ inferGoalRet
@@ -65,7 +64,7 @@ inferFromDB dp (Pred _ n xs) = mconcat newParams'
     inferParams (v, (Typing d t)) = 
       (fromMaybe (err v) $ identifier v) |-> Typing y t
       where 
-        y | v ^. annLens . annBound = Unknown
+        y | v ^. ann . annBound = Unknown
           | otherwise     = d
     err v = error $ show v ++ " does not have an indentifier"
     newParams' = inferParams <$> (xs `zip` unified)
@@ -84,17 +83,17 @@ inferPred :: DatalogProgram -> DatalogProgram
 inferPred dp = dp & dpRules . traversed . ruleTail %~ U.transform f
   where
     f p@(Pred _ n xs) 
-      | anyPC     = p & annLens . domain .~ Private
+      | anyPC     = p & ann . domain .~ Private
       | anyUnk    = p
-      | otherwise = p & annLens . domain .~ Public
+      | otherwise = p & ann . domain .~ Public
       where
         dbf = findDBFact dp n
         (Pred _ _ ys) = dbf ^. ruleHead
         -- See if a bound variable is compared to a private DB column
-        privateComp (x, y) = x ^. annLens . annBound && 
-                             y ^. annLens . domain . to (==Private)
+        privateComp (x, y) = x ^. ann . annBound && 
+                             y ^. ann . domain . to (==Private)
         anyPC = any privateComp $ xs `zip` ys
-        anyUnk = any (==Unknown) $ xs ^.. folded . annLens . domain
+        anyUnk = any (==Unknown) $ xs ^.. folded . ann . domain
     f x = x
 
 -----------------------------------------------
@@ -120,20 +119,20 @@ inferBuiltins r = applyTypeSubst subst' r'
 inferBinRet :: Expr -> Expr -> Expr -> Expr
 inferBinRet e x y
   -- If both are bound then it is a comparison and privacy depends on subterms
-  | xb && yb  = e & annLens . annType %~ unifyTypes PPBool
-                  & annLens . domain  .~ safelyUnifyDomains xd yd
+  | xb && yb  = e & ann . annType %~ unifyTypes PPBool
+                  & ann . domain  .~ safelyUnifyDomains xd yd
   -- If only one variable is bound, then it is an assignment and will always
   -- return true
-  | xb        = e & annLens . annType %~ unifyTypes PPBool
-                  & annLens . domain  .~ Public
-  | yb        = e & annLens . annType %~ unifyTypes PPBool
-                  & annLens . domain  .~ Public
+  | xb        = e & ann . annType %~ unifyTypes PPBool
+                  & ann . domain  .~ Public
+  | yb        = e & ann . annType %~ unifyTypes PPBool
+                  & ann . domain  .~ Public
   | otherwise = error $ "Uninitialized variables: " ++ show e
   where
-    xd = x ^. annLens . domain
-    xb = x ^. annLens . annBound
-    yd = y ^. annLens . domain
-    yb = y ^. annLens . annBound
+    xd = x ^. ann . domain
+    xb = x ^. ann . annBound
+    yd = y ^. ann . domain
+    yb = y ^. ann . annBound
 
 inferBinArgs :: Expr -> Expr -> Expr -> TypeSubstitution
 inferBinArgs e x y
@@ -142,10 +141,10 @@ inferBinArgs e x y
   | xb       = fromMaybe mempty $ (|-> xt) <$> identifier y
   | otherwise = error $ "Uninitialized variables: " ++ show e
   where
-    xt = x ^. annLens . typing
-    xb = x ^. annLens . annBound
-    yt = y ^. annLens . typing
-    yb = y ^. annLens . annBound
+    xt = x ^. ann . typing
+    xb = x ^. ann . annBound
+    yt = y ^. ann . typing
+    yb = y ^. ann . annBound
 
 -- | Infers rule types from the parameter typings in the goal predicate.
 inferFromGoal :: DatalogProgram -> DatalogProgram
@@ -154,13 +153,14 @@ inferFromGoal dp = dp & dpRules . traverse %~ subst
     g = dp ^. dpGoal
     subst r = fromMaybe r $
       do
-        rn <- r ^? ruleHead . _Pred . _2
-        gn <- g ^? _Pred . _2
+        -- Find all rules that get called by the goal
+        rn <- r ^? ruleHead . predName
+        gn <- g ^? predName
         guard $ rn == gn
-        rxs <- r ^? ruleHead . _Pred . _3 :: Maybe [Expr]
-        gxs <- g ^? _Pred . _3 :: Maybe [Expr]
-        let unified :: [Typing]
-            unified = (uncurry unifyExprTypings) <$> (rxs `zip` gxs)
+        rxs <- r ^? ruleHead . predArgs
+        gxs <- g ^? predArgs
+        -- Unify goal and rule arguments
+        let unified = (uncurry unifyExprTypings) <$> (rxs `zip` gxs)
             f (x, y) = (,) <$> (maybeToList $ identifier x) <*> [y]
             paramNames :: [(String, Typing)]
             paramNames = concat $ traverse f $ rxs `zip` unified
@@ -186,34 +186,34 @@ inferGoal dp = dp & dpGoal  %~ U.transform f
                   . _Pred 
                   . _3
     foldUnify :: [Expr] -> PPType
-    foldUnify x = foldl1 unifyTypes $ x ^.. folded . annLens . annType
+    foldUnify x = foldl1 unifyTypes $ x ^.. folded . ann . annType
     f = applyTypeSubstToExpr .
           mconcat $ [x |-> (Typing Unknown $ foldUnify y) | (Just x, y) <- goalRules]
 
 inferFromInputs :: DatalogProgram -> DatalogProgram
 inferFromInputs dp = dp & dpGoal %~ applyTypeSubstToExpr (mconcat inps)
   where
-    inps = dp ^.. inputs . to(\v -> (fromJust $ identifier v) |-> (v ^. annLens . typing))
+    inps = dp ^.. inputs . to(\v -> (fromJust $ identifier v) |-> (v ^. ann . typing))
 
 -- | Decides the return type of a rule by looking at the return types of the
 -- predicates in its body
 inferRuleRet :: Rule -> Rule
-inferRuleRet r = r & ruleHead . annLens . typing %~ unified
+inferRuleRet r = r & ruleHead . ann . typing %~ unified
   where
-    isPred x = x ^. annLens . annType . to(==PPBool)
+    isPred x = x ^. ann . annType . to(==PPBool)
     predTypings = catMaybes [ 
       do 
         guard (isPred x)
-        Just $ x ^. annLens . typing 
+        Just $ x ^. ann . typing 
       | x <- andsToList (r ^. ruleTail) ]
     unified
       | any (\(Typing d _) -> d == Unknown) predTypings = id
       | otherwise = const $ foldl unifyTypings (Typing Unknown PPBool) predTypings
 
 inferGoalRet :: DatalogProgram -> DatalogProgram
-inferGoalRet dp = dp & dpGoal . annLens . domain .~ d
+inferGoalRet dp = dp & dpGoal . ann . domain .~ d
   where
-    doms = dp ^.. dpRules . folded . ruleHead . annLens . domain
+    doms = dp ^.. dpRules . folded . ruleHead . ann . domain
     d = foldl safelyUnifyDomains Unknown doms
 
 -- | Applies a type substitution to an expression
@@ -228,12 +228,12 @@ applyTypeSubstToExpr (TypeSubstitution ts) e = U.transform f e
 unifyExprTypings :: Expr -> Expr -> Typing
 unifyExprTypings x y = Typing d t
   where
-    d = unifyDomains (x ^. annLens . domain) (y ^. annLens . domain)
-    t = unifyTypes (x ^. annLens . annType) (y ^. annLens . annType)
+    d = unifyDomains (x ^. ann . domain) (y ^. ann . domain)
+    t = unifyTypes (x ^. ann . annType) (y ^. ann . annType)
 
 -- | Extracts typing from an expression
 exprTyping :: Expr -> Typing
-exprTyping e = e ^. annLens . typing
+exprTyping e = e ^. ann . typing
 
 -- | Applies type substitution to a rule
 applyTypeSubst :: TypeSubstitution -> Rule -> Rule

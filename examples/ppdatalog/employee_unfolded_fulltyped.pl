@@ -38,12 +38,13 @@ viewESM(X0 : public string, X2 : private int, X4 : public string) : private bool
 %the truth type of the rule is private since at least one its line has private truth type
 %there are no implicit matchings of input against constant 0 since the second argument of the goal is not an input
 %(constant arguments are treated differently in fib.pl example)
-viewESM(X0 : public string, 0 : public int, X4 : public string) : private bool :-
-  eds(X0 : public string, X1 : public string, X2 : private int) : public bool,
+viewESM(X0 : public string, X1 : public int, X4 : public string) : private bool :-
+  X1 : public int = 0 : public int                              : public bool,
+  eds(X0 : public string, X5 : public string, X2 : private int) : public bool,
   2500 : public int =< X2 : private int                         : private bool,
   % Comparisons are done between public columns, so result is public bool
   dm(X3 : public string, X4 : public string)                    : public bool,
-  X1 : public string = X3 : public string                       : public bool.
+  X5 : public string = X3 : public string                       : public bool.
 
 % the truth type is private since it is private for at least one viewWSM rule
 % the type of 'manager1' is public since it is a constant
@@ -51,3 +52,4 @@ viewESM(X0 : public string, 0 : public int, X4 : public string) : private bool :
 % the type of Y2 is private string since it is so for at least one viewESM rule
 :- outputs([Y1 : string, Y2 : int]).
 viewESM(Y1 : string, Y2 : int, 'manager1' : public string) : private bool?
+

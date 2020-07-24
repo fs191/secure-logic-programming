@@ -8,6 +8,7 @@ import Language.SecreC
 import Data.Text.Prettyprint.Doc
 import Data.Maybe
 import Transform
+import PreProcessing
 import PostProcessing
 import TypeInference
 import Adornment
@@ -24,8 +25,8 @@ main = do
 
   -- parse the input datalog program
   program <- parseDatalogFromFile inFileName
-  let _trans = fromMaybe (error "failed to derive ground rules") $ 
-                 deriveAllGroundRules (adornProgram program) _ite
+  let _preProc = preProcess program
+  let _trans = deriveAllGroundRules _ite (adornProgram _trans)
   let _postProc = postProcess _trans
   let _domained = typeInference _postProc
 
@@ -47,3 +48,4 @@ main = do
   if outFilePath /= ""
      then writeFile outFilePath secrec
      else putStrLn secrec
+

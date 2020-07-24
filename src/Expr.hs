@@ -10,6 +10,8 @@ module Expr
   , isConstExpr, isLeaf
   , isVar
   , _Pred
+  , predName
+  , predArgs
   , constStr
   , constInt
   , constBool
@@ -28,7 +30,7 @@ module Expr
   , eMin, eMax
   , eAnd, eOr
   , eList
-  , annLens
+  , ann
   , annType, domain
   , applyTyping
   , getAnn
@@ -68,32 +70,33 @@ import Annotation
 -- artihmetic expressions
 -- associative operations are represented with lists
 data Expr
-  = ConstInt   !Ann !Int
-  | ConstFloat !Ann !Float
-  | ConstStr   !Ann !String
-  | ConstBool  !Ann !Bool
-  | Attribute  !Ann !String
-  | Var  !Ann !String
-  | Not  !Ann !Expr
-  | Neg  !Ann !Expr
-  | Inv  !Ann !Expr
-  | Div  !Ann !Expr !Expr
-  | Sub  !Ann !Expr !Expr
-  | Lt   !Ann !Expr !Expr
-  | Le   !Ann !Expr !Expr
-  | Eq   !Ann !Expr !Expr
-  | Is   !Ann !Expr !Expr
-  | Gt   !Ann !Expr !Expr
-  | Ge   !Ann !Expr !Expr
-  | Mul  !Ann !Expr !Expr
-  | Add  !Ann !Expr !Expr
-  | Min  !Ann !Expr !Expr
-  | Max  !Ann !Expr !Expr
-  | And  !Ann !Expr !Expr
-  | Or   !Ann !Expr !Expr
-  | Pred !Ann !String ![Expr]
-  | List !Ann ![Expr]
+  = ConstInt   {_ann :: !Ann, _intVal :: !Int}
+  | ConstFloat {_ann :: !Ann, _floatVal :: !Float}
+  | ConstStr   {_ann :: !Ann, _strVal :: !String}
+  | ConstBool  {_ann :: !Ann, _boolVal :: !Bool}
+  | Attribute  {_ann :: !Ann, _attrName :: !String}
+  | Var  {_ann :: !Ann, _varName :: !String}
+  | Not  {_ann :: !Ann, _arg :: !Expr}
+  | Neg  {_ann :: !Ann, _arg :: !Expr}
+  | Inv  {_ann :: !Ann, _arg :: !Expr}
+  | Div  {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Sub  {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Lt   {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Le   {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Eq   {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Is   {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Gt   {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Ge   {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Mul  {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Add  {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Min  {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Max  {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | And  {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Or   {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Pred {_ann :: !Ann, _predName :: !String, _predArgs :: ![Expr]}
+  | List {_ann :: !Ann, _xs :: ![Expr]}
   deriving (Ord,Show,Eq,Data,Typeable)
+makeLenses ''Expr
 makePrisms ''Expr
 
 instance Pretty Expr where
@@ -262,11 +265,7 @@ eIs :: Expr -> Expr -> Expr
 eIs = Is empty
 
 getAnn :: Expr -> Ann
-getAnn x = head $ x ^.. annLens
-
--- | A traversal for accessing the annotation of a term
-annLens :: Lens' Expr Ann
-annLens = singular $ (partsOf template) . _head
+getAnn x = head $ x ^.. ann
 
 -- | Turns all `And`s to a list, 
 -- starting from the root of the expression
@@ -317,21 +316,21 @@ attribute :: String -> Expr
 attribute = Attribute empty
 
 unifyExprAnns :: Expr -> Expr -> Expr
-unifyExprAnns x y = x & annLens %~ (unifyAnns a)
-  where a = y ^. annLens
+unifyExprAnns x y = x & ann %~ (unifyAnns a)
+  where a = y ^. ann
 
 unifyExprTypes :: Expr -> Expr -> PPType
 unifyExprTypes x y = unifyTypes xd yd
   where
-    xd = head $ x ^.. annLens . annType
-    yd = head $ y ^.. annLens . annType
+    xd = head $ x ^.. ann . annType
+    yd = head $ y ^.. ann . annType
 
 unifyExprDomains :: Expr -> Expr -> PPDomain
 unifyExprDomains x y = unifyDomains xd yd
   where
-    xd = head $ x ^.. annLens . domain
-    yd = head $ y ^.. annLens . domain
+    xd = head $ x ^.. ann . domain
+    yd = head $ y ^.. ann . domain
 
 applyTyping :: Typing -> Expr -> Expr
-applyTyping t e = e & annLens . typing %~ unifyTypings t
+applyTyping t e = e & ann . typing %~ unifyTypings t
 

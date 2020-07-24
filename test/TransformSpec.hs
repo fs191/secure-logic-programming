@@ -4,8 +4,6 @@ module TransformSpec where
 
 import Test.Hspec
 
-import Data.Maybe
-
 import Parser.DatalogParser
 
 import Transform
@@ -38,7 +36,7 @@ spec =
     runsSuccessfullyDB "examples/ppdatalog/employee.pl" transform employeeRes employeeDB
     
 transform :: DatalogProgram -> DatalogProgram
-transform = fromJust . flip deriveAllGroundRules 2
+transform = deriveAllGroundRules 2
 
 canDeriveOn :: String -> Int -> Spec
 canDeriveOn file n = it desc $ action `shouldReturn` ()
@@ -46,16 +44,16 @@ canDeriveOn file n = it desc $ action `shouldReturn` ()
     desc = "can derive ground rules on " ++ file ++ " with " ++ show n ++ " iterations"
     action = do
         f <- parseDatalogFromFile file
-        let d = deriveAllGroundRules f n
+        let d = deriveAllGroundRules n f
         return $ d `seq` ()
      
 transPreserveSem :: String -> Int -> Spec
 transPreserveSem f n = 
-  preservesSemantics (fromJust . flip deriveAllGroundRules n) f
+  preservesSemantics (deriveAllGroundRules n) f
 
 transPreserveSemDB :: String -> Int -> [Expr] -> Spec
 transPreserveSemDB f n db = 
-  preservesSemanticsDB (fromJust . flip deriveAllGroundRules n) f db
+  preservesSemanticsDB (deriveAllGroundRules n) f db
 
 --
 -- Expected results
