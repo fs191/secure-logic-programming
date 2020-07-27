@@ -31,6 +31,8 @@ module Expr
   , eAnd, eOr
   , eList
   , ann
+  , leftHand, rightHand
+  , arg
   , annType, domain
   , applyTyping
   , getAnn
@@ -56,7 +58,6 @@ import Control.Exception
 import Control.Lens hiding (transform, children, List)
 
 import Data.Data
-import Data.Data.Lens
 import Data.Generics.Uniplate.Data as U
 import Data.List as L
 import Data.Set as S hiding (empty)
@@ -94,7 +95,7 @@ data Expr
   | And  {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Or   {_ann :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Pred {_ann :: !Ann, _predName :: !String, _predArgs :: ![Expr]}
-  | List {_ann :: !Ann, _xs :: ![Expr]}
+  | List {_ann :: !Ann, _vals :: ![Expr]}
   deriving (Ord,Show,Eq,Data,Typeable)
 makeLenses ''Expr
 makePrisms ''Expr
@@ -108,7 +109,7 @@ instance Pretty Expr where
   pretty (Attribute e x)  = pretty x <+> (pretty $ show e)
   pretty (Pred e n args)  = pretty n <> tupled (pretty <$> args) <+> (pretty $ show e)
   pretty (Not e x)        = "!" <> pretty x <+> (pretty $ show e)
-  pretty (Neg e x)        = "-" <> pretty x <+> (pretty $ show e)
+  pretty (Neg e x)        = "-(" <> pretty x <> ")" <+> (pretty $ show e)
   pretty (Inv e x)        = "(" <> pretty x <> ")^(-1)" <+> (pretty $ show e)
   pretty (Div e x y)      = pretty x <+> "/" <+> pretty y <+> (pretty $ show e)
   pretty (Sub e x y)      = pretty x <+> "-" <+> pretty y <+> (pretty $ show e)
@@ -176,16 +177,16 @@ isVar (Var _ _) = True
 isVar _       = False
 
 constStr :: String -> Expr
-constStr = ConstStr ann
+constStr = ConstStr a
   where
-    ann = empty & annBound .~ True
-                & annType  .~ PPStr
-                & domain   .~ Public
+    a = empty & annBound .~ True
+              & annType  .~ PPStr
+              & domain   .~ Public
 
 constInt :: Int -> Expr
-constInt = ConstInt ann
+constInt = ConstInt a
   where
-    ann = empty & annBound .~ True
+    a = empty & annBound .~ True
                 & annType  .~ PPInt
                 & domain   .~ Public
 
@@ -202,14 +203,14 @@ constBool = ConstBool (empty & annBound .~ True
                              & domain   .~ Public)
 
 var :: String -> Expr
-var n = Var ann n 
-  where ann = empty & annType .~ PPAuto
+var n = Var a n 
+  where a = empty & annType .~ PPAuto
                     & domain  .~ Unknown
 
 predicate :: String -> [Expr] -> Expr
-predicate = Pred ann
+predicate = Pred a
   where
-    ann = empty & annBound .~ True
+    a = empty & annBound .~ True
                 & annType  .~ PPBool
                 & domain   .~ Unknown
 

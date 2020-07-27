@@ -1,9 +1,13 @@
 % this rule looks simple, but implicitly it contains a matching of an input against a constant
 % N = 0 for a private N (type of N is private since it is goal's input)
 % the implicit matchings can be determinined similarly to matchings of database predicate arguments
-fib(0 : public int, 1 : public int) : private bool.
+fib(N : private int, F : public int) : private bool :-
+  N : private int = 0 : public int   : private bool,
+  F : public int = 1 : public int    : public bool.
 
-fib(1 : public int, 1 : public int) : private bool.
+fib(N : private int, F : public int) : private bool :-
+  N : private int = 1 : public int   : private bool,
+  F : public int = 1 : public int    : public bool.
 
 % type of N is private since it is goal's input
 fib(N: private int, F: public int) : private bool :-

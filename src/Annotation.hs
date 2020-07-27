@@ -11,6 +11,7 @@ module Annotation
   , annBound
   , unifyAnns
   , unifyTypings
+  , safelyUnifyDomains, safelyUnifyTypings
   , typing
   ) where
 
@@ -67,3 +68,15 @@ typing = lens getter setter
 unifyTypings :: Typing -> Typing -> Typing
 unifyTypings (Typing xd xt) (Typing yd yt)
   =  Typing (unifyDomains xd yd) (unifyTypes xt yt)
+
+safelyUnifyDomains :: PPDomain -> PPDomain -> PPDomain
+safelyUnifyDomains Private _ = Private
+safelyUnifyDomains _ Private = Private
+safelyUnifyDomains Unknown _ = Unknown
+safelyUnifyDomains _ Unknown = Unknown
+safelyUnifyDomains _ _       = Public
+
+safelyUnifyTypings :: Typing -> Typing -> Typing 
+safelyUnifyTypings (Typing dx tx) (Typing dy ty)
+  = Typing (safelyUnifyDomains dx dy) $ unifyTypes tx ty
+

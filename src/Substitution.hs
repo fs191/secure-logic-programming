@@ -39,7 +39,7 @@ instance Show Subst where
   show (Th theta) = concat $ map (\(k,v) -> show k ++ " -> " ++ show v ++ "\n") (M.toList theta)
 
 instance Pretty Subst where
-  pretty (Th s) = tupled $ (\(a, b) -> pretty a <+> "->" <+> pretty b) <$> M.toList s
+  pretty (Th s) = tupled $ (\(a, b) -> pretty a <+> " -> " <+> pretty b) <$> M.toList s
 
 -- | A very safe string that is prepended to variable names to keep track
 -- of which variables have already been substituted. Only used internally.
@@ -98,7 +98,6 @@ applyToExpr theta bexpr = removeSafePrefixes . transform f $ safePrefix _bexpr
   where theta'      = mapKeys (safeStr<>) theta
         f v@(Var _ _) = evalTheta theta' v
         f x         = x
-        err         = error "could not evaluate theta"
         _vars       = [b | (Var _ b) <- universe bexpr]
         -- Ensure that no variables begin with the safe string before application
         _bexpr      = assert (all (not . isPrefixOf safeStr) _vars) bexpr
@@ -123,11 +122,10 @@ refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
         i <- get
         modify (+1)
         let n = prefix <> show i
-        -- This should succeed, because the type remains the same
-        let err = error "A variable does not unify types with itself?"
         return $ v |-> Var a n
     f _ = error "Expected a variable, got something else"
 
+-- | Prefixes a variable name with the safe string
 safePrefix :: Expr -> Expr
 safePrefix = transform f
   where f (Var a n) = Var a (safeStr <> n)

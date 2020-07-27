@@ -54,7 +54,8 @@ ruleP =
     void $ symbol "."
     let expr = joinExprs b
         t = a ^. A.typing
-    return $ R.rule n xs expr & R.ruleHead . ann . A.typing .~ t
+    (return $ R.rule n xs expr & R.ruleHead . ann . A.typing .~ t) 
+      <?> "rule"
 
 funCall :: Parser DP.Directive
 funCall = asum

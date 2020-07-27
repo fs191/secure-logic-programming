@@ -15,6 +15,7 @@ import Expr
 import DatalogProgram
 import Rule
 import Language.SecreC.Types
+import Debug.Trace
 
 data TypeSubstitution 
   = TypeSubstitution (M.Map String Typing)
@@ -36,8 +37,9 @@ typeInference dp =
      & id %~ inferFromInputs
      & dpRules . traversed %~ applyDBInfer
      & id %~ inferFromGoal
+     & dpRules . traversed . ruleTail %~ inferArithmetic
      & dpRules . traversed %~ inferBuiltins
-     & id %~ inferPred
+     & id %~ inferDBRet
      & dpRules . traversed %~ inferRuleRet
      & id %~ inferGoal
      & id %~ inferGoalRet
@@ -79,8 +81,8 @@ inferConstants (Pred _ n xs) = predicate n xs
 inferConstants x = x
 
 -- | Infers typings for database facts
-inferPred :: DatalogProgram -> DatalogProgram
-inferPred dp = dp & dpRules . traversed . ruleTail %~ U.transform f
+inferDBRet :: DatalogProgram -> DatalogProgram
+inferDBRet dp = dp & dpRules . traversed . ruleTail %~ U.transform f
   where
     f p@(Pred _ n xs) 
       | anyPC     = p & ann . domain .~ Private
@@ -96,6 +98,25 @@ inferPred dp = dp & dpRules . traversed . ruleTail %~ U.transform f
         anyUnk = any (==Unknown) $ xs ^.. folded . ann . domain
     f x = x
 
+inferArithmetic :: Expr -> Expr
+inferArithmetic = U.transform (\x -> fromMaybe x $ appIfBinArith f x)
+  where
+    f :: Expr -> Expr -> Expr -> Expr
+    f a x y = a & ann . typing   %~ unifyTypings (safelyUnifyTypings xt yt)
+                & ann . annBound .~ (x ^. ann . annBound && y ^. ann . annBound)
+      where
+        xt = x ^. ann . typing
+        yt = y ^. ann . typing
+
+appIfBinArith :: (Expr -> Expr -> Expr -> a) -> Expr -> Maybe a
+appIfBinArith f e@(Add _ a b) = Just $ f e a b
+appIfBinArith f e@(Sub _ a b) = Just $ f e a b
+appIfBinArith f e@(Mul _ a b) = Just $ f e a b
+appIfBinArith f e@(Div _ a b) = Just $ f e a b
+appIfBinArith f e@(Min _ a b) = Just $ f e a b
+appIfBinArith f e@(Max _ a b) = Just $ f e a b
+appIfBinArith _ _ = Nothing
+
 -----------------------------------------------
 -- Built-in predicate type and domain inference
 -----------------------------------------------
@@ -106,6 +127,7 @@ appIfBinPred f e@(Gt _ a b) = Just $ f e a b
 appIfBinPred f e@(Eq _ a b) = Just $ f e a b
 appIfBinPred f e@(Le _ a b) = Just $ f e a b
 appIfBinPred f e@(Lt _ a b) = Just $ f e a b
+appIfBinPred f e@(Is _ a b) = Just $ f e a b
 appIfBinPred _ _ = Nothing
 
 inferBuiltins :: Rule -> Rule
@@ -200,15 +222,11 @@ inferFromInputs dp = dp & dpGoal %~ applyTypeSubstToExpr (mconcat inps)
 inferRuleRet :: Rule -> Rule
 inferRuleRet r = r & ruleHead . ann . typing %~ unified
   where
-    isPred x = x ^. ann . annType . to(==PPBool)
-    predTypings = catMaybes [ 
+    predTypings =
       do 
-        guard (isPred x)
-        Just $ x ^. ann . typing 
-      | x <- andsToList (r ^. ruleTail) ]
-    unified
-      | any (\(Typing d _) -> d == Unknown) predTypings = id
-      | otherwise = const $ foldl unifyTypings (Typing Unknown PPBool) predTypings
+        x <- andsToList (r ^. ruleTail)
+        return $ x ^. ann . typing
+    unified = unifyTypings $ foldl1 safelyUnifyTypings predTypings
 
 inferGoalRet :: DatalogProgram -> DatalogProgram
 inferGoalRet dp = dp & dpGoal . ann . domain .~ d
@@ -240,11 +258,4 @@ applyTypeSubst :: TypeSubstitution -> Rule -> Rule
 applyTypeSubst ts r = 
   r & ruleHead %~ applyTypeSubstToExpr ts
     & ruleTail %~ applyTypeSubstToExpr ts
-
-safelyUnifyDomains :: PPDomain -> PPDomain -> PPDomain
-safelyUnifyDomains Private _ = Private
-safelyUnifyDomains _ Private = Private
-safelyUnifyDomains Unknown _ = Unknown
-safelyUnifyDomains _ Unknown = Unknown
-safelyUnifyDomains _ _       = Public
 
