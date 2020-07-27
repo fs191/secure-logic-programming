@@ -31,6 +31,10 @@ spec = parallel . describe "Parser.parseDatalog" $ do
     canParse "examples/ppdatalog/auction.pl"
     canParse "examples/ppdatalog/employee.pl"
     canParse "examples/ppdatalog/relatives.pl"
+    canParse "examples/ppdatalog/fib_unfolded_3_fulltyped.pl"
+    canParse "examples/ppdatalog/market_unfolded_fulltyped.pl"
+    canParse "examples/ppdatalog/employee_unfolded_fulltyped.pl"
+    canParse "examples/ppdatalog/relatives_unfolded_3_fulltyped.pl"
     cannotParse "examples/prolog/negative/gibberish.pl"
 
 canParse :: String -> Spec

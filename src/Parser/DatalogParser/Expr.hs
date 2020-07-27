@@ -1,6 +1,6 @@
 module Parser.DatalogParser.Expr
   ( aExpr
-  , term
+  , aTerm
   , rule
   , list
   , attributeParse
@@ -9,9 +9,6 @@ module Parser.DatalogParser.Expr
   ) where
 
 import Text.Megaparsec
-
-import Control.Lens
-import Control.Monad.Combinators.Expr
 
 import Data.Void (Void)
 import Data.Foldable
@@ -27,63 +24,65 @@ type Parser = Parsec Void String
 -- Numeric expressions
 -----------------------
 
-aExprTable :: [[Operator Parser Expr]]
-aExprTable = 
-  [ [ prefix "-" eNeg
-    ]
-  , [ binary "\\/" eMax
-    , binary "/\\" eMin
-    ]
-  , [ binary "*" eMul
-    , binary "/" eDiv
-    ]
-  , [ binary "+" eAdd
-    , binary "-" eSub
-    ]
-  , [ binary "=<" lessEqual
-    , binary "<"  less
-    , binary ">=" greaterEqual
-    , binary ">"  greater
-    , binary "="  equal
-    , binary "is" eIs
-    ]
-  ]
-
 aExpr :: Parser Expr
-aExpr = typable $ makeExprParser aTerm aExprTable
+aExpr = aExpr1
 
 aTerm :: Parser Expr
-aTerm = try term
-
-term :: Parser Expr
-term = asum
+aTerm = asum
   [ try predParse
   , try varParse
   , try strParse
   , try intParse
   , try attributeParse
   , try list
-  , parens aExpr
+  , typable $ parens aExpr
   ] <?> "term"
 
+aExpr1 :: Parser Expr
+aExpr1 = asum
+  [ binary greaterEqual ">=" aExpr1 aExpr2
+  , binary greater      ">"  aExpr1 aExpr2
+  , binary equal        "="  aExpr1 aExpr2
+  , binary lessEqual    "=<" aExpr1 aExpr2
+  , binary less         "<"  aExpr1 aExpr2
+  , binary eIs          "is" aExpr1 aExpr2
+  , aExpr2
+  ]
+
+aExpr2 :: Parser Expr
+aExpr2 = asum
+  [ binary eAdd "+" aExpr2 aExpr3
+  , binary eSub "-" aExpr2 aExpr3
+  , aExpr3
+  ]
+
+aExpr3 :: Parser Expr
+aExpr3 = asum
+  [ binary eMul "*" aExpr3 aTerm
+  , binary eDiv "/" aExpr3 aTerm
+  , aTerm
+  ]
+
 list :: Parser Expr
-list = eList <$> (brackets $ sepBy term comma) <?> "list"
+list = eList <$> (brackets $ sepBy aTerm comma) <?> "list"
+
+binary 
+  :: (Expr -> Expr -> Expr) 
+  -> String 
+  -> Parser Expr 
+  -> Parser Expr 
+  -> Parser Expr
+binary op sym p1 p2 = try . typable $ op <$> p2 <* symbol sym <*> p1
 
 -----------------------
 -- Helper functions
 -----------------------
 
-binary :: String -> (a -> a -> a) -> Operator Parser a
-binary n f = InfixL  (f <$ symbol n)
-
-prefix :: String -> (a -> a) -> Operator Parser a
-prefix n f = Prefix  (f <$ symbol n)
-
 predParse :: Parser Expr
 predParse = 
   do
     n <- identifier
-    args <- parens $ sepBy1 term comma
+    args <- parens $ sepBy1 aTerm comma
     typable . return $ predicate n args
 
 intParse :: Parser Expr
@@ -108,7 +107,7 @@ rule :: Parser R.Rule
 rule = 
   do
     psym <- identifier
-    terms <- option [] . parens $ sepBy1 term comma
+    terms <- option [] . parens $ sepBy1 aTerm comma
     return $ R.fact psym terms
 
 attributeParse :: Parser Expr
