@@ -46,6 +46,7 @@ module Expr
   , unifyExprAnns
   , unifyExprTypes
   , unifyExprDomains
+  , isArithmetic, isPredicative
   ) where
 
 ---------------------------------------------------------
@@ -190,8 +191,9 @@ constBool = ConstBool (empty & annBound .~ True
 -- | Creates a new variable
 var :: String -> Expr
 var n = Var a n 
-  where a = empty & annType .~ PPAuto
-                    & domain  .~ Unknown
+  where a = empty & annType  .~ PPAuto
+                  & domain   .~ Unknown
+                  & annBound .~ False
 
 -- | Creates a new predicate from name and arguments
 predicate :: String -> [Expr] -> Expr
@@ -341,4 +343,27 @@ unifyExprDomains x y = unifyDomains xd yd
 -- and then sets the result of unification as the new typing of that expression.
 applyTyping :: Typing -> Expr -> Expr
 applyTyping t e = e & annotation . typing %~ unifyTypings t
+
+-- | Returns True if expression is an arithmetic expression.
+isArithmetic :: Expr -> Bool
+isArithmetic (Add{}) = True
+isArithmetic (Sub{}) = True
+isArithmetic (Mul{}) = True
+isArithmetic (Div{}) = True
+isArithmetic (Min{}) = True
+isArithmetic (Max{}) = True
+isArithmetic (Neg{}) = True
+isArithmetic (Inv{}) = True
+isArithmetic _       = False
+
+-- | Returns True if the expression is a predicate, built-in or otherwise
+isPredicative :: Expr -> Bool
+isPredicative (Pred{}) = True
+isPredicative (Gt{})   = True
+isPredicative (Ge{})   = True
+isPredicative (Eq{})   = True
+isPredicative (Le{})   = True
+isPredicative (Lt{})   = True
+isPredicative (Is{})   = True
+isPredicative _        = False
 

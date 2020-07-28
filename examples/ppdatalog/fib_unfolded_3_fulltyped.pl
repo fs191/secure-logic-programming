@@ -20,7 +20,7 @@ fib(N: private int, F: public int) : private bool :-
         F1: public int  = 1: public int                                   : public bool,
         N2: private int = 1: public int                                   : private bool,
         F2: public int  = 1: public int                                   : public bool,
-        F: public int is (F1: public int + F2: public int) : private int  : public bool.
+        F: public int is (F1: public int + F2: public int) : public int   : public bool.
 
 fib(N: private int, F: public int) : private bool :-
         N: private int > 1: public int                                     : private bool,

@@ -52,7 +52,7 @@ instance Show Ann where
 
 -- | Returns the default annotation that is untyped and unbound.
 empty :: Ann
-empty = Ann PPAuto Unknown False
+empty = Ann PPAuto Unknown True
 
 -- | Returns an empty typing with no domain and auto type
 emptyTyping :: Typing

@@ -34,9 +34,9 @@ instance Monoid TypeSubstitution where
 -- | Infers data types and privacy domains for most expressions in the program.
 -- Assumes that the program has been post-processed.
 typeInference :: DatalogProgram -> DatalogProgram
-typeInference dp =
+typeInference dp = dp
      -- Infer typings for all constants
-  dp & dpRules . traversed . ruleHead %~ U.transform inferConstants
+     & dpRules . traversed . ruleHead %~ U.transform inferConstants
      & dpRules . traversed . ruleTail %~ U.transform inferConstants
      & dpGoal %~ U.transform inferConstants
      -- Take typings from the input clause and unify them with attributes
@@ -46,11 +46,11 @@ typeInference dp =
      & dpRules . traversed %~ applyDBInfer
      -- Apply the typings in the goal clause to all of the rule clauses
      & id %~ inferFromGoal
-     -- WIP: infer typings of arithmetic sub-expressions 
-     -- (addition, multiplication etc.)
-     & dpRules . traversed . ruleTail %~ inferArithmetic
-     -- Infer typings of comparisons and equalities
-     & dpRules . traversed %~ inferBuiltins
+     -- Infer typings of binary sub-expressions (addition, multiplication etc.)
+     -- Warning: if the type checker gets stuck in a loop, then it is probably
+     -- due to this function.
+     -- TODO: Reimplement using term rewriting
+     & dpRules . traversed %~ converge inferBuiltins
      -- Infer the return typings of database queries in the rule bodies.
      & id %~ inferDBRet
      -- Infer the return typings of rule heads
@@ -118,78 +118,59 @@ inferDBRet dp = dp & dpRules . traversed . ruleTail %~ U.transform f
         anyUnk = any (==Unknown) $ xs ^.. folded . annotation . domain
     f x = x
 
-inferArithmetic :: Expr -> Expr
-inferArithmetic = U.transform (\x -> fromMaybe x $ appIfBinArith f x)
-  where
-    f :: Expr -> Expr -> Expr -> Expr
-    f a x y = a & annotation . typing   %~ unifyTypings (safelyUnifyTypings xt yt)
-                & annotation . annBound .~ (x ^. annotation . annBound && y ^. annotation . annBound)
-      where
-        xt = x ^. annotation . typing
-        yt = y ^. annotation . typing
-
--- | Breaks the arithmetic expression into left hand side and right hand side 
--- and then applies the function to itself both subexpressions. Does nothing if 
--- the expression is not an arithmetic expression.
-appIfBinArith :: (Expr -> Expr -> Expr -> a) -> Expr -> Maybe a
-appIfBinArith f e@(Add _ a b) = Just $ f e a b
-appIfBinArith f e@(Sub _ a b) = Just $ f e a b
-appIfBinArith f e@(Mul _ a b) = Just $ f e a b
-appIfBinArith f e@(Div _ a b) = Just $ f e a b
-appIfBinArith f e@(Min _ a b) = Just $ f e a b
-appIfBinArith f e@(Max _ a b) = Just $ f e a b
-appIfBinArith _ _ = Nothing
+applyBin :: (Expr -> Expr -> Expr -> b) -> Expr -> Maybe b
+applyBin f e =
+  do
+    l <- e ^? leftHand
+    r <- e ^? rightHand
+    return $ f e l r
 
 -----------------------------------------------
 -- Built-in predicate type and domain inference
 -----------------------------------------------
 
--- | Breaks the comparison expression into left hand side and right hand side 
--- and then applies the function to itself both subexpressions. Does nothing if 
--- the expression is not a comparison expression.
-appIfBinPred :: (Expr -> Expr -> Expr -> a) -> Expr -> Maybe a
-appIfBinPred f e@(Ge _ a b) = Just $ f e a b
-appIfBinPred f e@(Gt _ a b) = Just $ f e a b
-appIfBinPred f e@(Eq _ a b) = Just $ f e a b
-appIfBinPred f e@(Le _ a b) = Just $ f e a b
-appIfBinPred f e@(Lt _ a b) = Just $ f e a b
--- Assuming that `is` is also a comparison operator
-appIfBinPred f e@(Is _ a b) = Just $ f e a b
-appIfBinPred _ _ = Nothing
-
--- | Infers the return types for comparison expressions
+-- | Infers the return types for binary subexpressions
 inferBuiltins :: Rule -> Rule
-inferBuiltins r = applyTypeSubst subst' r'
+inferBuiltins r = r & ruleTail %~ U.transform ret
+                    & id %~ U.transform subst'
   where
-    ret x = fromMaybe x $ appIfBinPred inferBinRet x
-    r' = r & ruleTail %~ U.transform ret
-    subst x = fromMaybe mempty $ appIfBinPred inferBinArgs x
-    subst' = mconcat $ subst <$> r ^. ruleTail . to U.universe
+    ret :: Expr -> Expr
+    ret x = fromMaybe x $ applyBin inferBinRet x
+    subst :: [Expr] -> TypeSubstitution
+    subst x = mconcat . catMaybes $ applyBin inferBinArgs <$> x
+    subst' :: Rule -> Rule
+    subst' x = applyTypeSubst (x ^. ruleTail . to (subst . U.universe)) x
 
 inferBinRet :: Expr -> Expr -> Expr -> Expr
 inferBinRet e x y
   -- If both are bound then it is a comparison and privacy depends on subterms
-  | xb && yb  = e & annotation . annType %~ unifyTypes PPBool
+  | xb && yb  = e & annotation . annType %~ unifyTypes ut
                   & annotation . domain  .~ safelyUnifyDomains xd yd
   -- If only one variable is bound, then it is an assignment and will always
   -- return true
-  | xb        = e & annotation . annType %~ unifyTypes PPBool
+  | xb        = e & annotation . annType %~ unifyTypes ut
                   & annotation . domain  .~ Public
-  | yb        = e & annotation . annType %~ unifyTypes PPBool
+  | yb        = e & annotation . annType %~ unifyTypes ut
                   & annotation . domain  .~ Public
-  | otherwise = error $ "Uninitialized variables: " ++ show e
+  -- User has written incorrect code if both sides of the expression are unbound
+  | otherwise = error $ "Uninitialized subexpressions: " ++ show e
   where
     xd = x ^. annotation . domain
     xb = x ^. annotation . annBound
+    xt = x ^. annotation . annType
     yd = y ^. annotation . domain
     yb = y ^. annotation . annBound
+    yt = y ^. annotation . annType
+    ut | isArithmetic e  = unifyTypes xt yt
+       | isPredicative e = PPBool
+       | otherwise       = PPAuto
 
 inferBinArgs :: Expr -> Expr -> Expr -> TypeSubstitution
 inferBinArgs e x y
   | xb && yb = mempty
   | yb       = fromMaybe mempty $ (|-> yt) <$> identifier x
   | xb       = fromMaybe mempty $ (|-> xt) <$> identifier y
-  | otherwise = error $ "Uninitialized variables: " ++ show e
+  | otherwise = error $ "Uninitialized subexpressions: " ++ show e
   where
     xt = x ^. annotation . typing
     xb = x ^. annotation . annBound
@@ -217,7 +198,7 @@ inferFromGoal dp = dp & dpRules . traverse %~ subst
             s = mconcat $ (uncurry (|->)) <$> paramNames
         return $ applyTypeSubst s r
 
--- | Creates a new type substitution from expression identifier and typing
+-- | Creates a new type substitution from an expression identifier and a typing
 (|->) :: String -> Typing -> TypeSubstitution
 (|->) x y = TypeSubstitution $ M.singleton x y
 
@@ -240,6 +221,7 @@ inferGoal dp = dp & dpGoal  %~ U.transform f
     f = applyTypeSubstToExpr .
           mconcat $ [x |-> (Typing Unknown $ foldUnify y) | (Just x, y) <- goalRules]
 
+-- | Infer types from the input directive
 inferFromInputs :: DatalogProgram -> DatalogProgram
 inferFromInputs dp = dp & dpGoal %~ applyTypeSubstToExpr (mconcat inps)
   where
@@ -287,4 +269,10 @@ applyTypeSubst :: TypeSubstitution -> Rule -> Rule
 applyTypeSubst ts r = 
   r & ruleHead %~ applyTypeSubstToExpr ts
     & ruleTail %~ applyTypeSubstToExpr ts
+
+-- | Applies a function until a fixpoint is reached
+converge :: (Eq a) => (a -> a) -> a -> a
+converge f a
+  | f a == a  = a
+  | otherwise = converge f $ f a
 
