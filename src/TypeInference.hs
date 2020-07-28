@@ -216,10 +216,10 @@ inferGoal dp = dp & dpGoal  %~ U.transform f
                   . ruleHead 
                   . _Pred 
                   . _3
-    foldUnify :: [Expr] -> PPType
-    foldUnify x = foldl1 unifyTypes $ x ^.. folded . annotation . annType
+    foldUnify :: [Expr] -> Typing
+    foldUnify x = foldl1 unifyTypings $ x ^.. folded . annotation . typing
     f = applyTypeSubstToExpr .
-          mconcat $ [x |-> (Typing Unknown $ foldUnify y) | (Just x, y) <- goalRules]
+          mconcat $ [x |-> (foldUnify y) | (Just x, y) <- goalRules]
 
 -- | Infer types from the input directive
 inferFromInputs :: DatalogProgram -> DatalogProgram

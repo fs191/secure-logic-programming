@@ -50,6 +50,6 @@ viewESM(X0 : public string, X1 : public int, X4 : public string) : private bool 
 % the type of 'manager1' is public since it is a constant
 % the type of Y1 is public string since it is so for all viewESM rules
 % the type of Y2 is private string since it is so for at least one viewESM rule
-:- outputs([Y1 : string, Y2 : int]).
-viewESM(Y1 : string, Y2 : int, 'manager1' : public string) : private bool?
+:- outputs([Y1 : public string, Y2 : private int]).
+viewESM(Y1 : public string, Y2 : private int, 'manager1' : public string) : private bool?
 

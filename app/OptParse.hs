@@ -8,7 +8,7 @@ import ProgramOptions
 
 programArgs :: Parser ProgramOptions
 programArgs = ProgramOptions
-  <$> option auto (short 'n' <> long "iterations" <> value 10 <> help "specify the maximum number of iterations")
+  <$> option auto (short 'n' <> long "iterations" <> value 2 <> help "specify the maximum number of iterations")
   <*> switch (long "db-create-tables"
               <> hidden
               <> help "Create the required tables in the database using the data in input files\n \

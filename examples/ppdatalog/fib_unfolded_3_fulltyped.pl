@@ -42,6 +42,6 @@ fib(N: private int, F: public int) : private bool :-
 % That is, privately computing fibonacci number with index 'x' in fact matches 'x' against
 % pre-computed pairs [(0,1),(1,1),(2,2),(3,3),(4,5),...] and takes the corresponding 'y'.
 :-inputs([@x : private int]).
-:-outputs([Y : int]).
-fib(@x : private int,Y : int) : private bool?
+:-outputs([Y : public int]).
+fib(@x : private int,Y : public int) : private bool?
 
