@@ -403,9 +403,9 @@ secrecCode dp = program $
   ++ [Funct goal]
  where
    rules = dp ^. DP.dpRules
-   (xis,goal) = concreteGoal rules (dp ^.. DP.inputs) (dp ^.. DP.outputs) (DP.goal dp)
+   (xis,goal) = concreteGoal rules (dp ^.. DP.inputs) (dp ^.. DP.outputs) (dp ^. DP.dpGoal)
    extPreds = dp ^.. DP.dpDBClauses
-   (intPredPs, intPredNs) = unzip $ nub $ map (\p -> (predicateName p, predicateArity p)) $ map (\r -> r ^. ruleHead) rules
+   (intPredPs, intPredNs) = unzip $ nub $ map (\p -> (p ^. predName, predicateArity p)) $ map (\r -> r ^. ruleHead) rules
 
    lss = [ls | r <- rules, let ls = filter (>= 0) $ zipWith (\r' l -> if ruleName r == ruleName r' then l else -1) rules [0..]]
 
@@ -528,7 +528,7 @@ concreteGoal rules xs ys (Pred _ p zs) = (xis, mainFun $
 
   -- get the arguments of a goal
   map (\(Var xtype x,i) -> VarInit (variable SCPublic (scColTypeI i xtype)        (nameArg i)) (funConstCol [funGetArg [SCConstStr x]])) setX ++
-  map (\(z,i)           -> VarInit (variable SCPublic ((scColTypeI i . getAnn) z) (nameArg i)) (funConstCol [scConstType z])) setC ++
+  map (\(z,i)           -> VarInit (variable SCPublic ((scColTypeI i . (view annotation)) z) (nameArg i)) (funConstCol [scConstType z])) setC ++
   map (\(Var xtype x,i) -> VarInit (variable SCPublic (scColTypeI i xtype)        (nameArg i)) (funFreeVCol [])) setY ++
 
   -- create an input data structure that corresponds to particular goal
@@ -573,7 +573,7 @@ concreteGoal rules xs ys (Pred _ p zs) = (xis, mainFun $
     xis = map snd $ setX ++ setC
 
     -- which types the args of p have according to the goal (inputs/outputs)
-    goalTypes = zipWith (\z i -> scColTypeI i (getAnn z)) zs is
+    goalTypes = zipWith (\z i -> scColTypeI i (z ^. annotation)) zs is
 
     rs = filter (\r -> ruleName r == p) rules
     -- which types the args of p have according to rules for relation p
@@ -582,7 +582,7 @@ concreteGoal rules xs ys (Pred _ p zs) = (xis, mainFun $
     argTypes = foldr (zipWith joinType) (map dynamicColumn is) (goalTypes : ruleTypes)
 
     -- if the truthness condition of at least one rule has private type, then so has the final answer
-    doms = map (\r -> let q = r ^. ruleTail in ((getAnn q) ^.) domain) rules
+    doms = map (\r -> let q = r ^. ruleTail in ((q ^. annotation) ^.) domain) rules
     outDomain = if elem Private doms then SCShared3p else SCPublic
 
 
@@ -605,9 +605,9 @@ ruleToSC xis' r j = function template returnType fname fargs fbody
 
     -- template   = SCTemplateDecl $ Just ((SCDynamic Nothing) :  map (SCDynamic . Just) is, (SCDynamicT Nothing) : (map (SCDynamicT . Just) is ++ map (SCDynamicS . Just) is))
     --returnType = Just $ SCStruct (nameTableStruct p) (SCTemplateUse $ Just ([SCDynamic Nothing], map dynamicColumn is))
-    js = map fst $ filter snd $ zipWith (\z i -> (i, case scDomainFromAnn (getAnn z) of {SCDynamic _ -> True; _ -> False})) zs is
+    js = map fst $ filter snd $ zipWith (\z i -> (i, case scDomainFromAnn (z ^. annotation) of {SCDynamic _ -> True; _ -> False})) zs is
     template = SCTemplateDecl $ Just ((scDomainFromAnn ann) :  map (SCDynamic . Just) js, (SCDynamicT Nothing) : (map (SCDynamicT . Just) js ++ map (SCDynamicS . Just) js)) --SCTemplateDecl Nothing
-    returnType = Just $ SCStruct (nameTableStruct p) (SCTemplateUse $ Just ([scDomainFromAnn ann], zipWith (\z i -> scColTypeI i (getAnn z)) zs is))
+    returnType = Just $ SCStruct (nameTableStruct p) (SCTemplateUse $ Just ([scDomainFromAnn ann], zipWith (\z i -> scColTypeI i (z ^. annotation)) zs is))
     --
 
     fname      = nameGoalComp p j
@@ -631,7 +631,7 @@ ruleBodyToSC xis ann ds input p zs q =
   , VarInit (variable (SCDynamic Nothing) (SCArray 1 SCBool) result_b) (SCAnd (SCVarName (nameTableBB inputTable)) (SCAnds (map (\i -> SCVarName (nameB i)) [1..length qs])))
 
   --, VarDecl (variable SCPublic (SCStruct (nameTableStruct p) (SCTemplateUse $ Just ([SCDynamic Nothing], map dynamicColumn [0..n-1]))) result)
-  , VarDecl (variable SCPublic (SCStruct (nameTableStruct p) (SCTemplateUse $ Just ([scDomainFromAnn ann], zipWith (\z i -> scColTypeI i (getAnn z)) zs [0..n-1]))) result)
+  , VarDecl (variable SCPublic (SCStruct (nameTableStruct p) (SCTemplateUse $ Just ([scDomainFromAnn ann], zipWith (\z i -> scColTypeI i (z ^. annotation)) zs [0..n-1]))) result)
   --
 
   , VarAsgn (nameTableBB result) (SCVarName result_b)
@@ -646,11 +646,11 @@ ruleBodyToSC xis ann ds input p zs q =
     is = [0..n-1]
 
     (inputArgs', outputArgs') = partition snd $ zipWith (\z i -> ((z,i), elem i xis)) zs is
-    asgnInputArgs  = map (\((z,i),_) -> Eq (getAnn z) z (Var (getAnn z) (unpack $ nameTableArg inputTable i))) inputArgs'
+    asgnInputArgs  = map (\((z,i),_) -> Eq (z ^. annotation) z (Var (z ^. annotation) (unpack $ nameTableArg inputTable i))) inputArgs'
     asgnOutputArgs = map (\((z,i),_) -> VarAsgn (nameTableArg result i) (exprToSC z)) outputArgs'
 
     qs = asgnInputArgs ++ andsToList q
-    ts = map (\(qj,j) -> (predicateName qj, j)) $ filter (\(qj,j) -> case qj of {Pred _ _ _ -> True; _ -> False}) $ zip qs [1..]
+    ts = map (\(qj,j) -> (qj ^. predName, j)) $ filter (\(qj,j) -> case qj of {Pred _ _ _ -> True; _ -> False}) $ zip qs [1..]
     ks = 0 : (map snd ts)
 
     getRowCounts = map (\(tk,k) -> VarInit (variable SCPublic SCUInt (nameM k)) (funTdbGetRowCount [SCVarName ds, SCConstStr tk])) ts
@@ -676,7 +676,7 @@ formulaToSC dv stmts q j =
         -- here we assume that constants are not passed directly as arguments, but a comparison is added later
         Pred ann p zs    -> let dom = scDomainFromAnn ann in
                             let bb = VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ SCAnds $ map (\i -> SCVarName $ nameB (ind j i)) [0..length zs - 1] in
-                            let (dv',stmts') = foldl (\(dv0, stmts0) (z,i) -> formulaToSC dv0 stmts0 (Eq (getAnn z) z (ConstStr (getAnn z) (unpack $ nameTableArg (nameTable j) i))) (ind j i)) (dv,[]) (zip zs [0..]) in
+                            let (dv',stmts') = foldl (\(dv0, stmts0) (z,i) -> formulaToSC dv0 stmts0 (Eq (z ^. annotation) z (ConstStr (z ^. annotation) (unpack $ nameTableArg (nameTable j) i))) (ind j i)) (dv,[]) (zip zs [0..]) in
                             (dv', stmts' ++ [bb])
 
         Not ann (Pred _ p zs) ->

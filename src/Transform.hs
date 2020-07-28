@@ -20,11 +20,13 @@ import Expr
 import Substitution
 import qualified DatalogProgram as DP
 
--- | Generates all possible ground rules for n iterations
+-- | Generates all possible ground rules for `n` iterations by inlining
+-- predicates with matching rules. Each predicate gets inlined once per
+-- iteration.
 deriveAllGroundRules :: Int -> DP.DatalogProgram -> DP.DatalogProgram
 deriveAllGroundRules n program = program'
                                    -- & fromMaybe program' . adornProgram
-                                   & DP.ruleLens %~ f
+                                   & DP.dpRules %~ f
   where
     -- Input program but db clauses are converted to rules
     program' = program

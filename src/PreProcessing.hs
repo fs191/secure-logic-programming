@@ -68,11 +68,11 @@ simplifyRuleHead r = r & ruleHead . predArgs .~ _newArgs
       do
         i <- get
         modify (+1)
-        return $ equal (Var (x ^. ann) $ "$A" ++ show i) x
+        return $ equal (Var (x ^. annotation) $ "$A" ++ show i) x
     _genArgs x@(Var{}) = return x
     _genArgs x =
       do
         i <- get
         modify (+1)
-        return $ Var (x ^. ann) $ "$A" ++ show i
+        return $ Var (x ^. annotation) $ "$A" ++ show i
 

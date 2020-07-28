@@ -3,12 +3,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Adornment 
-  ( Adornable(..)
-  , suffixPredicate
+  ( suffixPredicate
   , adornProgram
-  -- Testing
-  , adornRule
-  , runAdornM
   ) where
 
 import Annotation
@@ -50,8 +46,8 @@ goalStr = "$goal"
 runAdornM :: AdornM a -> a
 runAdornM x = evalState x (AdornState [] [] S.empty [] [])
 
--- | Suffixes rules with parameter bindings and optimizes each rule to
--- fail as early as possible
+-- | Assigns correct bindings to variables. Creates new rules based on
+-- which arguments are bound when the rule gets called
 adornProgram :: DatalogProgram -> DatalogProgram
 adornProgram p = runAdornM $
   do
@@ -157,7 +153,8 @@ isVisited visited (Adornable r bp) = anyOf folded f visited
   where
     f (Adornable r' bp') = (r ^. ruleHead == r' ^. ruleHead) && bp == bp'
 
--- | Suffixes a predicate based on a given binding pattern
+-- | Suffixes a predicate based on a given binding pattern. A value of `True` at
+-- the index `n` means that the n-th argument of the predicate is bound.
 suffixPredicate :: [Bool] -> Expr -> Expr
 suffixPredicate suf = _Pred . _2 %~ (<> "_" <> showBindings suf)
 
@@ -213,7 +210,7 @@ isEDB :: Rule -> AdornM Bool
 isEDB = view $ ruleHead . to isPredEDB
 
 paramBindings :: Lens' Expr [Bool]
-paramBindings = partsOf $ _Pred . _3 . traversed . ann . annBound
+paramBindings = partsOf $ _Pred . _3 . traversed . annotation . annBound
 
 showBindings :: [Bool] -> String
 showBindings [] = ""

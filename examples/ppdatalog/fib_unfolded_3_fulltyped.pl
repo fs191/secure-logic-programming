@@ -36,7 +36,7 @@ fib(N: private int, F: public int) : private bool :-
         NN2: private int = 1: public int                                   : private bool,
         FF2: public int = 1: public int                                    : public bool,
         F2: public int is (FF1: public int + FF2: public int) : public int : public bool,
-        F: public int is F1: public int + F2: public int                   : public bool.
+        F: public int is F1: public int + F2: public int : public int      : public bool.
 
 % Note that the output y is "public", but the satisfiability bit "b" is private.
 % That is, privately computing fibonacci number with index 'x' in fact matches 'x' against

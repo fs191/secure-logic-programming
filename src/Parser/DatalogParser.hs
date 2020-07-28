@@ -26,9 +26,6 @@ data Clause
   | GC Expr
   | DC DP.Directive
 
--- Based on:
--- https://www.ccs.neu.edu/home/ramsdell/tools/datalog/datalog.html#index-comment-syntax-13
-
 datalogParser :: Parser DP.DatalogProgram
 datalogParser =
   do
@@ -54,7 +51,7 @@ ruleP =
     void $ symbol "."
     let expr = joinExprs b
         t = a ^. A.typing
-    (return $ R.rule n xs expr & R.ruleHead . ann . A.typing .~ t) 
+    (return $ R.rule n xs expr & R.ruleHead . annotation . A.typing .~ t) 
       <?> "rule"
 
 funCall :: Parser DP.Directive
@@ -112,9 +109,11 @@ goal =
 -- Exports
 -----------------------
 
+-- | Parses a privacy datalog program from a string
 parseDatalog :: String -> String -> Either (ParseErrorBundle String Void) DP.DatalogProgram
 parseDatalog = runParser datalogParser
 
+-- | Parses a privacy datalog program from a source file
 parseDatalogFromFile :: String -> IO DP.DatalogProgram
 parseDatalogFromFile filepath =
   do

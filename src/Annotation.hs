@@ -22,20 +22,23 @@ import Data.Foldable
 
 import Language.SecreC.Types
 
+-- | A data type used for unifying type and domain simultaneously
 data Typing
   = Typing PPDomain PPType
   deriving (Show)
 
+-- | Annotations data type for storing extra information about expressions
 data Ann = Ann
   { 
-    -- Datatype of the term
+    -- | Datatype of the term
     _annType  :: PPType
-    -- Security domain of the term
+    -- | Security domain of the term.
+    -- It tells whether a value is public, private or has an unknown domain.
   , _domain   :: PPDomain
+    -- | Tells wether the expression is bound
   , _annBound :: Bool
   }
   deriving (Ord, Eq, Data, Typeable)
-
 makeLenses ''Ann
 
 instance Show Ann where
@@ -47,9 +50,11 @@ instance Show Ann where
             , x ^. annType . to show
             ]
 
+-- | Returns the default annotation that is untyped and unbound.
 empty :: Ann
 empty = Ann PPAuto Unknown False
 
+-- | Returns an empty typing with no domain and auto type
 emptyTyping :: Typing
 emptyTyping = Typing Unknown PPAuto
 
@@ -57,6 +62,7 @@ emptyTyping = Typing Unknown PPAuto
 unifyAnns :: Ann -> Ann -> Ann
 unifyAnns x y = x & typing %~ unifyTypings (y ^. typing)
 
+-- | Lens for accessing the typing of an annotation
 typing :: Lens' Ann Typing
 typing = lens getter setter
   where 
@@ -64,11 +70,15 @@ typing = lens getter setter
     setter ann (Typing d t) = ann & domain  .~ d
                                   & annType .~ t
 
--- | Unifies two typings
+-- | Unifies two typings so that unknown domain gets overwritten by anything
+-- else. Useful for assigning a typing to an expression that might already have
+-- a typing.
 unifyTypings :: Typing -> Typing -> Typing
 unifyTypings (Typing xd xt) (Typing yd yt)
   =  Typing (unifyDomains xd yd) (unifyTypes xt yt)
 
+-- | Unifies domains in a conservative way, so that if one of the terms is
+-- unknown and the other public, then the result will be unknown.
 safelyUnifyDomains :: PPDomain -> PPDomain -> PPDomain
 safelyUnifyDomains Private _ = Private
 safelyUnifyDomains _ Private = Private

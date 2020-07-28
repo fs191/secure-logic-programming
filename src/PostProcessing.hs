@@ -1,3 +1,6 @@
+-- | Post-processing for privalog programs. Meant to be used after
+-- transformation. The result of post-processing is a program that is more
+-- similar to the final SecreC code.
 module PostProcessing (postProcess) where
 
 import Control.Lens hiding (universe)
@@ -9,6 +12,8 @@ import DatalogProgram
 import Expr
 import Rule
 
+-- | Removes all rules that are not called by the goal clause and also removes
+-- rules that contain calls to other rules that are not facts.
 postProcess :: DatalogProgram -> DatalogProgram
 postProcess = filterGoalRules
             . filterGroundRules
@@ -21,6 +26,7 @@ filterGroundRules dp = dp & dpRules %~ filter fil
     _name (Pred _ n _) = n
     fil x = all (`elem` _facts) [n | (Pred _ n _) <- universe $ x ^. ruleTail]
 
+-- | Removes all rules that do not get called directly by the goal clause
 filterGoalRules :: DatalogProgram -> DatalogProgram
 filterGoalRules dp = dp & dpRules .~ _rs
   where _g     = dp ^. dpGoal . _Pred . _2

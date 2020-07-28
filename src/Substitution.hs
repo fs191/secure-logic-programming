@@ -25,6 +25,7 @@ import Data.Text.Prettyprint.Doc
 
 import Control.Exception (assert)
 import Control.Lens hiding (universe, transform, transformM)
+import Control.Lens.Extras
 import Control.Monad.State
 import Control.Monad.Trans.UnionFind
 import Control.Applicative
@@ -32,6 +33,8 @@ import Control.Applicative
 import Expr
 import Annotation
 
+-- | Representation of substitution on variables. Only works on
+-- expressions that have an identifier. Currently does not preserve types.
 newtype Subst = Th (M.Map String Expr)
   deriving (Semigroup, Monoid, Eq)
 
@@ -39,14 +42,19 @@ instance Show Subst where
   show (Th theta) = concat $ map (\(k,v) -> show k ++ " -> " ++ show v ++ "\n") (M.toList theta)
 
 instance Pretty Subst where
-  pretty (Th s) = tupled $ (\(a, b) -> pretty a <+> " -> " <+> pretty b) <$> M.toList s
+  pretty (Th s) = tupled $ (\(a, b) -> pretty a <+> "->" <+> pretty b) <$> M.toList s
 
 -- | A very safe string that is prepended to variable names to keep track
 -- of which variables have already been substituted. Only used internally.
 safeStr :: String
 safeStr = "$!!?"
 
--- | Compresses the substitution using union-find.
+-- | Compresses the substitution using union-find. 
+--
+-- @
+--   compress $ mconcat [Var "x" |-> Var "y", Var "y" |-> Var "z"] ==
+--              mconcat [Var "x" |-> Var "z", Var "y" |-> Var "z"]
+-- @
 compress :: Subst -> Subst
 compress (Th m) = runIdentity . runUnionFind $
   do
@@ -88,7 +96,7 @@ evalTheta :: Subst -> Expr -> Expr
 evalTheta (Th theta) v@(Var a n) = 
   if M.member n theta 
     then 
-      theta M.! n & ann %~ (unifyAnns a)
+      theta M.! n & annotation %~ (unifyAnns a)
     else v
 
 -- | Apply a substitution to an expression
@@ -125,7 +133,8 @@ refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
         return $ v |-> Var a n
     f _ = error "Expected a variable, got something else"
 
--- | Prefixes a variable name with the safe string
+-- | Prefixes a variable name with the safe string to keep track which variables
+-- have already been substituted
 safePrefix :: Expr -> Expr
 safePrefix = transform f
   where f (Var a n) = Var a (safeStr <> n)
@@ -185,5 +194,5 @@ valEq _ _                             = False
 --
 
 vars :: [(Expr, Expr)] -> [Expr]
-vars x = filter isVar . uncurry (<>) $ unzip x
+vars x = filter (is _Var) . uncurry (<>) $ unzip x
 

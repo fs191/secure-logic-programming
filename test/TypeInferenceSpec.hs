@@ -59,5 +59,5 @@ infersTypes n = it desc $
 clearTypings :: Expr -> Expr
 clearTypings e = U.transform f e
   where
-    f = ann . typing .~ emptyTyping
+    f = annotation . typing .~ emptyTyping
 
