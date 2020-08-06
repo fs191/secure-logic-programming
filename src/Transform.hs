@@ -64,10 +64,10 @@ simplifyVars r = applySubst subst r
 simplifyVars' :: Expr -> Subst
 simplifyVars' r = compress . mconcat $ f <$> U.universe r
   where f (Eq _ v x)
-          | isLeaf x  = v |-> x
+          | isVar x  = v |-> x
           | otherwise = mempty
         f (Eq _ x v)
-          | isLeaf x  = v |-> x
+          | isVar x  = v |-> x
           | otherwise = mempty
         f _ = mempty
 

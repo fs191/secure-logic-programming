@@ -10,6 +10,7 @@ module Expr
   , PPType(..), PPDomain(..)
   , Ann
   , isLeaf
+  , isVar
   , _Pred
   , predName
   , predArgs
@@ -157,6 +158,10 @@ isLeaf (ConstBool _ _) = True
 isLeaf (ConstInt _ _)  = True
 isLeaf (ConstStr _ _)  = True
 isLeaf _             = False
+
+isVar :: Expr -> Bool
+isVar (Var _ _) = True
+isVar _         = False
 
 -- | Creates a new constant string
 constStr :: String -> Expr
