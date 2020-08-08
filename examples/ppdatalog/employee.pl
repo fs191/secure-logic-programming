@@ -1,7 +1,8 @@
 :-type(eds, [@employee:public string,@department:public string, @salary:private int]).
 :-type(dm, [@department:public string, @manager:public string]).
 
-secureEDS(E,D,0) :-
+secureEDS(E,D,S0) :-
+    S0 = 0,
     eds(E,D,S),
     2500 =< S.
 

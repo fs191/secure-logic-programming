@@ -342,6 +342,21 @@ scDomain i Unknown = SCDynamic i
 scDomainFromAnn :: Ann -> SCDomain
 scDomainFromAnn ann = scDomain Nothing (ann ^. domain)
 
+scVarType :: Ann -> (SCDomain, SCType)
+scVarType ann =
+  let dom    = ann ^. domain in
+  let dtype  = ann ^. annType in
+
+  let scDom = scDomain Nothing dom in
+  let sctype = case (dtype, dom) of
+          (PPBool, _) -> SCBool
+          (PPInt,  _) -> SCInt32
+          (PPStr,  Private) -> SCArray 1 SCXorUInt8
+          (PPStr,  Public)  -> SCString
+          (PPStr,  Unknown) -> error $ "cannot determine data type for a string of unknown domain"
+          (PPAuto,     _)   -> SCDynamicT Nothing
+  in (scDom, sctype)
+
 scStructType :: (SCDomain -> SCType -> SCType -> SCType) -> Maybe Int -> Ann -> SCType
 scStructType f i ann =
   let dom    = ann ^. domain in
@@ -503,7 +518,7 @@ intPredCat p n = function template returnType fname fargs fbody
             ++ [Return (SCVarName result)]
 
 intPredGet :: [(Int, SCType)] -> String -> Int -> FunctionDecl
-intPredGet ls@((l',_):ls') p n = function template returnType fname fargs fbody
+intPredGet ls p n = function template returnType fname fargs fbody
   where
     ds = "ds"
     input  = "args"
@@ -514,10 +529,9 @@ intPredGet ls@((l',_):ls') p n = function template returnType fname fargs fbody
     fname = nameGetTableStruct p
     fargs = [variable SCPublic SCString ds, variable SCPublic (dynamicColT 1) input]
     fbody = [ VarDecl (variable SCPublic (SCDynamicT (Just 0)) result)]
-            ++ map (\(l,lt) -> VarInit (variable SCPublic lt (nameIndex result l)) (SCFunCall (nameGoalComp p l) [SCVarName ds, SCVarName input])) ls ++
-            [ VarAsgn result  $ foldr (\(l,lt) rest -> SCFunCall (nameTableCat p) [rest, SCVarName (nameIndex result l)]) (SCVarName (nameIndex result l')) ls'
-            , Return (SCVarName result)
-            ]
+            ++ map (\(l,lt) -> VarInit (variable SCPublic lt (nameIndex result l)) (SCFunCall (nameGoalComp p l) [SCVarName ds, SCVarName input])) ls
+            ++ map (\(l,lt) -> VarAsgn result $ SCFunCall (nameTableCat p) [SCVarName result, SCVarName (nameIndex result l)]) ls
+            ++ [Return (SCVarName result)]
 
 defaultGoal :: ([Int], FunctionDecl)
 defaultGoal = ([0..], mainFun $
@@ -535,7 +549,8 @@ defaultGoal = ([0..], mainFun $
 concreteGoal :: [Rule] -> [Expr] -> [Expr] -> Expr -> ([Int], SCType, FunctionDecl)
 concreteGoal rules xs ys (Pred ptype p zs) = (xis, argTableType, mainFun $
   -- get the arguments of a goal
-  map (\(Var xtype x,i) -> VarInit (variable SCPublic (scColTypeI i xtype)        (nameArg i)) (funConstCol [funGetArg [SCConstStr x]])) setX ++
+  map (\(Var xtype x,i) -> let (xdom,xsctype) = scVarType xtype in VarInit (variable xdom xsctype (pack x)) (funGetArg [SCConstStr x])) setX ++
+  map (\(Var xtype x,i) -> VarInit (variable SCPublic (scColTypeI i xtype)        (nameArg i)) (funConstCol [SCVarName (pack x)])) setX ++
   map (\(z,i)           -> VarInit (variable SCPublic ((scColTypeI i . (view annotation)) z) (nameArg i)) (funConstCol [scConstType z])) setC ++
   map (\(Var xtype x,i) -> VarInit (variable SCPublic (scColTypeI i xtype)        (nameArg i)) (funFreeVCol [])) setF ++
 
@@ -729,6 +744,8 @@ formulaToSC dv stmts q j =
                                    _            -> ez
                           -- if both x and y are not fresh, then compare
                           ez = (dv, [bcomp])
+
+        Is ann e1 e2 -> formulaToSC dv stmts (Eq ann e1 e2) j
 
         _ -> error $ "Cannot determine truthness for " ++ show q
         where

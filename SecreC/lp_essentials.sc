@@ -842,12 +842,12 @@ D T [[N]] declassifyIfNeed(D T [[N]] x){
     return x;
 }
 
+
 template<type T, dim N>
 T [[N]] choose(bool [[N]] b, T [[N]] x, T [[N]] y){
     T [[N]] bn = (T)b;
     return bn * x + (1 - bn) * y;
 }
-
 
 template<domain D, dim N>
 D int32 [[N]] choose(bool [[N]] b, D int32 [[N]] x, D int32 [[N]] y){
@@ -861,6 +861,29 @@ D int32 [[N]] choose(bool [[N]] b, int32 [[N]] x, D int32 [[N]] y){
 }
 template<domain D, dim N>
 D int32 [[N]] choose(bool [[N]] b, D int32 [[N]] x, int32 [[N]] y){
+    int32 [[N]] bn = (int32)b;
+    return bn * x + (1 - bn) * y;
+}
+
+
+template<domain D, type T, dim N>
+D T [[N]] choose(D bool [[N]] b, T [[N]] x, T [[N]] y){
+    D T [[N]] bn = (T)b;
+    return bn * x + (1 - bn) * y;
+}
+
+template<domain D, dim N>
+D int32 [[N]] choose(D bool [[N]] b, D int32 [[N]] x, D int32 [[N]] y){
+    D int32 [[N]] bn = (int32)b;
+    return bn * x + (1 - bn) * y;
+}
+template<domain D, dim N>
+D int32 [[N]] choose(D bool [[N]] b, int32 [[N]] x, D int32 [[N]] y){
+    int32 [[N]] bn = (int32)b;
+    return bn * x + (1 - bn) * y;
+}
+template<domain D, dim N>
+D int32 [[N]] choose(D bool [[N]] b, D int32 [[N]] x, int32 [[N]] y){
     int32 [[N]] bn = (int32)b;
     return bn * x + (1 - bn) * y;
 }
@@ -995,20 +1018,35 @@ relColumn<D, T1, T2> getDBColumn(string ds, string tableName, T _colIndex, uint 
     return result;
 }
 
+//creation of constant columns
+//if column size is not specified, we assume that it is 1
+template <domain D, type T0, type T, dim N>
+T0 constColumn(D T [[N]] arg){
+    return constColumn(arg, 1 :: uint);
+}
+
+//a boolean column is just a vector of booleans
+template <domain D>
+D bool [[1]] constColumn(D bool b, uint m){
+    return reshape(true,m);
+}
+
+//string column
 //convert a string to uint32 hash
-relColumn<public, uint32, uint8> constColumn(string arg){
+
+//public->public
+relColumn<public, uint32, uint8> constColumn(string arg, uint m){
     pd_shared3p xor_uint8 [[1]] blstr = bl_str(arg);
     uint8 [[1]] str = declassify(blstr);
     uint32 val = declassify(CRC32(blstr));
     relColumn<public, uint32, uint8> result;
-    result.val = reshape(val,1);
-    result.str = reshape(str,1,size(str));
-    result.fv = reshape(false,1);
+    result.val = reshape(val,m);
+    result.str = reshape(str,m,size(str));
+    result.fv = reshape(false,m);
     return result;
 }
 
-// TODO did not understand why exactly it does not work with a template
-//template <domain D>
+//public->private
 relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(string arg, uint m){
     pd_shared3p xor_uint8 [[1]] str = bl_str(arg);
     pd_shared3p xor_uint32 val = CRC32(str);
@@ -1019,19 +1057,23 @@ relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(string arg, uint m){
     return result;
 }
 
-template <domain D>
-relColumn<D, xor_uint32, xor_uint8> constColumn(D xor_uint8 [[1]] arg, uint m){
-    D xor_uint32 [[1]] val = CRC32(arg);
-    relColumn<D, xor_uint32, xor_uint8> result;
+//private->private
+relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(pd_shared3p xor_uint8 [[1]] arg, uint m){
+    pd_shared3p xor_uint32 val = CRC32(arg);
+    relColumn<pd_shared3p, xor_uint32, xor_uint8> result;
     result.val = reshape(val,m);
-    result.str = reshape(str,m,size(str));
+    result.str = reshape(arg,m,size(arg));
     result.fv = reshape(false,m);
     return result;
 }
 
+//int column
+
+//public->public
+//private->private
 template <domain D, type T>
 relColumn<D, int32, int32> constColumn(D T arg0, uint m){
-    int32 arg = (int32)arg0;
+    D int32 arg = (int32)arg0;
     relColumn<D, int32, int32> result;
     result.val = reshape(arg,m);
     result.str = reshape(0,m,0);
@@ -1039,22 +1081,15 @@ relColumn<D, int32, int32> constColumn(D T arg0, uint m){
     return result;
 }
 
-/*
-we may need this for testing to convert public int to private
-template <domain D1, domain D2, type T>
-relColumn<D1, int32, int32> constColumn(D2 T arg0){
-    int32 arg = (int32)arg0;
-    relColumn<D1, int32, int32> result;
+//public->private
+template <domain D, type T>
+relColumn<D, int32, int32> constColumn(T arg0){
+    D int32 arg = (int32)arg0;
+    relColumn<D, int32, int32> result;
     result.val = reshape(arg,1);
     result.str = reshape(0,1,0);
     result.fv = reshape(false,1);
     return result;
-}
-*/
-
-template <domain D, type T, type T0, type T1>
-relColumn<D, T0, T1> constColumn(D T arg){
-    return constColumn(arg, 1 :: uint);
 }
 
 template <domain D, type T, type S>
@@ -1081,9 +1116,15 @@ bool [[1]] trueColumn(){
 
 template<domain D, type T, type S>
 relColumn<D, T, S> myCat(relColumn<D, T, S> x, relColumn<D, T, S> y){
-    x.val = myCat(x.val, y.val);
-    x.str = myCat(x.str, y.str);
     x.fv  = myCat(x.fv,  y.fv);
+    x.val = myCat(x.val, y.val);
+    if (shape(x.str)[0] == 0){
+        x.str = y.str;
+    } else if (shape(y.str)[0] == 0) {
+        x.str = x.str;
+    } else {
+        x.str = myCat(x.str, y.str);
+    }
     return x;
 }
 
@@ -1092,21 +1133,45 @@ relColumn<D, T1, S1> myCat(relColumn<public, T0, S0> x, relColumn<D, T1, S1> y){
     D T1 [[1]] xval = x.val;
     D S1 [[2]] xstr = x.str;
     relColumn<D, T1, S1> z;
-    z.val = myCat(xval, y.val);
-    z.str = myCat(xstr, y.str);
     z.fv  = myCat(x.fv,  y.fv);
+    z.val = myCat(xval, y.val);
+    if (shape(x.str)[0] == 0){
+        z.str = y.str;
+    } else if (shape(y.str)[0] == 0) {
+        z.str = xstr;
+    } else {
+        z.str = myCat(xstr, y.str);
+    }
     return z;
 }
 
 template<domain D, type T0, type S0, type T1, type S1>
-relColumn<D, T1, S1> myCat(relColumn<D, T0, S0> x, relColumn<public, T1, S1> y){
+relColumn<D, T0, S0> myCat(relColumn<D, T0, S0> x, relColumn<public, T1, S1> y){
     D T0 [[1]] yval = y.val;
     D S0 [[2]] ystr = y.str;
     relColumn<D, T0, S0> z;
-    z.val = myCat(x.val, yval);
-    z.str = myCat(x.str, ystr);
     z.fv  = myCat(x.fv,  y.fv);
+    z.val = myCat(x.val, yval);
+    if (shape(x.str)[0] == 0){
+        z.str = ystr;
+    } else if (shape(y.str)[0] == 0) {
+        z.str = x.str;
+    } else {
+        z.str = myCat(x.str, ystr);
+    }
     return z;
+}
+
+template<type T, dim N>
+pd_shared3p T [[N]] myCat(pd_shared3p T [[N]] x, public T [[N]] y){
+    pd_shared3p T [[N]] y_pr = y;
+    return myCat(x, y_pr);
+}
+
+template<type T, dim N>
+pd_shared3p T [[N]] myCat(public T [[N]] x, pd_shared3p T [[N]] y){
+    pd_shared3p T [[N]] x_pr = x;
+    return myCat(x_pr, y);
 }
 
 
@@ -1239,8 +1304,67 @@ void publishArg(T0 i0, string vname, relColumn<D,T,S> col){
     }
 }
 
+//aggregations (as used in DES Datalog Educational System)
+
+//count
+template<domain D, domain D0, type T0, type S0>
+D uint32 aggr_count(D bool [[1]] b, relColumn<D0, T0, S0> x){
+    D uint32 [[1]] bn = (uint32)b;
+    return sum(bn);
+}
+
+//sum
+template<domain D, domain D0, type T0, type S0>
+D0 T0 aggr_sum(D bool [[1]] b, relColumn<D0, T0, S0> x){
+    D0 T0 [[1]] empty (size(b)); empty = 0;
+    D0 T0 [[1]] filtered = choose(b, x.val, empty);
+    return sum(filtered);
+}
+
+//min
+template<domain D, domain D0, type T0, type S0>
+D0 T0 aggr_min(D bool [[1]] b, relColumn<D0, T0, S0> x){
+    D0 T0 [[1]] empty (size(b)); empty = 0;
+    D0 T0 [[1]] filtered = choose(b, x.val, empty);
+    return min(filtered);
+}
+
+//max
+template<domain D, domain D0, type T0, type S0>
+D0 T0 aggr_max(D bool [[1]] b, relColumn<D0, T0, S0> x){
+    D0 T0 [[1]] empty (size(b)); empty = 0;
+    D0 T0 [[1]] filtered = choose(b, x.val, empty);
+    return max(filtered);
+}
+
+//times
+template<domain D, domain D0, type T0, type S0>
+D0 T0 aggr_times(D bool [[1]] b, relColumn<D0, T0, S0> x){
+    D0 T0 [[1]] empty (size(b)); empty = 0;
+    D0 T0 [[1]] filtered = choose(b, x.val, empty);
+    return product(filtered);
+}
+
+
 //different blackbox operations lifted to relColumn
 //produce error if we try to valuate a free variable
+template<domain D>
+D bool [[1]] apply_op(string s, uint32 [[1]] x, D xor_uint32 [[1]] y){
+    D bool [[1]] b;
+    //this gives an error for (x == y) for some type derivation reasons
+    if (s == "==") b = (y == x);
+    else assert(false);
+    return b;
+}
+
+template<domain D>
+D bool [[1]] apply_op(string s, D xor_uint32 [[1]] x, uint32 [[1]] y){
+    D bool [[1]] b;
+    if (s == "==") b = (x == y);
+    else assert(false);
+    return b;
+}
+
 template<domain D, domain D0, domain D1, type T>
 D bool [[1]] apply_op(string s, D0 T [[1]] x, D1 T [[1]] y){
     D bool [[1]] b;
