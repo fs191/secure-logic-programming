@@ -38,7 +38,7 @@ deriveAllGroundRules n program = program'
       . removeFalseFacts 
       . (traversed . ruleTail %~ simplifyAnds :: [Rule] -> [Rule]) 
       . map (refreshRule "X_") 
-      . (traversed %~ simplifyVars) 
+      -- . (traversed %~ simplifyVars)
       . inlineOnce
 
 -- | Tries to unify each predicate in each rule body with an appropriate rule

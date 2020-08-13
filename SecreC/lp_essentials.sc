@@ -386,6 +386,34 @@ D T [[2]] unapplyPermutation(D T [[2]] A, D U [[1]] pi){
     return applyPermutation(A, inversePermutation(tau));
 }
 
+//lifting applyPermutation to column structure
+template <domain D, type T, type S, type U>
+relColumn<D,T,S> applyPermutation (relColumn<D,T,S> a, D U [[1]] pi){
+    relColumn<D,T,S> b;
+    b.fv  = reshape(false, size(a.fv));
+    b.str = applyPermutation(a.str, pi);
+    b.val = applyPermutation(a.val, pi);
+    return b;
+}
+
+template <domain D, type T, type S, type U>
+relColumn<D,T,S> applyPermutation (relColumn<D,T,S> a, U [[1]] pi){
+    relColumn<D,T,S> b;
+    b.fv  = reshape(false, size(a.fv));
+    b.str = applyPermutation(b.str, pi);
+    b.val = applyPermutation(b.val, pi);
+    return b;
+}
+
+template <domain D, type T, type S, type U>
+relColumn<D,T,S> applyPermutation (relColumn<public,T,S> a, D U [[1]] pi){
+    relColumn<D,T,S> b;
+    b.fv  = reshape(false, size(a.fv));
+    b.str = applyPermutation(b.str, pi);
+    b.val = applyPermutation(b.val, pi);
+    return b;
+}
+
 //equivalent of stdlib 'cat'
 template <type T>
 T[[1]] myCat(T[[1]] X, T[[1]] Y) {
@@ -679,6 +707,53 @@ D T [[2]] prefixSumPar(D T [[2]] src) {
     return res;
 }
 
+//sorting permutation
+template <domain D, type T>
+D uint32 [[1]] quickSortPermutation (D T[[1]] X) {
+
+    uint64 [[1]] blocks = {0 :: uint64, size(X)};
+    uint64 [[1]] sigma  = iota(size(X));
+    D uint [[1]] pi     = sigma;
+
+    D xor_uint64 [[1]] dummy = sigma;
+
+    D uint8 [[1]] key(32);
+    key = randomize(key);
+
+    X     = shuffle(X,key);
+    pi    = shuffle(pi,key);
+    dummy = shuffle(dummy,key);
+
+    bool ascend = true;
+    __syscall("shared3p::stable_sort_$T\_vec", __domainid(D), X, dummy, ascend, __cref blocks, __ref sigma);
+
+    pi = applyPermutation(pi, sigma);
+    return (uint32)pi;
+}
+
+//lifting quicksort to columns
+template <domain D, type T, type S>
+D uint32 [[1]] quickSortPermutation (relColumn<D,T,S> col) {
+    return quickSortPermutation(col.val);
+}
+
+template <type T>
+T [[1]] inversePermutation (T [[1]] permutation){
+    T [[1]] permutation_inverse(size(permutation));
+    for (uint i = 0; i < size(permutation); i++){
+        permutation_inverse[(uint)permutation[i]] = (T)i;
+    }
+    return permutation_inverse;
+}
+
+//sorting permutation of public data
+template <type T>
+uint32 [[1]] quickSortPermutation(T[[1]] vec) {
+    uint64 [[1]] sigma(size(vec));
+    __syscall("shared3p::public_sort_$T\_vec",  __domainid (pd_shared3p), __ref sigma, __cref vec);
+    return (uint32)(permutation_inverse(sigma));
+}
+
 // shuffle
 template <domain D, type T>
 D T [[2]] shufflePar (D T [[2]] vectors, D uint8 [[1]] key){
@@ -830,6 +905,15 @@ struct relColumn{
     bool [[1]] fv;
     D T [[1]] val;
     D S [[2]] str;
+}
+
+template<domain D0, domain D1, type T0, type T1, type S0, type S1>
+relColumn<D1,T1,S1> copyColumn(relColumn<D0,T0,S0> a){
+    relColumn<D1,T1,S1> b;
+    b.fv = a.fv;
+    b.str = a.str;
+    b.val = a.val;
+    return b;
 }
 
 template<domain D, type T1, type T2, dim N>
@@ -1265,6 +1349,21 @@ D uint32 [[1]] lpShuffle(D bool [[1]] b){
     return pi;
 }
 
+//postprocessing
+template<domain D, type T, type S>
+D bool [[1]] findRepeating(relColumn<public,T,S> col){
+    D bool [[1]] eq0  = col.val[0:size(col.val)-1] == col.val[1:size(col.val)];
+    D bool [[1]] eq   = cat(eq0, {false});
+    return eq;
+}
+
+template<domain D, type T, type S>
+D bool [[1]] findRepeating(relColumn<D,T,S> col){
+    D bool [[1]] eq0  = (mySlice(col.val, 0, size(col.val)-1) == mySlice(col.val, 1, size(col.val)));
+    D bool [[1]] eq   = myCat(eq0, {false});
+    return eq;
+}
+
 /*
 template<domain D0, domain D, type T, dim N>
 D0 T [[N]] filterTrue(D0 uint32 [[1]] pi, uint32 n, D T [[N]] val){
@@ -1284,9 +1383,25 @@ void publishArg(T0 i0, string vname, D T [[1]] val, D S [[2]] str){
 }
 */
 
-template<domain D0, domain D, type T, type S>
-relColumn<D0,T,S> filterTrue(D0 uint32 [[1]] pi, uint32 n, relColumn<D,T,S> col){
-    relColumn<D0,T,S> result;
+template<domain D, type T, type S>
+relColumn<D,T,S> filterTrue(D uint32 [[1]] pi, uint32 n, relColumn<D,T,S> col){
+    relColumn<D,T,S> result;
+    result.val = mySlice(applyPermutation(col.val,pi), 0, n);
+    result.str = mySlice(applyPermutation(col.str,pi), 0, n);
+    return result;
+}
+
+template<domain D, type T, type S>
+relColumn<D,T,S> filterTrue(D uint32 [[1]] pi, uint32 n, relColumn<public,T,S> col){
+    relColumn<D,T,S> result;
+    result.val = mySlice(applyPermutation(col.val,pi), 0, n);
+    result.str = mySlice(applyPermutation(col.str,pi), 0, n);
+    return result;
+}
+
+template<domain D, type T, type S>
+relColumn<D,T,S> filterTrue(uint32 [[1]] pi, uint32 n, relColumn<D,T,S> col){
+    relColumn<D,T,S> result;
     result.val = mySlice(applyPermutation(col.val,pi), 0, n);
     result.str = mySlice(applyPermutation(col.str,pi), 0, n);
     return result;
@@ -1348,6 +1463,8 @@ D0 T0 aggr_times(D bool [[1]] b, relColumn<D0, T0, S0> x){
 
 //different blackbox operations lifted to relColumn
 //produce error if we try to valuate a free variable
+
+//boolean operations
 template<domain D>
 D bool [[1]] apply_op(string s, uint32 [[1]] x, D xor_uint32 [[1]] y){
     D bool [[1]] b;
@@ -1415,3 +1532,96 @@ D bool [[1]] bop(string s, relColumn<D1, T1, S1> x, D0 T0 [[1]] y){
     return b;
 }
 
+template<domain D, domain D0, domain D1>
+D int32 [[1]] div(D0 int32 [[1]] x, D1 int32 [[1]] y){
+    D0 bool [[1]] xpos = (x >= 0);
+    D1 bool [[1]] ypos = (y >= 0);
+    D0 uint32 [[1]] ux = (uint32)x * (2*(uint32)xpos - 1);
+    D1 uint32 [[1]] uy = (uint32)y * (2*(uint32)ypos - 1);
+    D bool [[1]] exactDiv = (ux % uy == 0);
+    D bool [[1]] diffSign = (xpos ^ ypos);
+    D uint32 [[1]] uz = ux / uy;
+    D int32 [[1]] z = (int32)uz + 1 - (int32)(exactDiv | !diffSign);
+    return (int32)z * (1 - 2*(int32)diffSign);
+}
+
+//arithmetic operations
+template<domain D, domain D0, domain D1>
+D int32 [[1]] apply_op(string s, D0 int32 [[1]] x, D1 int32 [[1]] y){
+    D int32 [[1]] z;
+    if      (s == "+") z = x + y;
+    else if (s == "-") z = x - y;
+    else if (s == "*") z = x * y;
+    else if (s == "/") z = div(x, y);
+    //TODO can we do it more efficiently if one argument is public?
+    else if (s == "min"){
+        D int32 [[1]] xpr = x;
+        D int32 [[1]] ypr = y;
+        z = min(xpr, ypr);
+    }
+    else if (s == "max"){
+        D int32 [[1]] xpr = x;
+        D int32 [[1]] ypr = y;
+        z = max(xpr, ypr);
+    }
+    else assert(false);
+    return z;
+}
+
+template<domain D, domain D0, domain D1, type T, type S>
+relColumn<D, T, S> aop(string s, relColumn<D0, T, S> x, relColumn<D1, T, S> y){
+    assert(sum((uint)x.fv) == 0);
+    assert(sum((uint)y.fv) == 0);
+
+    relColumn<D, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, x.val, y.val);
+    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    return z;
+}
+
+template<domain D, type T, type S>
+relColumn<D, T, S> aop(string s, T x, relColumn<D, T, S> y){
+    assert(sum((uint)y.fv) == 0);
+    D T [[1]] xval = reshape(x, size(y.val));
+
+    relColumn<D, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, xval, y.val);
+    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    return z;
+}
+
+template<domain D, domain D0, domain D1, type T, type S>
+relColumn<D, T, S> aop(string s, D0 T [[1]] x, relColumn<D1, T, S> y){
+    assert(sum((uint)y.fv) == 0);
+
+    relColumn<D, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, x, y.val);
+    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    return z;
+}
+
+template<domain D, type T, type S>
+relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, T y){
+    assert(sum((uint)x.fv) == 0);
+    D T [[1]] yval = reshape(y, size(x.val));
+
+    relColumn<D, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, x.val, yval);
+    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    return z;
+}
+
+template<domain D, domain D0, domain D1, type T, type S>
+relColumn<D, T, S> aop(string s, relColumn<D1, T, S> x, D0 T [[1]] y){
+    assert(sum((uint)x.fv) == 0);
+
+    relColumn<D, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, x.val, y);
+    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    return z;
+}
