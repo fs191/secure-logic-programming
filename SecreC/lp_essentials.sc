@@ -1102,6 +1102,65 @@ relColumn<D, T1, T2> getDBColumn(string ds, string tableName, T _colIndex, uint 
     return result;
 }
 
+// write public data to secret-shared database
+// this is meant for testing only
+template<type T>
+void writePublicToTable(string ds, string tableName, bool [[1]] isIntColumn, string headers, T [[1]] _ns, string strData, T [[1]] _ms, T [[1]] _intData) {
+    uint [[1]] ns = (uint)_ns;
+    uint [[1]] ms = (uint)_ms;
+    int32 [[1]] intData = (int32)_intData;
+
+    pd_shared3p int32     temp_D_int32;
+    pd_shared3p xor_uint8 temp_D_string;
+    uint params;
+
+    if (tdbTableExists(ds, tableName)) {
+        print("Deleting existing table: " + tableName);
+        tdbTableDelete(ds, tableName);
+    }
+    print("Start creating the new table: " + tableName);
+
+    params = tdbVmapNew();
+    uint n = size(ns);
+    uint m = size(ms);
+    uint offset = 0;
+    for (uint j = 0; j < n; j++){
+        if (isIntColumn[j]){
+            tdbVmapAddType(params, "types", temp_D_int32);
+        }else{
+            tdbVmapAddVlenType(params, "types", temp_D_string);
+        }
+        tdbVmapAddString(params, "names", substring(headers, offset, offset + ns[j]));
+        offset = offset + ns[j];
+    }
+    tdbTableCreate(ds, tableName, params);
+    tdbVmapDelete(params);
+
+    params = tdbVmapNew();
+    uint strCnt = 0;
+    uint intCnt = 0;
+
+    offset = 0;
+    while (true){
+        for (uint j = 0; j < n; j++){
+            if (isIntColumn[j]){
+                pd_shared3p int32 temp = intData[intCnt];
+                tdbVmapAddValue(params, "values", temp);
+                intCnt++;
+            } else {
+                pd_shared3p xor_uint8 [[1]] temp = __bytes_from_string(substring(strData, offset, offset + ms[strCnt]));
+                tdbVmapAddVlenValue(params, "values", temp);
+                offset = offset + ms[strCnt];
+                strCnt++;
+            }
+        }
+        tdbInsertRow(ds,tableName, params);
+        tdbVmapClear(params);
+        if (strCnt == m) break;
+    }
+
+}
+
 //creation of constant columns
 //if column size is not specified, we assume that it is 1
 template <domain D, type T0, type T, dim N>

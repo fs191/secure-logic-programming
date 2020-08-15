@@ -3,6 +3,7 @@
 
 module Language.SecreC
   ( secrecCode
+  , csvImportCode
   ) where
 
 ---------------------------------------------------------
@@ -18,10 +19,13 @@ import qualified Data.Set as S
 import Data.Text (Text, pack, unpack)
 import Data.Text.Prettyprint.Doc
 
+import Debug.Trace
+
 import qualified DatalogProgram as DP
 import DBClause
 import Expr
 import Rule
+import Table(getTableData)
 
 newtype SCProgram = SCProgram
   { _pStatements :: [TopStatement]
@@ -111,6 +115,8 @@ data SCExpr
   | SCConstFloat Float
   | SCConstStr   String
   | SCConstBool  Bool
+  | SCConstArr   [SCExpr]
+  | SCConstAny   String
   | SCVarName    Text
   | SCNot SCExpr
   | SCNeg SCExpr
@@ -140,6 +146,11 @@ instance Pretty SCExpr where
   pretty (SCConstStr x)   = dquotes $ pretty x
   pretty (SCConstBool True)  = "true"
   pretty (SCConstBool False) = "false"
+  pretty (SCConstArr xs)  = if length xs > 0 then
+                                lbrace <> (hsep . punctuate ",") (pretty <$> xs) <> rbrace
+                            else
+                                pretty $ funReshape [SCConstInt 0, SCConstInt 0]
+  pretty (SCConstAny x)   = pretty x
   pretty (SCVarName x)    = pretty x
   pretty (SCNot e)        = "!" <> parens (pretty e)
   pretty (SCNeg e)        = "-" <> parens (pretty e)
@@ -334,6 +345,7 @@ funDeclassify     = SCFunCall "declassifyIfNeed"
 funTdbGetRowCount = SCFunCall "tdbGetRowCount"
 
 funPublishArg         = FunCall "publishArg"
+funWriteToTable       = FunCall "writePublicToTable"
 funTdbOpenConnection  = FunCall "tdbOpenConnection"
 funTdbCloseConnection = FunCall "tdbCloseConnection"
 
@@ -423,7 +435,7 @@ dynamicColumn i = SCColumn (dynamicColD i) (dynamicColT i) (dynamicColS i)
 dynamicSubst  i = SCSubst  (dynamicColD i) (dynamicColumn i)
 
 --------------------------------------------------
--- convert a pogram to SecreC (transformation S^P)
+-- convert a program to SecreC (transformation S^P)
 secrecCode :: DP.DatalogProgram -> SCProgram
 secrecCode dp = program $
 
@@ -868,3 +880,46 @@ exprToSC e =
     Pred _ _ _ -> error $ "High order predicates are not supported"
 
 
+--------------------------------------------------
+-- create a script that writes data from .csv file to Sharemind database
+-- WARNING! this should never be used with actual private data, as it is insecure and is meant for testing purposes only
+
+csvImportCode :: DP.DatalogProgram -> IO (SCProgram)
+csvImportCode dp = do
+  let ds = "ds"
+  let extPreds = dp ^.. DP.dpDBClauses
+  tableData <- mapM (getTableData . name) extPreds
+  return $ program $ header
+                     ++ [Funct $ mainFun $
+                                     [ VarInit (variable SCPublic SCString ds) strDataset
+                                     , funTdbOpenConnection [SCVarName ds]]
+                                     ++ zipWith (tableGenerationCode ds) extPreds tableData ++
+                                     [funTdbCloseConnection [SCVarName ds]]]
+
+tableGenerationCode :: Text -> DBClause -> [[String]] -> Statement
+tableGenerationCode ds dbc (tableHeader:tableRows) =
+
+  funWriteToTable [ SCVarName ds, SCConstStr p, SCConstArr (map  SCConstBool isInt)
+                  , SCConstStr headerStr, SCConstArr (map SCConstInt hlengths)
+                  , SCConstStr valuesStr, SCConstArr (map SCConstInt vlengths)
+                  , SCConstArr (map SCConstAny intData)]
+  where
+        p  = name dbc
+        xs = vars dbc
+        is = [0..length xs - 1]
+        isInt = map (\x -> let dtype  = x ^. annotation ^. annType in
+                        case dtype of
+                            PPBool -> False
+                            PPInt  -> True
+                            PPStr  -> False
+                            PPAuto -> error $ "Cannot create a table without knowing column data type."
+                ) xs
+
+        hlengths  = map length tableHeader
+        headerStr = concat $ tableHeader
+
+        (_intData, _strData) = unzip $ map (\vs -> (partition snd) (zip vs isInt)) tableRows
+        intData = map fst . concat $ _intData
+        strData = map fst . concat $ _strData
+        vlengths = map length strData
+        valuesStr = concat $ strData

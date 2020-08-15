@@ -44,6 +44,7 @@ library
       PreProcessing
       Rule
       Substitution
+      Table
       Transform
       TypeInference
   other-modules:
