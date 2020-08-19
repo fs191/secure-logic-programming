@@ -34,6 +34,7 @@ module Expr
   , eList
   , annotation
   , leftHand, rightHand
+  , aggrName, aggrPred, sourceExpr, targetExpr
   , arg
   , annType, domain
   , applyTyping
@@ -41,6 +42,7 @@ module Expr
   , _ConstStr
   , andsToList
   , predicateVarNames
+  , predicateVars
   , predicateArity
   , annotateWithBindings
   , identifier
@@ -78,22 +80,28 @@ data Expr
   | Not  {_annotation :: !Ann, _arg :: !Expr}
   | Neg  {_annotation :: !Ann, _arg :: !Expr}
   | Inv  {_annotation :: !Ann, _arg :: !Expr}
+  | Sqrt {_annotation :: !Ann, _arg :: !Expr}
+  | FDiv {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Div  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Mod  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Sub  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Lt   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Le   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Eq   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Is   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Un   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Gt   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Ge   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Mul  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Add  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Min  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Max  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Pow  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | And  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Or   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Pred {_annotation :: !Ann, _predName :: !String, _predArgs :: ![Expr]}
   | List {_annotation :: !Ann, _vals :: ![Expr]}
+  | Aggr {_annotation :: !Ann, _aggrName :: !String, _aggrPred :: !Expr, _sourceExpr :: !Expr, _targetExpr :: !Expr}
   deriving (Ord,Show,Eq,Data,Typeable)
 makeLenses ''Expr
 makePrisms ''Expr
@@ -109,12 +117,16 @@ instance Pretty Expr where
   pretty (Not e x)        = "!" <> pretty x <+> (pretty $ show e)
   pretty (Neg e x)        = "-(" <> pretty x <> ")" <+> (pretty $ show e)
   pretty (Inv e x)        = "(" <> pretty x <> ")^(-1)" <+> (pretty $ show e)
-  pretty (Div e x y)      = pretty x <+> "/" <+> pretty y <+> (pretty $ show e)
+  pretty (Sqrt e x)       = "sqrt(" <> pretty x <> ")" <+> (pretty $ show e)
+  pretty (FDiv e x y)     = pretty x <+> "/" <+> pretty y <+> (pretty $ show e)
+  pretty (Div e x y)      = "div(" <> pretty x <> ", " <> pretty y <> ")" <+> (pretty $ show e)
+  pretty (Mod e x y)      = "mod(" <> pretty x <> ", " <> pretty y <> ")" <+> (pretty $ show e)
   pretty (Sub e x y)      = pretty x <+> "-" <+> pretty y <+> (pretty $ show e)
   pretty (Lt e x y)       = pretty x <+> "<" <+> pretty y <+> (pretty $ show e)
   pretty (Le e x y)       = pretty x <+> "=<" <+> pretty y <+> (pretty $ show e)
-  pretty (Eq e x y)       = pretty x <+> "=" <+> pretty y <+> (pretty $ show e)
+  pretty (Eq e x y)       = pretty x <+> "=:=" <+> pretty y <+> (pretty $ show e)
   pretty (Is e x y)       = pretty x <+> "is" <+> pretty y <+> (pretty $ show e)
+  pretty (Un e x y)       = pretty x <+> "=" <+> pretty y <+> (pretty $ show e)
   pretty (Gt e x y)       = pretty x <+> ">" <+> pretty y <+> (pretty $ show e)
   pretty (Ge e x y)       = pretty x <+> ">=" <+> pretty y <+> (pretty $ show e)
   pretty (Mul e x y)      = pretty x <+> "*" <+> pretty y <+> (pretty $ show e)
@@ -124,6 +136,7 @@ instance Pretty Expr where
   pretty (Or e x y)       = pretty x <> ";\n" <> pretty y <+> (pretty $ show e)
   pretty (And _ x y)      = pretty x <> ",\n" <> pretty y
   pretty (List e x)       = (list $ pretty <$> x) <+> (pretty $ show e)
+  pretty (Aggr e f p x y) = pretty f <> "(" <> pretty p <> ", " <> pretty x <> "," <> pretty y <> ")" <+> (pretty $ show e)
 
 instance PrologSource Expr where
   prolog (Var _ x)        = pretty x
@@ -133,15 +146,19 @@ instance PrologSource Expr where
   prolog (ConstFloat _ x) = pretty x
   prolog (Attribute _ x)  = pretty x
   prolog (Pred _ n args)  = pretty n <> tupled (prolog <$> args) -- <+> (prolog $ show e)
-  prolog (Not _ e)        = "!" <> prolog e
+  prolog (Not _ e)        = "\\+" <> prolog e
   prolog (Neg _ e)        = "-" <> prolog e
   prolog (Inv _ e)        = "(" <> prolog e <> ")^(-1)"
-  prolog (Div _ x y)      = prolog x <+> "/" <+> prolog y
+  prolog (Sqrt _ e)       = "sqrt(" <> prolog e <> ")"
+  prolog (FDiv _ x y)     = prolog x <+> "/" <+> prolog y
+  prolog (Div _ x y)      = "div(" <> prolog x <> ", " <> prolog y <> ")"
+  prolog (Mod _ x y)      = "mod(" <> prolog x <> ", " <> prolog y <> ")"
   prolog (Sub _ x y)      = prolog x <+> "-" <+> prolog y
   prolog (Lt _ x y)       = prolog x <+> "<" <+> prolog y
   prolog (Le _ x y)       = prolog x <+> "=<" <+> prolog y
-  prolog (Eq _ x y)       = prolog x <+> "=" <+> prolog y
+  prolog (Eq _ x y)       = prolog x <+> "=:=" <+> prolog y
   prolog (Is _ x y)       = prolog x <+> "is" <+> prolog y
+  prolog (Un _ x y)       = prolog x <+> "=" <+> prolog y
   prolog (Gt _ x y)       = prolog x <+> ">" <+> prolog y
   prolog (Ge _ x y)       = prolog x <+> ">=" <+> prolog y
   prolog (Mul _ x y)      = prolog x <+> "*" <+> prolog y
@@ -151,6 +168,28 @@ instance PrologSource Expr where
   prolog (Or _ x y)       = prolog x <> ";\n" <> prolog y
   prolog (And _ x y)      = prolog x <> ",\n" <> prolog y
   prolog (List _ x)       = list $ prolog <$> x
+
+  -- TODO there may be more compact/better ways for aggregations
+  prolog (Aggr e "times" p x y) = "findall(" <> "X0" <> "," <> "(" <> pretty p <> "," <> "X0 is log(" <> pretty x <> ")), Xs)" <> "," <+>
+                                  "sum_list(Xs,Y0)" <> "," <+>
+                                  pretty y <+> "is" <+> "exp(" <> "Y0" <> ")" <+>
+                                  (pretty $ show e)
+
+  prolog (Aggr e "avg" p x y) = "findall(" <> pretty x <> "," <> pretty p <> ", Xs)" <> "," <+>
+                                "sum_list(Xs,Y0)" <> "," <+>
+                                "length(Xs,N)" <> "," <+>
+                                pretty y <+> "is" <+> "Y0" <> "/" <> "N" <+>
+                                (pretty $ show e)
+  prolog (Aggr e f p x y) = "findall(" <> pretty x <> "," <> pretty p <> ", Xs)," <+>
+                            pretty (prologAggr f) <> "_list(Xs," <> pretty y <> ")" <+>
+                            (pretty $ show e)
+
+-- map datalog aggregations to prolog aggregations
+prologAggr :: String -> String
+prologAggr "sum"   = "sum_list"
+prologAggr "min"   = "min_list"
+prologAggr "max"   = "max_list"
+prologAggr "count" = "length"
 
 isLeaf :: Expr -> Bool
 isLeaf (Var _ _)       = True
@@ -228,6 +267,10 @@ greaterEqual = Ge empty
 equal :: Expr -> Expr -> Expr
 equal = Eq empty
 
+-- | Creates a new unification expression
+eUn :: Expr -> Expr -> Expr
+eUn = Un empty
+
 -- | Creates a new negation expression
 eNeg :: Expr -> Expr
 eNeg = Neg empty
@@ -244,9 +287,17 @@ eMin = Min empty
 eMul :: Expr -> Expr -> Expr
 eMul = Mul empty
 
--- | Creates a new division expression
+-- | Creates a new float division expression
+eFDiv :: Expr -> Expr -> Expr
+eFDiv = FDiv empty
+
+-- | Creates a new integer division expression
 eDiv :: Expr -> Expr -> Expr
 eDiv = Div empty
+
+-- | Creates a new remainder expression
+eMod :: Expr -> Expr -> Expr
+eMod = Mod empty
 
 -- | Creates a new addition expression
 eAdd :: Expr -> Expr -> Expr
@@ -260,6 +311,10 @@ eSub = Sub empty
 eInv :: Expr -> Expr
 eInv = Inv empty
 
+-- | Creates a new square root expression
+eSqrt :: Expr -> Expr
+eSqrt = Sqrt empty
+
 -- | Creates a new boolean and expression
 eAnd :: Expr -> Expr -> Expr
 eAnd = And empty
@@ -272,6 +327,10 @@ eOr = Or empty
 eList :: [Expr] -> Expr
 eList = List empty
 
+-- | Creates a new aggr expression
+eAggr :: String -> Expr -> Expr -> Expr -> Expr
+eAggr = Aggr empty
+
 -- | Creates a new 'is' expression
 eIs :: Expr -> Expr -> Expr
 eIs = Is empty
@@ -281,6 +340,11 @@ eIs = Is empty
 andsToList :: Expr -> [Expr]
 andsToList (And _ l r) = andsToList l <> andsToList r
 andsToList x = [x]
+
+-- | Gets predicate arguments as expressions
+predicateVars :: Expr -> [Expr]
+predicateVars (Pred _ _ vs) = vs
+predicateVars _ = error "Expecting a predicate"
 
 -- | Gets the names of all variables in the predicate arguments
 predicateVarNames :: Expr -> [String]
@@ -354,21 +418,26 @@ isArithmetic :: Expr -> Bool
 isArithmetic (Add{}) = True
 isArithmetic (Sub{}) = True
 isArithmetic (Mul{}) = True
+isArithmetic (FDiv{}) = True
 isArithmetic (Div{}) = True
+isArithmetic (Mod{}) = True
 isArithmetic (Min{}) = True
 isArithmetic (Max{}) = True
 isArithmetic (Neg{}) = True
 isArithmetic (Inv{}) = True
+isArithmetic (Sqrt{}) = True
 isArithmetic _       = False
 
 -- | Returns True if the expression is a predicate, built-in or otherwise
 isPredicative :: Expr -> Bool
 isPredicative (Pred{}) = True
+isPredicative (Aggr{}) = True
 isPredicative (Gt{})   = True
 isPredicative (Ge{})   = True
 isPredicative (Eq{})   = True
 isPredicative (Le{})   = True
 isPredicative (Lt{})   = True
 isPredicative (Is{})   = True
+isPredicative (Un{})   = True
 isPredicative _        = False
 
