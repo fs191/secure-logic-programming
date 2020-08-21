@@ -747,11 +747,20 @@ T [[1]] inversePermutation (T [[1]] permutation){
 }
 
 //sorting permutation of public data
+//template <type T>
+//uint32 [[1]] quickSortPermutation(T[[1]] vec) {
+//    uint64 [[1]] sigma(size(vec));
+//    __syscall("shared3p::public_sort_$T\_vec",  __domainid (pd_shared3p), __ref sigma, __cref vec);
+//    return (uint32)(permutation_inverse(sigma));
+//}
+
+//a workaround to use before getting a newer instance of Sharemind
+// TODO it is interesting to check whether we have public sort on the cluster now
 template <type T>
 uint32 [[1]] quickSortPermutation(T[[1]] vec) {
-    uint64 [[1]] sigma(size(vec));
-    __syscall("shared3p::public_sort_$T\_vec",  __domainid (pd_shared3p), __ref sigma, __cref vec);
-    return (uint32)(permutation_inverse(sigma));
+    pd_shared3p T [[1]] prvec = vec;
+    pd_shared3p uint32 [[1]] sigma = quickSortPermutation(prvec);
+    return declassify(sigma);
 }
 
 // shuffle
@@ -914,6 +923,11 @@ relColumn<D1,T1,S1> copyColumn(relColumn<D0,T0,S0> a){
     b.str = a.str;
     b.val = a.val;
     return b;
+}
+
+template <domain D, type T, type S>
+uint colSize(relColumn<D,T,S> x){
+    return size(x.val);
 }
 
 template<domain D, type T1, type T2, dim N>
@@ -1184,7 +1198,7 @@ relColumn<public, uint32, uint8> constColumn(string arg, uint m){
     uint32 val = declassify(CRC32(blstr));
     relColumn<public, uint32, uint8> result;
     result.val = reshape(val,m);
-    result.str = reshape(str,m,size(str));
+    result.str = reshape(copyBlock(str,{size(str)},{m}),m,size(str));
     result.fv = reshape(false,m);
     return result;
 }
@@ -1195,7 +1209,7 @@ relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(string arg, uint m){
     pd_shared3p xor_uint32 val = CRC32(str);
     relColumn<pd_shared3p, xor_uint32, xor_uint8> result;
     result.val = reshape(val,m);
-    result.str = reshape(str,m,size(str));
+    result.str = reshape(copyBlock(str,{size(str)},{m}),m,size(str));
     result.fv = reshape(false,m);
     return result;
 }
@@ -1205,7 +1219,7 @@ relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(pd_shared3p xor_uint8 
     pd_shared3p xor_uint32 val = CRC32(arg);
     relColumn<pd_shared3p, xor_uint32, xor_uint8> result;
     result.val = reshape(val,m);
-    result.str = reshape(arg,m,size(arg));
+    result.str = reshape(copyBlock(arg,{size(arg)},{m}),m,size(arg));
     result.fv = reshape(false,m);
     return result;
 }
@@ -1408,6 +1422,14 @@ D uint32 [[1]] lpShuffle(D bool [[1]] b){
     return pi;
 }
 
+template<domain D>
+D uint32 [[1]] lpShuffle(bool [[1]] b){
+    publish("does solution exist:", any(b));
+    uint32 [[1]] pi  = countSortPermutation(!b);
+    D uint32 [[1]] pr_pi = pi;
+    return pr_pi;
+}
+
 //postprocessing
 template<domain D, type T, type S>
 D bool [[1]] findRepeating(relColumn<public,T,S> col){
@@ -1467,7 +1489,7 @@ relColumn<D,T,S> filterTrue(uint32 [[1]] pi, uint32 n, relColumn<D,T,S> col){
 }
 
 template<domain D, type T0, type T, type S>
-void publishArg(T0 i0, string vname, relColumn<D,T,S> col){
+void publishCol(T0 i0, string vname, relColumn<D,T,S> col){
     uint i = (uint)i0;
     publish("var" + tostring(i), vname);
     if (shape(col.str)[1] >= 1){
@@ -1476,6 +1498,13 @@ void publishArg(T0 i0, string vname, relColumn<D,T,S> col){
     } else {
         publish("val" + tostring(i), col.val);
     }
+}
+
+template<domain D, type T0, type T>
+void publishVal(T0 i0, string vname, D T val){
+    uint i = (uint)i0;
+    publish("var" + tostring(i), vname);
+    publish("val" + tostring(i), val);
 }
 
 //aggregations (as used in DES Datalog Educational System)
@@ -1684,3 +1713,89 @@ relColumn<D, T, S> aop(string s, relColumn<D1, T, S> x, D0 T [[1]] y){
     z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
+
+//aggregations
+template<domain D0, domain D, type T, type S>
+D0 int32 [[1]] count_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
+    uint n = size(b) / m;
+    assert(m*n == size(b));
+    D0 int32 [[1]] bu = (int32)b;
+
+    relColumn<D, T, S> y;
+    y.fv  = false;
+    y.val = sum(bu,n);
+    y.str = reshape(0,n,0);
+
+    return y;
+}
+
+template<domain D0, domain D, type T, type S>
+D0 int32 [[1]] sum_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
+    uint n = size(b) / m;
+    assert(m*n == size(b));
+    D0 int32 [[1]] bu = (int32)b;
+
+    relColumn<D, T, S> y;
+    y.fv  = false;
+    y.val = sum(x.val * bu, n);
+    y.str = reshape(0,n,0);
+
+    return y;
+}
+
+template<domain D0, domain D, type T, type S>
+D0 float32 [[1]] avg_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
+    uint n = size(b) / m;
+    assert(m*n == size(b));
+    D0 int32 [[1]] bu = (int32)b;
+
+    relColumn<D, T, S> y;
+    y.fv  = false;
+    y.val = (float32)sum(x.val * bu, n) / (float32)sum(bu,n);
+    y.str = reshape(0,n,0);
+
+    return y;
+}
+
+template<domain D0, domain D, type T, type S>
+D0 int32 [[1]] min_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
+    uint n = size(b) / m;
+    assert(m*n == size(b));
+    D0 int32 [[1]] bu = (int32)b;
+
+    relColumn<D, T, S> y;
+    y.fv  = false;
+    y.val = min(bu * (x.val - INT32_MAX) + INT32_MAX, n);
+    y.str = reshape(0,n,0);
+
+    return y;
+}
+
+template<domain D0, domain D, type T, type S>
+relColumn<D0, T, S> max_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
+    uint n = size(b) / m;
+    assert(m*n == size(b));
+    D0 int32 [[1]] bu = (int32)b;
+
+    relColumn<D, T, S> y;
+    y.fv  = false;
+    y.val = max(bu * (x.val - INT32_MIN) + INT32_MIN, n);
+    y.str = reshape(0,n,0);
+
+    return y;
+}
+
+template<domain D0, domain D, type T, type S>
+D0 int32 [[1]] times_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
+    uint n = size(b) / m;
+    assert(m*n == size(b));
+    D0 int32 [[1]] bu = (int32)b;
+
+    relColumn<D, T, S> y;
+    y.fv  = false;
+    y.val = product(bu * (x.val - 1) + 1, n);
+    y.str = reshape(0,n,0);
+
+    return y;
+}
+
