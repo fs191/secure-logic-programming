@@ -84,6 +84,6 @@ fastestDelivery(PortName, CargoType, MinTime) :-
 
 %not sure if it is a good idea to use repeating name "@cargotype" in the table and for the inputs
 :-inputs([@portname:private string, @cargotype:private string]).
-:-outputs([Ship,MinTime]).
+:-outputs([MinTime]).
 fastestDelivery(@portname,@cargotype,MinTime)?
 
