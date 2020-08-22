@@ -36,14 +36,6 @@ runWithOptions args =
           . adornProgram
           . preProcess
 
-    let pipeline2
-          = id
-          . typeInference
-          . postProcess
-          . deriveAllGroundRules _ite
-          . adornProgram
-          . preProcess
-
     -- parse the input datalog program
     program <- parseDatalogFromFile inFileName
     let secrec = show . pretty $ pipeline program
@@ -60,11 +52,10 @@ runWithOptions args =
         writeFile createdbPath createdbStr
         putStrLn $ "Wrote database generation SecreC script into " ++ createdbPath
 
-
-    putStrLn (show . pretty $ pipeline2 program)
-
     -- Output the results
     if outFilePath /= ""
-       then writeFile outFilePath secrec
+       then do
+            writeFile outFilePath secrec
+            putStrLn $ "Wrote privacy-preserving computation SecreC script into " ++ outFilePath
        else putStrLn secrec
 
