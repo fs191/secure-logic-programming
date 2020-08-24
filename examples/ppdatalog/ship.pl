@@ -15,7 +15,6 @@
               @latitude:public float,
               @longitude:public float,
               @offloadcapacity:public int,
-              %we do not have a boolean type yet
               @available:private bool]).
 :-pk(port,[@name]).
 

@@ -15,6 +15,7 @@ data PPType
   = PPBool
   | PPInt
   | PPStr
+  | PPFloat
   | PPAuto
   deriving (Ord, Eq, Data, Typeable)
 
@@ -25,10 +26,11 @@ data PPDomain
   deriving (Ord, Eq, Data, Typeable)
 
 instance Show PPType where
-  show PPBool = "bool"
-  show PPInt  = "int"
-  show PPStr  = "string"
-  show PPAuto = "auto"
+  show PPBool  = "bool"
+  show PPInt   = "int"
+  show PPStr   = "string"
+  show PPFloat = "float"
+  show PPAuto  = "auto"
 
 instance Pretty PPType where
   pretty = pretty . show

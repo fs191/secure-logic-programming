@@ -56,20 +56,20 @@ inlineOnce rs =
       let subst = unify shd p
       [flip applySubst (tgt & ruleTail .~ mut stl) <$> subst]
 
-simplifyVars :: Rule -> Rule
-simplifyVars r = applySubst subst r
-  where subst = simplifyVars' $ r ^. ruleTail
-
--- | Removes any unnecessary variable equalities (e.g. X=Y)
-simplifyVars' :: Expr -> Subst
-simplifyVars' r = compress . mconcat $ f <$> U.universe r
-  where f (Eq _ v x)
-          | isVar x  = v |-> x
-          | otherwise = mempty
-        f (Eq _ x v)
-          | isVar x  = v |-> x
-          | otherwise = mempty
-        f _ = mempty
+--simplifyVars :: Rule -> Rule
+--simplifyVars r = applySubst subst r
+--  where subst = simplifyVars' $ r ^. ruleTail
+--
+---- | Removes any unnecessary variable equalities (e.g. X=Y)
+--simplifyVars' :: Expr -> Subst
+--simplifyVars' r = compress . mconcat $ f <$> U.universe r
+--  where f (Eq _ v x)
+--          | isVar x  = v |-> x
+--          | otherwise = mempty
+--        f (Eq _ x v)
+--          | isVar x  = v |-> x
+--          | otherwise = mempty
+--        f _ = mempty
 
 -- Removes duplicate terms from AND operations at the root expression
 simplifyAnds :: Expr -> Expr

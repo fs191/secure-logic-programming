@@ -13,6 +13,7 @@ module Annotation
   , unifyTypings
   , safelyUnifyDomains, safelyUnifyTypings
   , typing
+  , srcPos
   ) where
 
 import Control.Lens
@@ -21,6 +22,8 @@ import Data.Data
 import Data.Foldable
 
 import Language.SecreC.Types
+
+import Text.Megaparsec.Pos
 
 -- | A data type used for unifying type and domain simultaneously
 data Typing
@@ -37,6 +40,7 @@ data Ann = Ann
   , _domain   :: PPDomain
     -- | Tells wether the expression is bound
   , _annBound :: Bool
+  , _srcPos   :: Maybe (SourcePos, SourcePos)
   }
   deriving (Ord, Eq, Data, Typeable)
 makeLenses ''Ann
@@ -52,7 +56,7 @@ instance Show Ann where
 
 -- | Returns the default annotation that is untyped and unbound.
 empty :: Ann
-empty = Ann PPAuto Unknown True
+empty = Ann PPAuto Unknown True Nothing
 
 -- | Returns an empty typing with no domain and auto type
 emptyTyping :: Typing

@@ -8,6 +8,7 @@ import Text.Megaparsec
 import Data.Foldable
 import Data.Void (Void)
 
+import Control.Exception (throw)
 import Control.Monad (void)
 import Control.Lens
 
@@ -18,6 +19,7 @@ import qualified DatalogProgram as DP
 import Expr as E hiding (identifier)
 import qualified Rule as R
 import Annotation as A
+import ErrorMsg
 
 type Parser = Parsec Void String
 
@@ -33,12 +35,15 @@ datalogParser =
     st  <- manyTill clause eof
     let rs   = [x | RC x <- st]
     let dirs = [x | DC x <- st]
-    let [q]  = [x | GC x <- st]
-    return $ DP.ppDatalogProgram rs q dirs
+    let qs   = [x | GC x <- st]
+    case qs of
+      []  -> throw NoGoal
+      [q] -> return $ DP.ppDatalogProgram rs q dirs
+      x   -> throw $ TooManyGoals x
 
 clause :: Parser Clause
 clause = asum
-  [ try $ RC  <$> ruleP
+  [ try $ RC <$> ruleP
   , try $ GC <$> goal
   , DC <$> funCall
   ]

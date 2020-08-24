@@ -37,24 +37,28 @@ sc = C.space
   empty
 
 variable :: Parser String
-variable = lexeme $
-  do
-    h <- upperChar
-    t <- many $ alphaNumChar <|> identifierSymbols
-    (return $ h:t) <?> "variable"
+variable = lexeme variable' <?> "variable"
+  where
+    variable' =
+      do
+        h <- upperChar
+        t <- many $ alphaNumChar <|> identifierSymbols
+        (return $ h:t) 
 
 identifier :: Parser String
 identifier = asum
   [ try $ between sQuote sQuote identifier'
   , try $ between dQuote dQuote identifier'
   , identifier'
-  ] <?> "identifier"
+  ] 
+  <?> "identifier"
 
 attributeIdentifier :: Parser String
-attributeIdentifier = 
+attributeIdentifier =
   do
     void $ char '@'
-    identifier <?> "attribute"
+    lexeme identifier 
+  <?> "attribute"
 
 sQuote :: Parser String
 sQuote = symbol "'"
@@ -82,10 +86,10 @@ period :: Parser ()
 period = void $ symbol "."
 
 parens :: Parser a -> Parser a
-parens = lexeme . between (char '(') (char ')')
+parens = lexeme . between (symbol "(") (symbol ")")
 
 brackets :: Parser a -> Parser a
-brackets = lexeme . between (char '[') (char ']')
+brackets = lexeme . between (symbol "[") (symbol "]")
 
 impliedBy :: Parser ()
 impliedBy = void $ symbol ":-"
@@ -98,8 +102,9 @@ domainType =
 
 dataType :: Parser PPType
 dataType =
-      try (symbol "bool"   *> return PPBool)
-  <|> try (symbol "int"    *> return PPInt)
+      try (symbol "bool"  *> return PPBool)
+  <|> try (symbol "int"   *> return PPInt)
+  <|> try (symbol "float" *> return PPFloat)
   <|> (symbol "string" *> return PPStr)
   <?> "data type"
 
@@ -109,5 +114,6 @@ typing =
     void $ symbol ":"
     dom <- optional domainType
     dat <- dataType
-    (return $ Typing (fromMaybe Unknown dom) dat) <?> "typing"
+    (return $ Typing (fromMaybe Unknown dom) dat) 
+  <?> "typing"
 

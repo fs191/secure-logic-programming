@@ -10,6 +10,8 @@ module Parser.DatalogParser.Expr
 
 import Text.Megaparsec
 
+import Control.Lens
+
 import Data.Void (Void)
 import Data.Foldable
 
@@ -24,11 +26,8 @@ type Parser = Parsec Void String
 -- Numeric expressions
 -----------------------
 
-aExpr :: Parser Expr
-aExpr = aExpr1
-
 aTerm :: Parser Expr
-aTerm = asum
+aTerm = (withSrcPos $ asum
   [ try predParse
   , try varParse
   , try strParse
@@ -36,35 +35,36 @@ aTerm = asum
   , try attributeParse
   , try list
   , typable $ parens aExpr
-  ] <?> "term"
+  ])
+  <?> "term"
 
-aExpr1 :: Parser Expr
-aExpr1 = asum
-  [ binary greaterEqual ">=" aExpr1 aExpr2
-  , binary greater      ">"  aExpr1 aExpr2
-  , binary equal        "="  aExpr1 aExpr2
-  , binary lessEqual    "=<" aExpr1 aExpr2
-  , binary less         "<"  aExpr1 aExpr2
-  , binary eIs          "is" aExpr1 aExpr2
+aExpr :: Parser Expr
+aExpr = withSrcPos $ asum
+  [ binary greaterEqual ">=" aExpr aExpr2
+  , binary greater      ">"  aExpr aExpr2
+  , binary equal        "="  aExpr aExpr2
+  , binary lessEqual    "=<" aExpr aExpr2
+  , binary less         "<"  aExpr aExpr2
+  , binary eIs          "is" aExpr aExpr2
   , aExpr2
   ]
 
 aExpr2 :: Parser Expr
-aExpr2 = asum
+aExpr2 = withSrcPos $ asum
   [ binary eAdd "+" aExpr2 aExpr3
   , binary eSub "-" aExpr2 aExpr3
   , aExpr3
   ]
 
 aExpr3 :: Parser Expr
-aExpr3 = asum
+aExpr3 = withSrcPos $ asum
   [ binary eMul "*" aExpr3 aTerm
   , binary eDiv "/" aExpr3 aTerm
   , aTerm
   ]
 
 list :: Parser Expr
-list = eList <$> (brackets $ sepBy aTerm comma) <?> "list"
+list = (withSrcPos $ eList <$> (brackets $ sepBy aTerm comma)) <?> "list"
 
 binary 
   :: (Expr -> Expr -> Expr) 
@@ -72,33 +72,33 @@ binary
   -> Parser Expr 
   -> Parser Expr 
   -> Parser Expr
-binary op sym p1 p2 = try . typable $ op <$> p2 <* symbol sym <*> p1
+binary f sym p1 p2 = withSrcPos $ try . typable $ f <$> p2 <* symbol sym <*> p1
 
 -----------------------
 -- Helper functions
 -----------------------
 
 predParse :: Parser Expr
-predParse = 
+predParse = withSrcPos $
   do
     n <- identifier
     args <- parens $ sepBy1 aTerm comma
     typable . return $ predicate n args
 
 intParse :: Parser Expr
-intParse =
+intParse = withSrcPos $
   do
     n <- signedInteger
     typable . return $ constInt n
 
 varParse :: Parser Expr
-varParse =
+varParse = withSrcPos $
   do
     n <- variable
     typable . return $ var n
 
 strParse :: Parser Expr
-strParse = 
+strParse = withSrcPos $
   do
     s <- identifier
     typable . return $ constStr s
@@ -111,10 +111,14 @@ rule =
     return $ R.fact psym terms
 
 attributeParse :: Parser Expr
-attributeParse =
+attributeParse = withSrcPos $
   do
     s <- attributeIdentifier
     typable . return $ E.attribute s
+
+--
+-- Useful combinators for expression parsing
+--
 
 typable :: Parser Expr -> Parser Expr
 typable e =
@@ -122,8 +126,16 @@ typable e =
     e' <- e
     t <- try $ optional typing
     let f = case t of
-          Just p  -> applyTyping p
-          Nothing -> applyTyping A.emptyTyping
-    return $ f e'
+          Just p  -> p
+          Nothing -> A.emptyTyping
+    return $ applyTyping f e'
   <|> e
+
+withSrcPos :: Parser Expr -> Parser Expr
+withSrcPos parser =
+  do
+    begin <- getSourcePos
+    res <- parser
+    end <- getSourcePos
+    return $ res & annotation . A.srcPos .~ Just (begin, end)
 
