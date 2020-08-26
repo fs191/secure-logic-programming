@@ -21,8 +21,6 @@ import Expr as E hiding (identifier)
 import qualified Rule as R
 import qualified Annotation as A
 
-import Debug.Trace
-
 type Parser = Parsec Void String
 
 -----------------------
@@ -32,12 +30,12 @@ type Parser = Parsec Void String
 aTerm :: Parser Expr
 aTerm = (withSrcPos $ asum
   [ try predParse
+  , try holeParse
   , try varParse
   , try strParse
   , try floatParse
   , try intParse
   , try attributeParse
-  , try holeParse
   , try list
   ])
   <?> "term"
@@ -132,7 +130,6 @@ holeParse :: Parser Expr
 holeParse =
   do
     void $ symbol "_"
-    void $ optional variable
     typable . return $ hole
 
 rule :: Parser R.Rule

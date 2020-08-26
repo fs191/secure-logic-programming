@@ -17,7 +17,7 @@ programArgs =
       , help "Specifies the maximum depth of recursion for the transformation\
               \ stage. Larger value means that compilation will take longer,\ 
               \ but at lower values the SecreC program might only give a\
-              \ partial answer"
+              \ partial answer."
       , value 2
       , hidden
       ]
@@ -26,13 +26,13 @@ programArgs =
       [ long "db-create-tables"
       , hidden
       , help "Create the required tables in the database using the data in input files\n \
-              \ the script is written into file createdb_XXX where XXX is the specified output file"
+              \ the script is written into file createdb_XXX where XXX is the specified output file."
       , hidden
       ]
     verbose <- switch $ mconcat
       [ short 'v'
       , long "verbose"
-      , help "Produce verbose output"
+      , help "Produce verbose output."
       , hidden
       ]
     outFile <- strOption $ mconcat
@@ -44,7 +44,6 @@ programArgs =
       ]
     inFile <- strArgument $ mconcat
       [ metavar "INPUT"
-      , help "The input Privalog file"
       ]
     pure $ ProgramOptions
       { _iterations     = iterations
@@ -59,6 +58,6 @@ getProgramOptions = execParser opts
   where
     opts = info (programArgs <**> helper)
       (fullDesc
-      <> progDesc "Transforms a Privalog program to a privacy-preserving SecreC program.\n \
+      <> progDesc "Transforms a Privalog program to a privacy-preserving SecreC program.\n\
                   \ WARNING: the program is still under development."
       <> header "Privacy-preserving logic programming")

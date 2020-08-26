@@ -45,7 +45,13 @@ variable = lexeme variable' <?> "variable"
       do
         h <- upperChar
         t <- many $ alphaNumChar <|> identifierSymbols
-        (return $ h:t) 
+        return $ h:t
+      <|>
+      do
+        h <- char '_'
+        t <- some $ alphaNumChar <|> identifierSymbols
+        return $ h:t
+
 
 identifier :: Parser String
 identifier = asum
