@@ -30,7 +30,7 @@ data Clause
   | DC DP.Directive
 
 datalogParser :: Parser DP.DatalogProgram
-datalogParser =
+datalogParser = 
   do
     void sc
     st  <- manyTill clause eof
@@ -43,11 +43,13 @@ datalogParser =
       x   -> throw $ TooManyGoals x
 
 clause :: Parser Clause
-clause = asum
-  [ try $ RC <$> ruleP
-  , try $ GC <$> goal
-  , DC <$> funCall
-  ]
+clause = 
+  do
+    choice
+      [ try $ RC <$> ruleP
+      , GC <$> goal
+      , DC <$> funCall
+      ]
 
 ruleP :: Parser R.Rule
 ruleP = 
@@ -61,16 +63,18 @@ ruleP =
       <?> "rule"
 
 funCall :: Parser DP.Directive
-funCall = asum
-  [ try inputDir
-  , try outputDir
-  , dbDir
-  ]
+funCall = 
+  do
+    void impliedBy
+    choice
+      [ inputDir
+      , outputDir
+      , dbDir
+      ]
 
 inputDir :: Parser DP.Directive
 inputDir = 
   do
-    void impliedBy
     void $ symbol "inputs"
     _ins <- parens . brackets $ do
       sepBy attributeParse comma
@@ -80,7 +84,6 @@ inputDir =
 outputDir :: Parser DP.Directive
 outputDir = 
   do
-    void impliedBy
     void $ symbol "outputs"
     _ins <- parens . brackets $ do
       sepBy varParse comma
@@ -90,7 +93,6 @@ outputDir =
 dbDir :: Parser DP.Directive
 dbDir = 
   do
-    void impliedBy
     void $ symbol "type"
     _dir <- parens $ do
       _id <- identifier

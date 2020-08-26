@@ -10,7 +10,7 @@ module Parser.DatalogParser.Lexer
   , typing
   ) where
 
-import Text.Megaparsec
+import Text.Megaparsec as P
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as C
 
@@ -55,11 +55,18 @@ variable = lexeme variable' <?> "variable"
 
 identifier :: Parser String
 identifier = asum
-  [ try $ between sQuote sQuote identifier'
-  , try $ between dQuote dQuote identifier'
-  , identifier'
-  ] 
+  [ lexeme $ between sQuote sQuote identifier'
+  , lexeme $ between dQuote dQuote identifier'
+  , lexeme identifier'
+  ] >>= check
   <?> "identifier"
+  where 
+    check :: String -> Parser String
+    check x = 
+      if x `elem` keywords
+        then fail $ "reserved keyword " ++ x ++ " cannot be an identifier."
+        else return x
+    keywords = ["sqrt", "is"]
 
 attributeIdentifier :: Parser String
 attributeIdentifier =
@@ -75,7 +82,7 @@ dQuote :: Parser String
 dQuote = symbol "\""
 
 identifier' :: Parser String
-identifier' = lexeme $
+identifier' = 
   do
     h <- lowerChar
     t <- many $ alphaNumChar <|> identifierSymbols
@@ -107,15 +114,15 @@ impliedBy = void $ symbol ":-"
 
 domainType :: Parser PPDomain
 domainType =
-      (try $ symbol "public"  *> return Public)
+      (symbol "public"  *> return Public)
   <|> (symbol "private" *> return Private)
   <?> "privacy type"
 
 dataType :: Parser PPType
 dataType =
-      try (symbol "bool"  *> return PPBool)
-  <|> try (symbol "int"   *> return PPInt)
-  <|> try (symbol "float" *> return PPFloat)
+      (symbol "bool"   *> return PPBool)
+  <|> (symbol "int"    *> return PPInt)
+  <|> (symbol "float"  *> return PPFloat)
   <|> (symbol "string" *> return PPStr)
   <?> "data type"
 

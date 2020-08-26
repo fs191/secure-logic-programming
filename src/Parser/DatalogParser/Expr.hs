@@ -9,6 +9,7 @@ module Parser.DatalogParser.Expr
   ) where
 
 import Text.Megaparsec
+import Text.Megaparsec.Debug
 
 import Control.Lens
 import Control.Monad
@@ -29,48 +30,48 @@ type Parser = Parsec Void String
 
 aTerm :: Parser Expr
 aTerm = (withSrcPos $ asum
-  [ try predParse
-  , try holeParse
-  , try varParse
+  [ varParse
+  , holeParse
+  , try predParse
   , try strParse
+  , attributeParse
   , try floatParse
-  , try intParse
-  , try attributeParse
-  , try list
+  , intParse
+  , list
   ])
   <?> "term"
 
 aExpr :: Parser Expr
-aExpr = withSrcPos $ asum
-  [ binary greaterEqual ">=" aExpr aExpr2
-  , binary greater      ">"  aExpr aExpr2
-  , binary equal        "="  aExpr aExpr2
-  , binary lessEqual    "=<" aExpr aExpr2
-  , binary less         "<"  aExpr aExpr2
-  , binary eIs          "is" aExpr aExpr2
+aExpr = asum
+  [ binary greaterEqual ">=" aExpr2 aExpr
+  , binary lessEqual    "=<" aExpr2 aExpr
+  , binary greater      ">"  aExpr2 aExpr
+  , binary equal        "="  aExpr2 aExpr
+  , binary less         "<"  aExpr2 aExpr
+  , binary eIs          "is" aExpr2 aExpr
   , aExpr2
   ]
 
 aExpr2 :: Parser Expr
-aExpr2 = withSrcPos $ asum
-  [ binary eAdd "+" aExpr2 aExpr3
-  , binary eSub "-" aExpr2 aExpr3
+aExpr2 = asum
+  [ binary eAdd "+" aExpr3 aExpr2
+  , binary eSub "-" aExpr3 aExpr2
   , aExpr3
   ]
 
 aExpr3 :: Parser Expr
-aExpr3 = withSrcPos $ asum
-  [ binary eMul "*" aExpr3 aExpr4
-  , binary eDiv "/" aExpr3 aExpr4
+aExpr3 = asum
+  [ binary eMul "*" aExpr4 aExpr3
+  , binary eDiv "/" aExpr4 aExpr3
   , aExpr4
   ]
 
 aExpr4 :: Parser Expr
-aExpr4 = withSrcPos $ asum
-  [ binary ePow "^" aExpr4 aTerm
-  , try sqrtParse
-  , try aTerm
-  , typable $ parens aExpr
+aExpr4 = asum
+  [ binary ePow "^" aTerm aExpr4
+  , sqrtParse
+  , aTerm
+  , typable . lexeme $ parens aExpr
   ]
 
 list :: Parser Expr
@@ -82,7 +83,7 @@ binary
   -> Parser Expr 
   -> Parser Expr 
   -> Parser Expr
-binary f sym p1 p2 = withSrcPos $ try . typable $ f <$> p2 <* symbol sym <*> p1
+binary f sym p1 p2 = typable $ try (f <$> p1 <* symbol sym) <*> p2
 
 -----------------------
 -- Helper functions
@@ -92,14 +93,14 @@ predParse :: Parser Expr
 predParse = withSrcPos $
   do
     n <- identifier
-    args <- parens $ sepBy aTerm comma
+    args <- lexeme . parens $ sepBy aTerm comma
     typable . return $ predicate n args
 
 sqrtParse :: Parser Expr
 sqrtParse = withSrcPos $
   do
     void $ symbol "sqrt"
-    x <- parens aExpr
+    x <- lexeme $ parens aExpr
     return $ eSqrt x
 
 intParse :: Parser Expr
