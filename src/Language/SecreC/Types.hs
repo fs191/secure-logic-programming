@@ -55,3 +55,4 @@ unifyDomains Public Public = Public
 unifyDomains Unknown x     = x
 unifyDomains x Unknown     = x
 unifyDomains _ _           = Private
+

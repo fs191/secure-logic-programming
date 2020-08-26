@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Parser.DatalogParser
   ( parseDatalogFromFile
   , parseDatalog
@@ -124,8 +125,9 @@ parseDatalogFromFile filepath =
   do
     file <- readFile filepath
     let res = parse datalogParser filepath file
-    -- TODO use exception instead
-    return $ either (error . errorBundlePretty) id res
+    case res of
+      Left x  -> throw $ MegaparsecError x
+      Right x -> return x
 
 -----------------------
 -- Utils

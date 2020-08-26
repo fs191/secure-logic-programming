@@ -16,6 +16,7 @@ module Expr
   , predArgs
   , constStr
   , constInt
+  , constFloat
   , constBool
   , constTrue, constFalse
   , var
@@ -26,8 +27,9 @@ module Expr
   , equal
   , eIs
   , eNeg
-  , eAdd, eSub
   , eInv
+  , eSqrt, ePow
+  , eAdd, eSub
   , eMul, eDiv
   , eMin, eMax
   , eAnd, eOr
@@ -44,10 +46,12 @@ module Expr
   , predicateArity
   , annotateWithBindings
   , identifier
+  , hole
   , unifyExprAnns
   , unifyExprTypes
   , unifyExprDomains
   , isArithmetic, isPredicative
+  , applyAnnotation
   ) where
 
 ---------------------------------------------------------
@@ -78,6 +82,7 @@ data Expr
   | Not  {_annotation :: !Ann, _arg :: !Expr}
   | Neg  {_annotation :: !Ann, _arg :: !Expr}
   | Inv  {_annotation :: !Ann, _arg :: !Expr}
+  | Sqrt {_annotation :: !Ann, _arg :: !Expr}
   | Div  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Sub  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Lt   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
@@ -88,12 +93,14 @@ data Expr
   | Ge   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Mul  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Add  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Pow  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Min  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Max  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | And  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Or   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Pred {_annotation :: !Ann, _predName :: !String, _predArgs :: ![Expr]}
   | List {_annotation :: !Ann, _vals :: ![Expr]}
+  | Hole {_annotation :: !Ann}
   deriving (Ord,Show,Eq,Data,Typeable)
 makeLenses ''Expr
 makePrisms ''Expr
@@ -105,6 +112,7 @@ instance Pretty Expr where
   pretty (ConstBool e x)  = pretty x <+> (pretty $ show e)
   pretty (ConstFloat e x) = pretty x <+> (pretty $ show e)
   pretty (Attribute e x)  = pretty x <+> (pretty $ show e)
+  pretty (Hole e)         = "_" <+> (pretty $ show e)
   pretty (Pred e n args)  = pretty n <> tupled (pretty <$> args) <+> (pretty $ show e)
   pretty (Not e x)        = "!" <> pretty x <+> (pretty $ show e)
   pretty (Neg e x)        = "-(" <> pretty x <> ")" <+> (pretty $ show e)
@@ -132,6 +140,7 @@ instance PrologSource Expr where
   prolog (ConstBool _ x)  = pretty x
   prolog (ConstFloat _ x) = pretty x
   prolog (Attribute _ x)  = pretty x
+  prolog (Hole _)         = "_"
   prolog (Pred _ n args)  = pretty n <> tupled (prolog <$> args) -- <+> (prolog $ show e)
   prolog (Not _ e)        = "!" <> prolog e
   prolog (Neg _ e)        = "-" <> prolog e
@@ -176,8 +185,15 @@ constInt :: Int -> Expr
 constInt = ConstInt a
   where
     a = empty & annBound .~ True
-                & annType  .~ PPInt
-                & domain   .~ Public
+              & annType  .~ PPInt
+              & domain   .~ Public
+
+constFloat :: Float -> Expr
+constFloat = ConstFloat a
+  where
+    a = empty & annBound .~ True
+              & annType  .~ PPFloat
+              & domain   .~ Public
 
 -- | Creates a new true boolean
 constTrue :: Expr
@@ -231,6 +247,14 @@ equal = Eq empty
 -- | Creates a new negation expression
 eNeg :: Expr -> Expr
 eNeg = Neg empty
+
+-- | Creates a new square root expression
+eSqrt :: Expr -> Expr
+eSqrt = Sqrt empty
+
+-- | Creates a new power expression
+ePow :: Expr -> Expr -> Expr
+ePow = Pow empty
 
 -- | Creates a new maximum expression
 eMax :: Expr -> Expr -> Expr
@@ -325,6 +349,9 @@ identifier _ = Nothing
 attribute :: String -> Expr
 attribute = Attribute empty
 
+hole :: Expr
+hole = Hole empty
+
 -- | Unifies the typings of the two expressions
 unifyExprAnns :: Expr -> Expr -> Expr
 unifyExprAnns x y = x & annotation %~ (unifyAnns a)
@@ -371,4 +398,10 @@ isPredicative (Le{})   = True
 isPredicative (Lt{})   = True
 isPredicative (Is{})   = True
 isPredicative _        = False
+
+applyAnnotation :: Ann -> Expr -> Expr
+applyAnnotation ann expr = expr & annotation .~ ann'
+  where ann' = ann & annType  %~ unifyTypes (expr ^. annotation . annType)
+                   & domain   %~ unifyDomains (expr ^. annotation . domain)
+                   & annBound .~ (expr ^. annotation . annBound)
 

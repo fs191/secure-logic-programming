@@ -123,4 +123,6 @@ max_val(X,Y,X) :-
   X>=Y.
 max_val(X,Y,Y) :-
   X<Y.
-  
+
+state(s, s, s, s, s, _)?
+

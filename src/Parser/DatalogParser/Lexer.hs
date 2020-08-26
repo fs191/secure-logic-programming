@@ -3,6 +3,7 @@ module Parser.DatalogParser.Lexer
   , variable, identifier
   , attributeIdentifier
   , signedInteger
+  , signedFloat
   , comma, period, impliedBy
   , parens, brackets
   , domainType, dataType
@@ -17,10 +18,11 @@ import Data.Maybe
 import Data.Foldable
 import Data.Void (Void)
 
+import Control.Lens
 import Control.Monad (void)
 
 import Language.SecreC.Types
-import Annotation (Typing(..))
+import qualified Annotation as A
 
 type Parser = Parsec Void String
 
@@ -79,6 +81,9 @@ identifierSymbols = oneOf ['_']
 signedInteger :: Parser Int
 signedInteger = lexeme $ C.signed sc C.decimal
 
+signedFloat :: Parser Float
+signedFloat = lexeme $ C.signed sc C.float
+
 comma :: Parser ()
 comma = void $ symbol ","
 
@@ -108,12 +113,15 @@ dataType =
   <|> (symbol "string" *> return PPStr)
   <?> "data type"
 
-typing :: Parser Typing
+typing :: Parser A.Ann
 typing =
   do
     void $ symbol ":"
-    dom <- optional domainType
+    isPK <- isJust <$> (optional $ symbol "primary")
+    dom <- option Unknown domainType
     dat <- dataType
-    (return $ Typing (fromMaybe Unknown dom) dat) 
+    return $ A.empty & A.annType .~ dat
+                     & A.domain  .~ dom
+                     & A.isPK    .~ isPK
   <?> "typing"
 

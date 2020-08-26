@@ -1,6 +1,8 @@
 % Stratified Negation
 
-a :- not(b).
-b :- c,d.
-c :- b.
-c.
+a() :- not(b()).
+b() :- c(),d().
+c() :- b().
+c().
+
+a()?

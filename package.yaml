@@ -20,23 +20,22 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
-- Cabal
-- megaparsec
 - containers
+- text
+- split
 - transformers
 - mtl
-- text
+- hslogger
+- megaparsec
 - uniplate
 - optparse-applicative
 - semigroups
-- split
 - parser-combinators
 - lens
 - prettyprinter
 - union-find
-- algebraic-graphs
 # Testing only
-# For some reason I get errors in ghcide if these are not in the dependencies
+# For some reason there are errors in ghcide if these are not in the dependencies
 - hspec
 - HUnit
 - shelly
@@ -53,6 +52,7 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -Wall
     dependencies:
     - secure-logic-programming
 
@@ -64,6 +64,7 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -Wall
     dependencies:
     - secure-logic-programming
     - HUnit

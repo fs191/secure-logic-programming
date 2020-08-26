@@ -13,13 +13,10 @@ module Language.SecreC
 import Control.Lens hiding(Empty)
 
 import Data.List
-import Data.Maybe
 import qualified Data.Set as S
 
 import Data.Text (Text, pack, unpack)
 import Data.Text.Prettyprint.Doc
-
-import Debug.Trace
 
 import qualified DatalogProgram as DP
 import DBClause
@@ -195,7 +192,6 @@ instance Pretty TopStatement where
   pretty Empty = ""
 
 -- | Statements with a return type
--- TODO use GADTs to express the return type
 data Statement 
   = Comment String
   -- Variable declaration
@@ -381,12 +377,12 @@ scStructType f i ann =
   let dom    = ann ^. domain in
   let dtype  = ann ^. annType in
   case (dtype, dom) of
-      (PPBool, _) -> f (scDomain i dom) SCBool  SCBool
-      (PPInt,  _) -> f (scDomain i dom) SCInt32 SCInt32
+      (PPBool, _)       -> f (scDomain i dom) SCBool  SCBool
+      (PPInt,  _)       -> f (scDomain i dom) SCInt32 SCInt32
       (PPStr,  Private) -> f (scDomain i dom) SCXorUInt32 SCXorUInt8
       (PPStr,  Public)  -> f (scDomain i dom) SCUInt32    SCUInt8
-      (PPStr,  Unknown)      -> error $ "cannot determine data type for a string of unknown domain"
-      (PPAuto,     _)            -> f (scDomain i dom) (SCDynamicT i) (SCDynamicS i)
+      (PPStr,  Unknown) -> error $ "cannot determine data type for a string of unknown domain"
+      (PPAuto, _)       -> f (scDomain i dom) (SCDynamicT i) (SCDynamicS i)
 
 scStructPrivateType :: (SCDomain -> SCType -> SCType -> SCType) -> Maybe Int -> Ann -> SCType
 scStructPrivateType f i ann =
@@ -611,18 +607,6 @@ intPredDedup is@(i':is') p n = function template returnType fname fargs fbody
                 , Return (SCVarName result)]
             else
                 [Return (SCVarName result)]
-
-
-defaultGoal :: ([Int], FunctionDecl)
-defaultGoal = ([0..], mainFun $
-  [ VarDecl $ variable SCShared3p SCUInt32 "dummy"
-  , Comment "TODO: state your own goal here"
-  , FunCall "publish" 
-      [ SCConstStr "NOTICE: no goal specified in the main function"
-      , SCConstBool False
-      ]
-  ])
-
 
 --------------------------------------------------
 -- convert a predicate to SecreC (transformation S^G)

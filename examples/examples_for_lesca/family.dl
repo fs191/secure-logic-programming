@@ -4,18 +4,10 @@
 % Datalog Formulation
 
 % Optionally declare types
-:-type(father(father:string,child:string)).
-father(tom,amy).
-father(jack,fred).
-father(tony,carolII).
-father(fred,carolIII).
+:-type(father, [@father:private string,@child:private string]).
 
 % Optionally declare types
-:-type(mother(mother:string,child:string)).
-mother(grace,amy).
-mother(amy,fred).
-mother(carolI,carolII).
-mother(carolII,carolIII).
+:-type(mother, [@mother:private string,@child:private string]).
 
 parent(X,Y) :- 
   father(X,Y)
@@ -33,3 +25,7 @@ ancestor(X,Y) :-
 ancestor(X,Y) :- 
   parent(X,Z), 
   ancestor(Z,Y).
+
+:-inputs([@child:public string]).
+:-outputs([Ancestor]).
+ancestor(Ancestor, @child)?

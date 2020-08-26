@@ -11,6 +11,7 @@ module Parser.DatalogParser.Expr
 import Text.Megaparsec
 
 import Control.Lens
+import Control.Monad
 
 import Data.Void (Void)
 import Data.Foldable
@@ -19,6 +20,8 @@ import Parser.DatalogParser.Lexer
 import Expr as E hiding (identifier)
 import qualified Rule as R
 import qualified Annotation as A
+
+import Debug.Trace
 
 type Parser = Parsec Void String
 
@@ -31,10 +34,11 @@ aTerm = (withSrcPos $ asum
   [ try predParse
   , try varParse
   , try strParse
+  , try floatParse
   , try intParse
   , try attributeParse
+  , try holeParse
   , try list
-  , typable $ parens aExpr
   ])
   <?> "term"
 
@@ -58,9 +62,17 @@ aExpr2 = withSrcPos $ asum
 
 aExpr3 :: Parser Expr
 aExpr3 = withSrcPos $ asum
-  [ binary eMul "*" aExpr3 aTerm
-  , binary eDiv "/" aExpr3 aTerm
-  , aTerm
+  [ binary eMul "*" aExpr3 aExpr4
+  , binary eDiv "/" aExpr3 aExpr4
+  , aExpr4
+  ]
+
+aExpr4 :: Parser Expr
+aExpr4 = withSrcPos $ asum
+  [ binary ePow "^" aExpr4 aTerm
+  , try sqrtParse
+  , try aTerm
+  , typable $ parens aExpr
   ]
 
 list :: Parser Expr
@@ -82,14 +94,27 @@ predParse :: Parser Expr
 predParse = withSrcPos $
   do
     n <- identifier
-    args <- parens $ sepBy1 aTerm comma
+    args <- parens $ sepBy aTerm comma
     typable . return $ predicate n args
+
+sqrtParse :: Parser Expr
+sqrtParse = withSrcPos $
+  do
+    void $ symbol "sqrt"
+    x <- parens aExpr
+    return $ eSqrt x
 
 intParse :: Parser Expr
 intParse = withSrcPos $
   do
     n <- signedInteger
     typable . return $ constInt n
+
+floatParse :: Parser Expr
+floatParse = withSrcPos $
+  do
+    x <- signedFloat
+    typable . return $ constFloat x
 
 varParse :: Parser Expr
 varParse = withSrcPos $
@@ -102,6 +127,13 @@ strParse = withSrcPos $
   do
     s <- identifier
     typable . return $ constStr s
+
+holeParse :: Parser Expr
+holeParse =
+  do
+    void $ symbol "_"
+    void $ optional variable
+    typable . return $ hole
 
 rule :: Parser R.Rule
 rule = 
@@ -124,12 +156,11 @@ typable :: Parser Expr -> Parser Expr
 typable e =
   do
     e' <- e
-    t <- try $ optional typing
+    t <- optional $ try typing
     let f = case t of
           Just p  -> p
-          Nothing -> A.emptyTyping
-    return $ applyTyping f e'
-  <|> e
+          Nothing -> A.empty
+    return $ applyAnnotation f e'
 
 withSrcPos :: Parser Expr -> Parser Expr
 withSrcPos parser =

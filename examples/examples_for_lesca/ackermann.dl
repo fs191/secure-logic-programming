@@ -16,3 +16,6 @@ ack(M, N, A) :-
   ack(M, N1, A1),
   M1 is M-1,
   ack(M1, A1, A).
+
+:-outputs([X : public int]).
+ack(2, 1, X)?

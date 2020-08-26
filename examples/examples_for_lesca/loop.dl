@@ -5,3 +5,5 @@ loop(0).
 loop(X) :-
   loop(Y),
   X is Y+1.
+
+loop(100)?

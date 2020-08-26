@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 76bd1787d97674e6df59a510072abfd877822511326f7e2d1428a00783a1fa7e
+-- hash: 7769e22735865633c054ef353f5239f95f99f31f583658a11102914b3d7e68c2
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -53,11 +53,10 @@ library
       src
   ghc-options: -Wall
   build-depends:
-      Cabal
-    , HUnit
-    , algebraic-graphs
+      HUnit
     , base >=4.7 && <5
     , containers
+    , hslogger
     , hspec
     , lens
     , megaparsec
@@ -82,13 +81,12 @@ executable lpsec
       Paths_secure_logic_programming
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:
-      Cabal
-    , HUnit
-    , algebraic-graphs
+      HUnit
     , base >=4.7 && <5
     , containers
+    , hslogger
     , hspec
     , lens
     , megaparsec
@@ -121,14 +119,13 @@ test-suite test
       Paths_secure_logic_programming
   hs-source-dirs:
       test
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:
-      Cabal
-    , HUnit
-    , algebraic-graphs
+      HUnit
     , base >=4.7 && <5
     , containers
     , criterion
+    , hslogger
     , hspec
     , hspec-expectations
     , lens

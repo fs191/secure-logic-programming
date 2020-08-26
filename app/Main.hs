@@ -1,3 +1,7 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 import ProgramOptions
 import OptParse
 import Parser.DatalogParser
@@ -5,8 +9,10 @@ import Language.SecreC
 
 --import CSVImport(generateDataToDBscript)
 
-import Control.Monad
+import Control.Monad hiding (ap)
 import Data.Text.Prettyprint.Doc
+import System.Log.Logger
+
 import Transform
 import PreProcessing
 import PostProcessing
@@ -14,31 +20,30 @@ import TypeInference
 import Adornment
 
 main :: IO ()
-main = do
-  -- command line arguments
-  args <- getProgramOptions
-  runWithOptions args
-
-runWithOptions :: ProgramOptions -> IO ()
-runWithOptions args =
+main = 
   do
-    -- text file containing input Datalog program
+    args <- getProgramOptions
+    -- Text file containing input Datalog program
     let inFileName = _inFile args
-    -- text file containing output SecreC program
+    -- Text file containing output SecreC program
     let outFilePath = _outFile args
     let _ite = _iterations args
-
-    let pipeline 
-          = secrecCode
-          . typeInference
-          . postProcess
-          . deriveAllGroundRules _ite
-          . adornProgram
-          . preProcess
+    -- Set logging level
+    when (_verbose args) $
+      updateGlobalLogger rootLoggerName (setLevel DEBUG)
 
     -- parse the input datalog program
+    infoM rootLoggerName $ "Parsing " ++ inFileName
     program <- parseDatalogFromFile inFileName
-    let secrec = show . pretty $ pipeline program
+
+    pp <- (return $ preProcess program)
+    ap <- (return $ adornProgram pp)
+    tf <- (return $ deriveAllGroundRules _ite ap)
+    post <- (return $ postProcess tf)
+    ti <- (return $ typeInference post)
+    sc <- (return $ secrecCode ti)
+
+    let secrec = show $ pretty sc
 
     -- create a Sharemind script that can be used to upload the tables used in given program
     -- WARNING: this is used for testing only, do not apply it to actual private data!
@@ -50,12 +55,7 @@ runWithOptions args =
 
         let createdbPath = outFileDir ++ "createdb_" ++ outFileName
         writeFile createdbPath createdbStr
-        putStrLn $ "Wrote database generation SecreC script into " ++ createdbPath
 
     -- Output the results
-    if outFilePath /= ""
-       then do
-            writeFile outFilePath secrec
-            putStrLn $ "Wrote privacy-preserving computation SecreC script into " ++ outFilePath
-       else putStrLn secrec
+    writeFile outFilePath secrec
 

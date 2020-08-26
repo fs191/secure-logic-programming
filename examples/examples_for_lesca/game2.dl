@@ -26,3 +26,5 @@ odd_move(X,Y) :-
   move(X,Z1),
   move(Z1,Z2),
   odd_move(Z2,Y).
+
+
