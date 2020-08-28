@@ -32,8 +32,8 @@ aTerm :: Parser Expr
 aTerm = (withSrcPos $ asum
   [ varParse
   , holeParse
-  , try predParse
   , try strParse
+  , predParse
   , attributeParse
   , try floatParse
   , intParse

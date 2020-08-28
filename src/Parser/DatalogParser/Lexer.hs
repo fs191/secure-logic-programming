@@ -1,30 +1,77 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Parser.DatalogParser.Lexer
-  ( lexeme, symbol, sc
-  , variable, identifier
-  , attributeIdentifier
-  , signedInteger
-  , signedFloat
-  , comma, period, impliedBy
-  , parens, brackets
-  , domainType, dataType
-  , typing
+  ( tokenize
   ) where
 
 import Text.Megaparsec as P
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as C
 
-import Data.Maybe
-import Data.Foldable
+import Control.Exception
+import Control.Monad
+
+import Data.List
 import Data.Void (Void)
 
-import Control.Lens
-import Control.Monad (void)
-
-import Language.SecreC.Types
-import qualified Annotation as A
+import ErrorMsg
 
 type Parser = Parsec Void String
+
+data PrivalogToken
+  = Integer Int
+  | Float Float
+  | Variable String
+  | Atom String
+  | String String
+  | Operator String
+  | BracketL
+  | BracketR
+  | ParenL
+  | ParenR
+
+data PrivalogTokens = PrivalogTokens [PrivalogToken]
+
+instance Show PrivalogToken where
+  show (Integer x) = show x ++ ":int"
+  show (Float x) = show x ++ ":float"
+  show (Variable x) = x ++ ":var"
+  show (Atom x) = x ++ ":atom"
+  show (String x) = x ++ ":str"
+  show (Operator x) = x ++ ":op"
+  show BracketL = "[:br"
+  show BracketR = "]:br"
+  show ParenL = "(:par"
+  show ParenR = "):par"
+
+instance Show PrivalogTokens where
+  show (PrivalogTokens x) = intercalate " " $ show <$> x
+
+parseToken :: Parser PrivalogToken
+parseToken = label "token" . lexeme $ choice
+  [ Integer  <$> plInteger
+  , Float    <$> plFloat
+  , Variable <$> variable
+  , Atom     <$> atom
+  , String   <$> plString
+  , Operator <$> operator
+  , BracketL <$  (label "left bracket" $ symbol "[")
+  , BracketR <$  (label "right bracket" $ symbol "]")
+  , ParenL   <$  (label "left paren" $ symbol "(")
+  , ParenR   <$  (label "right paren" $ symbol ")")
+  ]
+
+plInteger :: Parser Int
+plInteger = label "integer" . lexeme $ C.decimal
+
+plFloat :: Parser Float
+plFloat = label "float" . lexeme $ C.float
+
+plString :: Parser String
+plString = label "string" . lexeme $
+  do
+    void $ char '"'
+    manyTill C.charLiteral $ char '"'
 
 lexeme :: Parser a -> Parser a
 lexeme = C.lexeme sc
@@ -39,102 +86,36 @@ sc = C.space
   empty
 
 variable :: Parser String
-variable = lexeme variable' <?> "variable"
-  where
-    variable' =
+variable = label "variable" . lexeme $
       do
-        h <- upperChar
-        t <- many $ alphaNumChar <|> identifierSymbols
-        return $ h:t
-      <|>
-      do
-        h <- char '_'
-        t <- some $ alphaNumChar <|> identifierSymbols
+        h <- upperChar <|> char '_'
+        t <- many $ alphaNumChar <|> char '_'
         return $ h:t
 
+atom :: Parser String
+atom = label "atom" . lexeme $ choice
+  [ do
+      h <- lowerChar
+      t <- many $ alphaNumChar <|> char '_'
+      return $ h:t
+  , do
+      void $ char '\''
+      manyTill C.charLiteral $ char '\''
+  ]
 
-identifier :: Parser String
-identifier = asum
-  [ lexeme $ between sQuote sQuote identifier'
-  , lexeme $ between dQuote dQuote identifier'
-  , lexeme identifier'
-  ] >>= check
-  <?> "identifier"
-  where 
-    check :: String -> Parser String
-    check x = 
-      if x `elem` keywords
-        then fail $ "reserved keyword " ++ x ++ " cannot be an identifier."
-        else return x
-    keywords = ["sqrt", "is"]
+operator :: Parser String
+operator = label "operator" . lexeme $
+  some $ oneOf 
+    [ '#', '$', '&', '*'
+    , '+', '-', '.', '/'
+    , ':', '<', '=', '>'
+    , '?', '@', '^', '~'
+    , ';', ',', '\\'
+    ]
 
-attributeIdentifier :: Parser String
-attributeIdentifier =
-  do
-    void $ char '@'
-    lexeme identifier 
-  <?> "attribute"
-
-sQuote :: Parser String
-sQuote = symbol "'"
-
-dQuote :: Parser String
-dQuote = symbol "\""
-
-identifier' :: Parser String
-identifier' = 
-  do
-    h <- lowerChar
-    t <- many $ alphaNumChar <|> identifierSymbols
-    return $ h:t
-
-identifierSymbols :: Parser Char
-identifierSymbols = oneOf ['_']
-
-signedInteger :: Parser Int
-signedInteger = lexeme $ C.signed sc C.decimal
-
-signedFloat :: Parser Float
-signedFloat = lexeme $ C.signed sc C.float
-
-comma :: Parser ()
-comma = void $ symbol ","
-
-period :: Parser ()
-period = void $ symbol "."
-
-parens :: Parser a -> Parser a
-parens = lexeme . between (symbol "(") (symbol ")")
-
-brackets :: Parser a -> Parser a
-brackets = lexeme . between (symbol "[") (symbol "]")
-
-impliedBy :: Parser ()
-impliedBy = void $ symbol ":-"
-
-domainType :: Parser PPDomain
-domainType =
-      (symbol "public"  *> return Public)
-  <|> (symbol "private" *> return Private)
-  <?> "privacy type"
-
-dataType :: Parser PPType
-dataType =
-      (symbol "bool"   *> return PPBool)
-  <|> (symbol "int"    *> return PPInt)
-  <|> (symbol "float"  *> return PPFloat)
-  <|> (symbol "string" *> return PPStr)
-  <?> "data type"
-
-typing :: Parser A.Ann
-typing =
-  do
-    void $ symbol ":"
-    isPK <- isJust <$> (optional $ symbol "primary")
-    dom <- option Unknown domainType
-    dat <- dataType
-    return $ A.empty & A.annType .~ dat
-                     & A.domain  .~ dom
-                     & A.isPK    .~ isPK
-  <?> "typing"
+tokenize :: String -> PrivalogTokens
+tokenize t = 
+  case PrivalogTokens <$> runParser (sc *> many parseToken <* eof) "" t of
+    Left e  -> throw $ LexerError e
+    Right x -> x
 

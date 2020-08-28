@@ -30,6 +30,7 @@ data Severity
 
 data CompilerException
   = MegaparsecError (ParseErrorBundle String Void)
+  | LexerError (ParseErrorBundle String Void)
   | NoGoal
   | TooManyGoals [Expr]
   | TypeMismatch PPType PPType
@@ -48,13 +49,14 @@ instance Pretty Severity where
   pretty Warning  = "[WARNING ]"
 
 instance Show CompilerException where
-  show = show . pretty
+  show x = show $ (pretty $ severity x) <+> pretty x
 
 instance HasSeverity CompilerException where
   severity _ = Error
 
 instance Pretty CompilerException where
   pretty (MegaparsecError err) = pretty $ errorBundlePretty err
+  pretty (LexerError err) = pretty $ errorBundlePretty err
   pretty NoGoal = "Program has no goal."
   pretty (TooManyGoals x) = hsep
     [ "Program has more than one goal:"
