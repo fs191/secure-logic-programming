@@ -17,4 +17,4 @@ sg(X,Y) :-
   par(Y,Y1),
   sg(X1,Y1).
 
-sg('chris','dave')?
+?-sg('chris','dave').

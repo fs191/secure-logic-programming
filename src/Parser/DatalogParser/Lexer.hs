@@ -49,14 +49,14 @@ variable = lexeme variable' <?> "variable"
       <|>
       do
         h <- char '_'
-        t <- some $ alphaNumChar <|> identifierSymbols
+        t <- many $ alphaNumChar <|> identifierSymbols
         return $ h:t
 
 
 identifier :: Parser String
 identifier = asum
-  [ lexeme $ between sQuote sQuote identifier'
-  , lexeme $ between dQuote dQuote identifier'
+  [ lexeme $ (try sQuote) *> identifier' <* sQuote
+  , lexeme $ (try dQuote) *> identifier' <* dQuote
   , lexeme identifier'
   ] >>= check
   <?> "identifier"
@@ -71,7 +71,7 @@ identifier = asum
 attributeIdentifier :: Parser String
 attributeIdentifier =
   do
-    void $ char '@'
+    try . void $ char '@'
     lexeme identifier 
   <?> "attribute"
 

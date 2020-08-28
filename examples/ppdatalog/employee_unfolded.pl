@@ -15,4 +15,4 @@ viewESM(X0,0,X4) :-
 
 :- inputs([]).
 :- outputs([Y1, Y2]).
-viewESM(Y1,Y2,'manager1')?
+?-viewESM(Y1,Y2,'manager1').

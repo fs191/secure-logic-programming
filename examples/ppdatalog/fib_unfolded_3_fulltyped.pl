@@ -43,5 +43,5 @@ fib(N: private int, F: public int) : private bool :-
 % pre-computed pairs [(0,1),(1,1),(2,2),(3,3),(4,5),...] and takes the corresponding 'y'.
 :-inputs([@x : private int]).
 :-outputs([Y : public int]).
-fib(@x : private int,Y : public int) : private bool?
+?-fib(@x : private int,Y : public int) : private bool.
 

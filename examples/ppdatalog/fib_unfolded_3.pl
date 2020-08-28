@@ -47,4 +47,4 @@ fib(N, F) :-
 
 :-inputs([@x : private int]).
 :-outputs([Y]).
-fib(@x,Y)?
+?-fib(@x,Y).

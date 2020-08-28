@@ -13,4 +13,4 @@ sg(X,Y) :-
   sg(X1,Y1).
 
 :-outputs([Y]).
-sg('chris',Y)?
+?-sg('chris',Y).

@@ -14,5 +14,5 @@ sm(X, M, S) :-
   S = S1 + X.
 
 :- outputs([S]).
-sm(1, S)?
+?-sm(1, S).
 

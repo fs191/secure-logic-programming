@@ -39,4 +39,4 @@ sg(X:public string,Y:private string) : private bool :-
 
 :- inputs([@x1 : public string]).
 :- outputs([Y : private string]).
-sg(@x1:public string, Y:private string) : private bool?
+?-sg(@x1:public string, Y:private string) : private bool.

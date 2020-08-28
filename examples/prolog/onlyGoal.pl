@@ -3,4 +3,4 @@ range(X) :-
   X < 10.
 
 :-outputs([X]).
-range(X)?
+?-range(X).

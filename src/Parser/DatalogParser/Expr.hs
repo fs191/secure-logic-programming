@@ -9,7 +9,6 @@ module Parser.DatalogParser.Expr
   ) where
 
 import Text.Megaparsec
-import Text.Megaparsec.Debug
 
 import Control.Lens
 import Control.Monad
@@ -23,6 +22,7 @@ import qualified Rule as R
 import qualified Annotation as A
 
 type Parser = Parsec Void String
+data Operator = Operator String (Expr -> Expr -> Expr)
 
 -----------------------
 -- Numeric expressions
@@ -31,9 +31,9 @@ type Parser = Parsec Void String
 aTerm :: Parser Expr
 aTerm = (withSrcPos $ asum
   [ varParse
-  , holeParse
-  , try predParse
-  , try strParse
+  , sqrtParse
+  , predParse
+  , strParse
   , attributeParse
   , try floatParse
   , intParse
@@ -42,48 +42,55 @@ aTerm = (withSrcPos $ asum
   <?> "term"
 
 aExpr :: Parser Expr
-aExpr = asum
-  [ binary greaterEqual ">=" aExpr2 aExpr
-  , binary lessEqual    "=<" aExpr2 aExpr
-  , binary greater      ">"  aExpr2 aExpr
-  , binary equal        "="  aExpr2 aExpr
-  , binary less         "<"  aExpr2 aExpr
-  , binary eIs          "is" aExpr2 aExpr
-  , aExpr2
-  ]
+aExpr = binary ops aExpr aExpr2
+  where
+    ops =
+      [ Operator ">=" greaterEqual
+      , Operator "=<" lessEqual
+      , Operator ">"  greater
+      , Operator "<"  less
+      , Operator "="  equal
+      , Operator "is" eIs
+      ]
 
 aExpr2 :: Parser Expr
-aExpr2 = asum
-  [ binary eAdd "+" aExpr3 aExpr2
-  , binary eSub "-" aExpr3 aExpr2
-  , aExpr3
-  ]
+aExpr2 = binary ops aExpr2 aExpr3
+  where
+    ops =
+      [ Operator "+" eAdd
+      , Operator "-" eSub
+      ]
 
 aExpr3 :: Parser Expr
-aExpr3 = asum
-  [ binary eMul "*" aExpr4 aExpr3
-  , binary eDiv "/" aExpr4 aExpr3
-  , aExpr4
-  ]
+aExpr3 = binary ops aExpr3 aExpr4
+  where 
+    ops =
+      [ Operator "*" eMul
+      , Operator "/" eDiv
+      ]
 
 aExpr4 :: Parser Expr
-aExpr4 = asum
-  [ binary ePow "^" aTerm aExpr4
-  , sqrtParse
-  , aTerm
-  , typable . lexeme $ parens aExpr
-  ]
+aExpr4 = binary ops aExpr4 (aTerm <|> par)
+  where
+    par = typable . lexeme $ parens aExpr
+    ops = 
+      [ Operator "^" ePow
+      ]
+ 
+
+binary :: [Operator] -> Parser Expr -> Parser Expr -> Parser Expr
+binary ops this next = (typable $
+  do
+    f <- try $ do
+      lhs <- next
+      opr <- choice $ (\(Operator sym ope) -> symbol sym *> return ope) <$> ops
+      return $ opr lhs
+    rhs <- this
+    return $ f rhs
+  ) <|> next
 
 list :: Parser Expr
 list = (withSrcPos $ eList <$> (brackets $ sepBy aTerm comma)) <?> "list"
-
-binary 
-  :: (Expr -> Expr -> Expr) 
-  -> String 
-  -> Parser Expr 
-  -> Parser Expr 
-  -> Parser Expr
-binary f sym p1 p2 = typable $ try (f <$> p1 <* symbol sym) <*> p2
 
 -----------------------
 -- Helper functions
@@ -92,15 +99,20 @@ binary f sym p1 p2 = typable $ try (f <$> p1 <* symbol sym) <*> p2
 predParse :: Parser Expr
 predParse = withSrcPos $
   do
-    n <- identifier
-    args <- lexeme . parens $ sepBy aTerm comma
+    n <- try $ do
+      n <- identifier
+      void $ symbol "("
+      return n
+    args <- sepBy aTerm comma
+    void $ symbol ")"
     typable . return $ predicate n args
 
 sqrtParse :: Parser Expr
 sqrtParse = withSrcPos $
   do
-    void $ symbol "sqrt"
-    x <- lexeme $ parens aExpr
+    try . void $ symbol "sqrt" >> symbol "("
+    x <- lexeme aExpr
+    void $ symbol ")"
     return $ eSqrt x
 
 intParse :: Parser Expr
@@ -119,19 +131,15 @@ varParse :: Parser Expr
 varParse = withSrcPos $
   do
     n <- variable
-    typable . return $ var n
+    typable . return $ case n of
+      "_" -> hole
+      _   -> var n
 
 strParse :: Parser Expr
 strParse = withSrcPos $
   do
     s <- identifier
     typable . return $ constStr s
-
-holeParse :: Parser Expr
-holeParse =
-  do
-    void $ symbol "_"
-    typable . return $ hole
 
 rule :: Parser R.Rule
 rule = 

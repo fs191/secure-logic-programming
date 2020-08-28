@@ -17,5 +17,5 @@ bargain(Buyer,Seller,Product) :-
 
 :-inputs([@x1:public string,@x2:public string]).
 :-outputs([Y]).
-bargain(@x1, Y, @x2)?
+?-bargain(@x1, Y, @x2).
 

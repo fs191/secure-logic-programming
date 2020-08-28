@@ -10,4 +10,4 @@ fib(N, F) :-
         F is F1+F2.
 
 :-outputs([Y]).
-fib(2,Y)?
+?-fib(2,Y).

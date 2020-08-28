@@ -13,4 +13,4 @@ bargain(X,Y,Z) :-
     P1 =< P2.
 
 :-outputs([Y]).
-bargain('alice',Y,'garlic')?
+?-bargain('alice',Y,'garlic').

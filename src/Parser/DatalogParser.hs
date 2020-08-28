@@ -6,7 +6,6 @@ module Parser.DatalogParser
 
 import Text.Megaparsec
 
-import Data.Foldable
 import Data.Void (Void)
 
 import Control.Exception (throw)
@@ -43,29 +42,27 @@ datalogParser =
       x   -> throw $ TooManyGoals x
 
 clause :: Parser Clause
-clause = 
+clause =  label "clause" $
   do
     choice
-      [ try $ RC <$> ruleP
+      [ DC <$> funCall
+      , RC <$> ruleP
       , GC <$> goal
-      , DC <$> funCall
-      ]
+      ] <* symbol "."
 
 ruleP :: Parser R.Rule
-ruleP = 
+ruleP = label "rule" $
   do
     (Pred a n xs) <- predParse
     b <- option [] $ impliedBy *> body
-    void $ symbol "."
     let expr = joinExprs b
         t = a ^. A.typing
     (return $ R.rule n xs expr & R.ruleHead . annotation . A.typing .~ t) 
-      <?> "rule"
 
 funCall :: Parser DP.Directive
 funCall = 
   do
-    void impliedBy
+    try $ void impliedBy
     choice
       [ inputDir
       , outputDir
@@ -75,32 +72,29 @@ funCall =
 inputDir :: Parser DP.Directive
 inputDir = 
   do
-    void $ symbol "inputs"
+    try . void $ symbol "inputs"
     _ins <- parens . brackets $ do
       sepBy attributeParse comma
-    void $ symbol "."
     return . DP.inputDirective $ _ins
 
 outputDir :: Parser DP.Directive
 outputDir = 
   do
-    void $ symbol "outputs"
+    try . void $ symbol "outputs"
     _ins <- parens . brackets $ do
       sepBy varParse comma
-    void $ symbol "."
     return $ DP.outputDirective _ins
 
 dbDir :: Parser DP.Directive
 dbDir = 
   do
-    void $ symbol "type"
+    try . void $ symbol "type"
     _dir <- parens $ do
       _id <- identifier
       void comma
       _ins <- brackets $ do
         sepBy attributeParse comma
       return $ DP.dbDirective _id _ins
-    void $ symbol "."
     return _dir
 
 body :: Parser [Expr]
@@ -109,8 +103,8 @@ body = sepBy1 aExpr comma
 goal :: Parser Expr
 goal = 
   do
+    try . void $ symbol "?-"
     p <- predParse
-    void $ symbol "?"
     return p
 
 -----------------------

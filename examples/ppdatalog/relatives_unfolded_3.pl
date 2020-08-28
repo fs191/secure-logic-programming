@@ -27,4 +27,4 @@ sg(X,Y) :-
 
 :- inputs([@x : public string]).
 :- outputs([Y]).
-sg(@x,Y)?
+?-sg(@x,Y).

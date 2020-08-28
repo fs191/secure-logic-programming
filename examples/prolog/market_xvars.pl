@@ -16,4 +16,4 @@ bargain(X_1,X_2,X_3) :-
 
 :-inputs([@x1:public string,@x2:public string]).
 :-outputs([Y]).
-bargain(@x1, Y, @x2)?
+?-bargain(@x1, Y, @x2).
