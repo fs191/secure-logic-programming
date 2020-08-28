@@ -27,6 +27,7 @@ module Expr
   , equal
   , eIs
   , eNeg
+  , eNot
   , eInv
   , eSqrt, ePow
   , eAdd, eSub
@@ -247,6 +248,10 @@ equal = Eq empty
 -- | Creates a new negation expression
 eNeg :: Expr -> Expr
 eNeg = Neg empty
+
+-- | Creates a new boolean not expression
+eNot :: Expr -> Expr
+eNot = Not empty
 
 -- | Creates a new square root expression
 eSqrt :: Expr -> Expr

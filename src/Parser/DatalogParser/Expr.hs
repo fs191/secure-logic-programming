@@ -22,7 +22,7 @@ import qualified Rule as R
 import qualified Annotation as A
 
 type Parser = Parsec Void String
-data Operator = Operator String (Expr -> Expr -> Expr)
+data Operator f = Operator String f
 
 -----------------------
 -- Numeric expressions
@@ -31,7 +31,6 @@ data Operator = Operator String (Expr -> Expr -> Expr)
 aTerm :: Parser Expr
 aTerm = (withSrcPos $ asum
   [ varParse
-  , sqrtParse
   , predParse
   , strParse
   , attributeParse
@@ -42,15 +41,23 @@ aTerm = (withSrcPos $ asum
   <?> "term"
 
 aExpr :: Parser Expr
-aExpr = binary ops aExpr aExpr2
+aExpr = binary ops aExpr aExpr1
   where
     ops =
-      [ Operator ">=" greaterEqual
-      , Operator "=<" lessEqual
-      , Operator ">"  greater
-      , Operator "<"  less
-      , Operator "="  equal
-      , Operator "is" eIs
+      [ Operator ";" eOr
+      ]
+
+aExpr1 :: Parser Expr
+aExpr1 = binary ops aExpr1 aExpr2
+  where
+    ops =
+      [ Operator ">="  greaterEqual
+      , Operator "=<"  lessEqual
+      , Operator ">"   greater
+      , Operator "<"   less
+      , Operator "=:=" equal
+      , Operator "="   equal
+      , Operator "is"  eIs
       ]
 
 aExpr2 :: Parser Expr
@@ -70,24 +77,52 @@ aExpr3 = binary ops aExpr3 aExpr4
       ]
 
 aExpr4 :: Parser Expr
-aExpr4 = binary ops aExpr4 (aTerm <|> par)
+aExpr4 = binary ops aExpr4 aExpr5
   where
-    par = typable . lexeme $ parens aExpr
     ops = 
       [ Operator "^" ePow
       ]
- 
 
-binary :: [Operator] -> Parser Expr -> Parser Expr -> Parser Expr
+aExpr5 :: Parser Expr
+aExpr5 = unary ops aExpr <|> aTerm <|> par
+  where
+    par = typable . lexeme $ parens aExpr
+    ops =
+      [ Operator "sqrt" eSqrt
+      , Operator "\\+"  eNot
+      ]
+
+unary 
+  :: [Operator (Expr -> Expr)] 
+  -> Parser Expr 
+  -> Parser Expr
+unary ops next = typable $
+  do
+    f <- try $ do
+      f <- choice $ parseOperator <$> ops
+      void $ symbol "("
+      return f
+    x <- lexeme next
+    void $ symbol ")"
+    return $ f x
+
+binary 
+  :: [Operator (Expr -> Expr -> Expr)] 
+  -> Parser Expr 
+  -> Parser Expr 
+  -> Parser Expr
 binary ops this next = (typable $
   do
     f <- try $ do
       lhs <- next
-      opr <- choice $ (\(Operator sym ope) -> symbol sym *> return ope) <$> ops
+      opr <- choice $ parseOperator <$> ops
       return $ opr lhs
     rhs <- this
     return $ f rhs
   ) <|> next
+
+parseOperator :: Operator f -> Parser f
+parseOperator (Operator sym f) = symbol sym *> return f
 
 list :: Parser Expr
 list = (withSrcPos $ eList <$> (brackets $ sepBy aTerm comma)) <?> "list"
