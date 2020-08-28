@@ -99,7 +99,7 @@ unary
 unary ops next = typable $
   do
     f <- try $ do
-      f <- choice $ parseOperator <$> ops
+      f <- choice $ try . parseOperator <$> ops
       void $ symbol "("
       return f
     x <- lexeme next
@@ -115,7 +115,7 @@ binary ops this next = (typable $
   do
     f <- try $ do
       lhs <- next
-      opr <- choice $ parseOperator <$> ops
+      opr <- choice $ try . parseOperator <$> ops
       return $ opr lhs
     rhs <- this
     return $ f rhs
@@ -141,14 +141,6 @@ predParse = withSrcPos $
     args <- sepBy aTerm comma
     void $ symbol ")"
     typable . return $ predicate n args
-
-sqrtParse :: Parser Expr
-sqrtParse = withSrcPos $
-  do
-    try . void $ symbol "sqrt" >> symbol "("
-    x <- lexeme aExpr
-    void $ symbol ")"
-    return $ eSqrt x
 
 intParse :: Parser Expr
 intParse = withSrcPos $
