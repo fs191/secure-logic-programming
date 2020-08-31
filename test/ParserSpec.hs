@@ -1,20 +1,13 @@
 module ParserSpec where
 
 import Test.Hspec
-import Test.Hspec.Expectations
 import Test.HUnit
 
-import Data.Either (isRight, isLeft, fromRight, fromLeft)
-
-import Control.Exception (try, SomeException)
-import Control.Monad (void)
+import Data.Either (isLeft)
 
 import Text.Megaparsec.Error (errorBundlePretty)
 
-import Debug.Trace
-
 import Parser.DatalogParser
-import DatalogProgram
 
 spec :: Spec
 spec = parallel . describe "Parser.parseDatalog" $ do
@@ -35,6 +28,7 @@ spec = parallel . describe "Parser.parseDatalog" $ do
     canParse "examples/ppdatalog/market_unfolded_fulltyped.pl"
     canParse "examples/ppdatalog/employee_unfolded_fulltyped.pl"
     canParse "examples/ppdatalog/relatives_unfolded_3_fulltyped.pl"
+    canParse "examples/ppdatalog/ship.pl"
     cannotParse "examples/prolog/negative/gibberish.pl"
 
 canParse :: String -> Spec
@@ -42,7 +36,7 @@ canParse file = it ("can parse " ++ file) $ action `shouldReturn` ()
   where action = do
             res <- parseDatalog file <$> readFile file
             case res of
-              Right x -> return ()
+              Right _ -> return ()
               Left  e -> error $ errorBundlePretty e
 
 cannotParse :: String -> Spec

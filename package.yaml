@@ -37,6 +37,7 @@ dependencies:
 # Testing only
 # For some reason there are errors in ghcide if these are not in the dependencies
 - hspec
+- hspec-expectations
 - HUnit
 - shelly
 
