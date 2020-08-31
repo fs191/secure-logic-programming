@@ -364,12 +364,12 @@ scVarType ann =
 
   let scDom = scDomain Nothing dom in
   let sctype = case (dtype, dom) of
-          (PPBool, _) -> SCBool
-          (PPInt,  _) -> SCInt32
-          (PPStr,  Private) -> SCArray 1 SCXorUInt8
-          (PPStr,  Public)  -> SCString
-          (PPStr,  Unknown) -> error $ "cannot determine data type for a string of unknown domain"
-          (PPAuto,     _)   -> SCDynamicT Nothing
+          (PPBool, _)      -> SCBool
+          (PPInt, _)       -> SCInt32
+          (PPStr, Private) -> SCArray 1 SCXorUInt8
+          (PPStr, Public)  -> SCString
+          (PPStr, Unknown) -> error $ "cannot determine data type for a string of unknown domain"
+          (_, _)           -> SCDynamicT Nothing
   in (scDom, sctype)
 
 scStructType :: (SCDomain -> SCType -> SCType -> SCType) -> Maybe Int -> Ann -> SCType
@@ -382,7 +382,7 @@ scStructType f i ann =
       (PPStr,  Private) -> f (scDomain i dom) SCXorUInt32 SCXorUInt8
       (PPStr,  Public)  -> f (scDomain i dom) SCUInt32    SCUInt8
       (PPStr,  Unknown) -> error $ "cannot determine data type for a string of unknown domain"
-      (PPAuto, _)       -> f (scDomain i dom) (SCDynamicT i) (SCDynamicS i)
+      (_, _)            -> f (scDomain i dom) (SCDynamicT i) (SCDynamicS i)
 
 scStructPrivateType :: (SCDomain -> SCType -> SCType -> SCType) -> Maybe Int -> Ann -> SCType
 scStructPrivateType f i ann =
@@ -391,7 +391,7 @@ scStructPrivateType f i ann =
       PPBool -> f SCShared3p SCBool  SCBool
       PPInt  -> f SCShared3p SCInt32 SCInt32
       PPStr  -> f SCShared3p SCXorUInt32 SCXorUInt8
-      PPAuto -> f SCShared3p (SCDynamicT i) (SCDynamicS i)
+      _      -> f SCShared3p (SCDynamicT i) (SCDynamicS i)
 
 scColTypeI :: Int -> Ann -> SCType
 scColTypeI i = scStructType SCColumn (Just i)
@@ -408,7 +408,7 @@ scConstType (ConstFloat _ c) = SCConstFloat c
 scConstType (ConstBool  _ c) = SCConstBool c
 scConstType (ConstStr   _ c) = SCConstStr c
 scConstType (Attribute  _ c) = SCConstStr c
-scConstType e                 = error $ "Expecting a constant, not " ++ show e
+scConstType e                = error $ "Expecting a constant, not " ++ show e
 
 scSubstType :: Int -> Ann -> SCType
 scSubstType i ann = SCSubst (scDomain (Just i) (ann ^. domain)) (scColTypeI i ann)
@@ -896,7 +896,7 @@ tableGenerationCode ds dbc (tableHeader:tableRows) =
                             PPBool -> False
                             PPInt  -> True
                             PPStr  -> False
-                            PPAuto -> error $ "Cannot create a table without knowing column data type."
+                            _      -> error $ "Cannot create a table without knowing column data type."
                 ) xs
 
         hlengths  = map length tableHeader

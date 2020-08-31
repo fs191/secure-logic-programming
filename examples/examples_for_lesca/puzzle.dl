@@ -30,4 +30,4 @@ safe(X,Y,X,V).
 % Farmer is not with Goat
 safe(X,X,X1,X) :- opp(X,X1).
 
-state(s, s, s, s)?
+?-state(s, s, s, s).

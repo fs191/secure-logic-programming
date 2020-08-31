@@ -1,6 +1,6 @@
 % Bridge problem
-%  Late midnight. It's dark. You and your three partners must cross a bridge which stands up to two. Only one torch is available and it is needed to cross the bridge if you keep stay alive withou falling into deep, frozen, and troubled waters. Behind you, a group of warriors are willing to cut some necks. Your estimations tell that warriors will come in less than 19 minutes, and each one of you, fugitives, needs (because of wounds) 1, 2, 5 and 10 minutes to cross the bridge. Are you able to safe all of you at the south, opposite shore before enemy arrive?
-% Source: Unknown (Anonymous?)
+?-%  Late midnight. It's dark. You and your three partners must cross a bridge which stands up to two. Only one torch is available and it is needed to cross the bridge if you keep stay alive withou falling into deep, frozen, and troubled waters. Behind you, a group of warriors are willing to cut some necks. Your estimations tell that warriors will come in less than 19 minutes, and each one of you, fugitives, needs (because of wounds) 1, 2, 5 and 10 minutes to cross the bridge. Are you able to safe all of you at the south, opposite shore before enemy arrive.
+?-% Source: Unknown (Anonymous.)
 % Coded by: F. Sáenz-Pérez
 % Date: 9/19/2012
 % Note: Based on farmer-wolf-goat-cabbage puzzle
@@ -124,5 +124,5 @@ max_val(X,Y,X) :-
 max_val(X,Y,Y) :-
   X<Y.
 
-state(s, s, s, s, s, _)?
+?-state(s, s, s, s, s, _).
 

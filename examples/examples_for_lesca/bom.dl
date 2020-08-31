@@ -55,5 +55,5 @@ larger(Part,Time) :-
   Time1 > Time.
 
 :-outputs([X : public int]).
-howsoon(bike, X)?
+?-howsoon(bike, X).
 

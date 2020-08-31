@@ -36,7 +36,7 @@ data CompilerException
   | ExpectedGroundTerm Expr
   | ExpectedConstant Expr
   | NonVariableArgument Expr
-  | CannotReadFile String
+  | CannotReadFile String IOException
 
 instance Exception CompilerException where
   displayException ex = show $ sev <+> pretty ex
@@ -54,23 +54,29 @@ instance HasSeverity CompilerException where
   severity _ = Error
 
 instance Pretty CompilerException where
-  pretty (MegaparsecError err) = pretty $ errorBundlePretty err
-  pretty NoGoal = "Program has no goal."
-  pretty (TooManyGoals x) = hsep
-    [ "Program has more than one goal:"
-    , indent 4 . hsep $ prettyLoc <$> x
-    ]
-  pretty (TypeMismatch expected got) = 
-    pretty expected `expectedGot` pretty got
-  pretty (ExpectedConstant expr) = 
-    "a constant" `expectedGot` pretty expr
-  pretty (ExpectedGroundTerm expr) = 
-    "a ground term" `expectedGot` pretty expr
-  pretty (NonVariableArgument expr) = 
-    "a variable argument" `expectedGot` pretty expr
-  pretty (CannotReadFile f) =
-    "Cannot read from file" <+> pretty f <> 
-    ". Ensure that the file uses a supported encoding (e.g. utf-8)."
+  pretty x = (pretty $ severity x) <+> (align $ errorMsg x)
+
+errorMsg :: CompilerException -> Doc ann
+errorMsg (MegaparsecError err) = pretty $ errorBundlePretty err
+errorMsg NoGoal = "Program has no goal."
+errorMsg (TooManyGoals x) = hsep
+  [ "Program has more than one goal:"
+  , indent 4 . hsep $ prettyLoc <$> x
+  ]
+errorMsg (TypeMismatch expected got) = 
+  pretty expected `expectedGot` pretty got
+errorMsg (ExpectedConstant expr) = 
+  "a constant" `expectedGot` pretty expr
+errorMsg (ExpectedGroundTerm expr) = 
+  "a ground term" `expectedGot` pretty expr
+errorMsg (NonVariableArgument expr) = 
+  "a variable argument" `expectedGot` pretty expr
+errorMsg (CannotReadFile f ex) = vsep
+  [ "Cannot read from file" <+> pretty f <> ":"
+  , pretty $ show ex <> "."
+  , "Ensure that the file uses a supported encoding (e.g. utf-8)."
+  ]
+
 
 -- Utilities
 

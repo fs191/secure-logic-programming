@@ -6,4 +6,4 @@ loop(X) :-
   loop(Y),
   X is Y+1.
 
-loop(100)?
+?-loop(100).

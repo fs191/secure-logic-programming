@@ -28,4 +28,4 @@ ancestor(X,Y) :-
 
 :-inputs([@child:public string]).
 :-outputs([Ancestor]).
-ancestor(Ancestor, @child)?
+?-ancestor(Ancestor, @child).
