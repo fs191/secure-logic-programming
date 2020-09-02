@@ -1,4 +1,3 @@
-% TODO this program is not parsed by PrivaLog yet
 :-type(ship, [@name:primary public string,
               @latitude:private float,
               @longitude:private float,
@@ -16,7 +15,7 @@
               @available:private bool]).
 
 % the placeholder "_" denotes an unnamed variable
-% we need use a special data construction for this
+% we need to use a special data construction for this
 ship_location(Ship,X,Y) :-
     ship(Ship,X,Y,_,_,_).
 

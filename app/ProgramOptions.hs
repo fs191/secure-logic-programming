@@ -14,6 +14,7 @@ data ProgramOptions = ProgramOptions
   , _verbose        :: Bool
   , _inFile         :: String
   , _outFile        :: String
+  , _inferTypesOnly :: Bool
   }
 makeLenses ''ProgramOptions
 

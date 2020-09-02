@@ -35,6 +35,12 @@ programArgs =
       , help "Produce verbose output."
       , hidden
       ]
+    inferTypesOnly <- switch $ mconcat
+      [ short 't'
+      , long "only-types"
+      , help "Outputs Privalog program with inferred types."
+      , hidden
+      ]
     outFile <- strOption $ mconcat
       [ short 'o'
       , long "output"
@@ -51,6 +57,7 @@ programArgs =
       , _verbose        = verbose
       , _inFile         = inFile
       , _outFile        = outFile
+      , _inferTypesOnly = inferTypesOnly
       }
 
 getProgramOptions :: IO ProgramOptions

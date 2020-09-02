@@ -8,12 +8,9 @@ import ErrorMsg
 import Parser.DatalogParser
 import Language.SecreC
 
---import CSVImport(generateDataToDBscript)
-
 import Control.Exception
 import Control.Monad hiding (ap)
 import Data.Text.Prettyprint.Doc
-import System.Log.Logger
 
 import Transform
 import PreProcessing
@@ -32,9 +29,7 @@ main =
       -- Text file containing output SecreC program
       let outFilePath = _outFile args
       let _ite = _iterations args
-      -- Set logging level
-      when (_verbose args) $
-        updateGlobalLogger rootLoggerName (setLevel DEBUG)
+      let inferTypesOnly = _inferTypesOnly args
 
       -- parse the input datalog program
       program' <- try $ parseDatalogFromFile inFileName 
@@ -43,14 +38,16 @@ main =
             Left ex -> throw $ CannotReadFile inFileName ex
             Right x -> x
 
-      pp <- (return $ preProcess program)
-      ap <- (return $ adornProgram pp)
-      tf <- (return $ deriveAllGroundRules _ite ap)
-      post <- (return $ postProcess tf)
-      ti <- (return $ typeInference post)
-      sc <- (return $ secrecCode ti)
+      pp   <- return $ preProcess program
+      ap   <- return $ adornProgram pp
+      tf   <- return $ deriveAllGroundRules _ite ap
+      post <- return $ postProcess tf
+      ti   <- return $ typeInference post
+      sc   <- return $ secrecCode ti
 
-      let secrec = show $ pretty sc
+      let output = show $ if inferTypesOnly
+          then pretty ti
+          else pretty sc
 
       -- create a Sharemind script that can be used to upload the tables used in given program
       -- WARNING: this is used for testing only, do not apply it to actual private data!
@@ -64,7 +61,7 @@ main =
           writeFile createdbPath createdbStr
 
       -- Output the results
-      writeFile outFilePath secrec
+      writeFile outFilePath output
     case res of
       Left ex -> putStrLn $ show (ex :: CompilerException)
       Right _ -> return ()
