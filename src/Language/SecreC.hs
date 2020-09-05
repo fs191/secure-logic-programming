@@ -146,7 +146,8 @@ data SCExpr
   | SCFunCall Text [SCExpr]
 
 instance Pretty SCExpr where
-  pretty (SCConstInt x)   = pretty x
+  pretty (SCConstInt x)   = integer x
+  pretty (SCConstFloat x) = float x
   pretty (SCConstStr x)   = dquotes $ pretty x
   pretty (SCConstBool True)  = "true"
   pretty (SCConstBool False) = "false"

@@ -36,9 +36,19 @@ runWithOptions args =
           . adornProgram
           . preProcess
 
+    let pipeline2
+          = id
+          . typeInference
+          . postProcess
+          . deriveAllGroundRules _ite
+          . adornProgram
+          . preProcess
+
     -- parse the input datalog program
     program <- parseDatalogFromFile inFileName
     let secrec = show . pretty $ pipeline program
+
+    putStrLn (show . pretty $ pipeline2 program)
 
     -- create a Sharemind script that can be used to upload the tables used in given program
     -- WARNING: this is used for testing only, do not apply it to actual private data!
