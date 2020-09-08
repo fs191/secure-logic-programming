@@ -32,8 +32,6 @@ simplify r = r & ruleTail %~ U.rewrite f
     f (Add _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify (+) x y
     f (Sub _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify (-) x y
     f (Mul _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify (*) x y
-    f (Min _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify min x y
-    f (Max _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify max x y
     f (Lt _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (<) x y
     f (Gt _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (>) x y
     f (Le _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (<=) x y

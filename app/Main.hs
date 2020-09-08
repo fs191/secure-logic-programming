@@ -41,7 +41,10 @@ main =
       pp   <- return $ preProcess program
       ap   <- return $ adornProgram pp
       tf   <- return $ deriveAllGroundRules _ite ap
-      post <- return $ postProcess tf
+      post <- return $ 
+        if inferTypesOnly
+          then tf
+          else postProcess tf
       ti   <- return $ typeInference post
       sc   <- return $ secrecCode ti
 

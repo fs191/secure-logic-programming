@@ -8,6 +8,7 @@
 module Expr
   ( Expr(..)
   , PPType(..), PPDomain(..)
+  , BuiltInFun(..)
   , Ann
   , isLeaf
   , isVar
@@ -32,9 +33,9 @@ module Expr
   , eSqrt, ePow
   , eAdd, eSub
   , eMul, eDiv
-  , eMin, eMax
   , eAnd, eOr
   , eList
+  , eFun
   , annotation
   , leftHand, rightHand
   , arg
@@ -72,6 +73,20 @@ import Language.Prolog.PrologSource
 
 import Annotation
 
+data BuiltInFun
+  = Sqrt
+  | Min
+  | Max
+  deriving (Ord, Eq, Data, Typeable)
+
+instance Show BuiltInFun where
+  show Max = "max"
+  show Min = "min"
+  show Sqrt = "sqrt"
+
+instance Pretty BuiltInFun where
+  pretty = pretty . show
+
 -- | A datatype for representing datalog expression trees.
 data Expr
   = ConstInt   {_annotation :: !Ann, _intVal :: !Int}
@@ -83,7 +98,6 @@ data Expr
   | Not  {_annotation :: !Ann, _arg :: !Expr}
   | Neg  {_annotation :: !Ann, _arg :: !Expr}
   | Inv  {_annotation :: !Ann, _arg :: !Expr}
-  | Sqrt {_annotation :: !Ann, _arg :: !Expr}
   | Div  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Sub  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Lt   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
@@ -95,8 +109,7 @@ data Expr
   | Mul  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Add  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Pow  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
-  | Min  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
-  | Max  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Fun  {_annotation :: !Ann, _fun :: BuiltInFun, _funArgs   :: ![Expr]}
   | And  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Or   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Pred {_annotation :: !Ann, _predName :: !String, _predArgs :: ![Expr]}
@@ -107,32 +120,32 @@ makeLenses ''Expr
 makePrisms ''Expr
 
 instance Pretty Expr where
-  pretty (Var e x)        = pretty x <+> (pretty $ show e)
-  pretty (ConstInt e x)   = pretty x <+> (pretty $ show e)
-  pretty (ConstStr e x)   = pretty x <+> (pretty $ show e)
-  pretty (ConstBool e x)  = pretty x <+> (pretty $ show e)
-  pretty (ConstFloat e x) = pretty x <+> (pretty $ show e)
-  pretty (Attribute e x)  = pretty x <+> (pretty $ show e)
-  pretty (Hole e)         = "_" <+> (pretty $ show e)
-  pretty (Pred e n args)  = pretty n <> tupled (pretty <$> args) <+> (pretty $ show e)
-  pretty (Not e x)        = "!" <> pretty x <+> (pretty $ show e)
-  pretty (Neg e x)        = "-(" <> pretty x <> ")" <+> (pretty $ show e)
-  pretty (Inv e x)        = "(" <> pretty x <> ")^(-1)" <+> (pretty $ show e)
-  pretty (Div e x y)      = pretty x <+> "/" <+> pretty y <+> (pretty $ show e)
-  pretty (Sub e x y)      = pretty x <+> "-" <+> pretty y <+> (pretty $ show e)
-  pretty (Lt e x y)       = pretty x <+> "<" <+> pretty y <+> (pretty $ show e)
-  pretty (Le e x y)       = pretty x <+> "=<" <+> pretty y <+> (pretty $ show e)
-  pretty (Eq e x y)       = pretty x <+> "=" <+> pretty y <+> (pretty $ show e)
-  pretty (Is e x y)       = pretty x <+> "is" <+> pretty y <+> (pretty $ show e)
-  pretty (Gt e x y)       = pretty x <+> ">" <+> pretty y <+> (pretty $ show e)
-  pretty (Ge e x y)       = pretty x <+> ">=" <+> pretty y <+> (pretty $ show e)
-  pretty (Mul e x y)      = pretty x <+> "*" <+> pretty y <+> (pretty $ show e)
-  pretty (Add e x y)      = pretty x <+> "+" <+> pretty y <+> (pretty $ show e)
-  pretty (Min e x y)      = "min(" <> pretty x <> ", " <> pretty y <> ")" <+> (pretty $ show e)
-  pretty (Max e x y)      = "max(" <> pretty x <> ", " <> pretty y <> ")" <+> (pretty $ show e)
-  pretty (Or e x y)       = pretty x <> ";\n" <> pretty y <+> (pretty $ show e)
+  pretty (Var e x)        = pretty x <+> pretty e
+  pretty (ConstInt e x)   = pretty x <+> pretty e
+  pretty (ConstStr e x)   = pretty x <+> pretty e
+  pretty (ConstBool e x)  = pretty x <+> pretty e
+  pretty (ConstFloat e x) = pretty x <+> pretty e
+  pretty (Attribute e x)  = pretty x <+> pretty e
+  pretty (Hole e)         = "_" <+> pretty e
+  pretty (Pred e n args)  = pretty n <> tupled (pretty <$> args) <+> pretty e
+  pretty (Not e x)        = "!" <> pretty x <+> pretty e
+  pretty (Neg e x)        = "-(" <> pretty x <> ")" <+> pretty e
+  pretty (Inv e x)        = "(" <> pretty x <> ")^(-1)"    <+> pretty e
+  pretty (Div e x y)      = pretty x <+> "/" <+> pretty y  <+> pretty e
+  pretty (Sub e x y)      = pretty x <+> "-" <+> pretty y  <+> pretty e
+  pretty (Lt e x y)       = pretty x <+> "<" <+> pretty y  <+> pretty e
+  pretty (Le e x y)       = pretty x <+> "=<" <+> pretty y <+> pretty e
+  pretty (Eq e x y)       = pretty x <+> "=" <+> pretty y  <+> pretty e
+  pretty (Is e x y)       = pretty x <+> "is" <+> pretty y <+> pretty e
+  pretty (Gt e x y)       = pretty x <+> ">" <+> pretty y  <+> pretty e
+  pretty (Ge e x y)       = pretty x <+> ">=" <+> pretty y <+> pretty e
+  pretty (Mul e x y)      = pretty x <+> "*" <+> pretty y  <+> pretty e
+  pretty (Add e x y)      = pretty x <+> "+" <+> pretty y  <+> pretty e
+  pretty (Or e x y)       = pretty x <> ";\n" <> pretty y  <+> pretty e
   pretty (And _ x y)      = pretty x <> ",\n" <> pretty y
-  pretty (List e x)       = (list $ pretty <$> x) <+> (pretty $ show e)
+  pretty (List e x)       = (list $ pretty <$> x) <+> pretty e
+  pretty (Pow e x y)      = pretty x <> "^" <> pretty y <+> pretty e
+  pretty (Fun e f xs)     = pretty f <> (tupled $ pretty <$> xs) <+> pretty e
 
 instance PrologSource Expr where
   prolog (Var _ x)        = pretty x
@@ -156,8 +169,6 @@ instance PrologSource Expr where
   prolog (Ge _ x y)       = prolog x <+> ">=" <+> prolog y
   prolog (Mul _ x y)      = prolog x <+> "*" <+> prolog y
   prolog (Add _ x y)      = prolog x <+> "+" <+> prolog y
-  prolog (Min _ x y)      = "min(" <> prolog x <> ", " <> prolog y <> ")"
-  prolog (Max _ x y)      = "max(" <> prolog x <> ", " <> prolog y <> ")"
   prolog (Or _ x y)       = prolog x <> ";\n" <> prolog y
   prolog (And _ x y)      = prolog x <> ",\n" <> prolog y
   prolog (List _ x)       = list $ prolog <$> x
@@ -222,8 +233,8 @@ predicate :: String -> [Expr] -> Expr
 predicate = Pred a
   where
     a = empty & annBound .~ True
-                & annType  .~ PPBool
-                & domain   .~ Unknown
+              & annType  .~ PPBool
+              & domain   .~ Unknown
 
 -- | Creates a new less-than expression
 less :: Expr -> Expr -> Expr
@@ -255,19 +266,11 @@ eNot = Not empty
 
 -- | Creates a new square root expression
 eSqrt :: Expr -> Expr
-eSqrt = Sqrt empty
+eSqrt x = Fun empty Sqrt [x]
 
 -- | Creates a new power expression
 ePow :: Expr -> Expr -> Expr
 ePow = Pow empty
-
--- | Creates a new maximum expression
-eMax :: Expr -> Expr -> Expr
-eMax = Max empty
-
--- | Creates a new minimum expression
-eMin :: Expr -> Expr -> Expr
-eMin = Min empty
 
 -- | Creates a new multiplication expression
 eMul :: Expr -> Expr -> Expr
@@ -304,6 +307,10 @@ eList = List empty
 -- | Creates a new 'is' expression
 eIs :: Expr -> Expr -> Expr
 eIs = Is empty
+
+-- | Creates a new built-in function expression
+eFun :: BuiltInFun -> [Expr] -> Expr
+eFun = Fun empty
 
 -- | Turns all `And`s to a list, 
 -- starting from the root of the expression
@@ -387,8 +394,6 @@ isArithmetic (Add{}) = True
 isArithmetic (Sub{}) = True
 isArithmetic (Mul{}) = True
 isArithmetic (Div{}) = True
-isArithmetic (Min{}) = True
-isArithmetic (Max{}) = True
 isArithmetic (Neg{}) = True
 isArithmetic (Inv{}) = True
 isArithmetic _       = False

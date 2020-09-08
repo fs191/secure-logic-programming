@@ -21,6 +21,7 @@ import Control.Lens
 
 import Data.Data
 import Data.Foldable
+import Data.Text.Prettyprint.Doc
 
 import Language.SecreC.Types
 
@@ -55,6 +56,9 @@ instance Show Ann where
             , " "
             , x ^. annType . to show
             ]
+
+instance Pretty Ann where
+  pretty = pretty . show
 
 -- | Returns the default annotation that is untyped and unbound.
 empty :: Ann

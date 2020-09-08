@@ -856,8 +856,6 @@ exprToSC e =
     Ge   _ e1 e2 -> funBoolOp [SCConstStr ">=", exprToSC e1, exprToSC e2]
     Mul  _ e1 e2 -> funArithOp [SCConstStr "*", exprToSC e1, exprToSC e2]
     Add  _ e1 e2 -> funArithOp [SCConstStr "+", exprToSC e1, exprToSC e2]
-    Min  _ e1 e2 -> funArithOp [SCConstStr "min", exprToSC e1, exprToSC e2]
-    Max  _ e1 e2 -> funArithOp [SCConstStr "max", exprToSC e1, exprToSC e2]
     And  _ e1 e2 -> funBoolOp [SCConstStr "and", exprToSC e1, exprToSC e2]
     Or   _ e1 e2 -> funBoolOp [SCConstStr "or", exprToSC e1, exprToSC e2]
 

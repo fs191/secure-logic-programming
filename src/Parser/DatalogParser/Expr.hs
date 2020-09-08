@@ -24,13 +24,14 @@ import qualified Annotation as A
 type Parser = Parsec Void String
 data Operator f = Operator String f
 
------------------------
--- Numeric expressions
------------------------
+-------------------------
+-- Numeric expressions --
+-------------------------
 
 aTerm :: Parser Expr
 aTerm = (withSrcPos $ asum
   [ varParse
+  , funParse
   , predParse
   , strParse
   , attributeParse
@@ -131,6 +132,21 @@ list = (withSrcPos $ eList <$> (brackets $ sepBy aTerm comma)) <?> "list"
 -- Helper functions
 -----------------------
 
+funParse :: Parser Expr
+funParse = withSrcPos $ choice
+  [ fun "max" Max
+  , fun "min" Min
+  , fun "sqrt" Sqrt
+  ]
+  where
+    fun :: String -> BuiltInFun -> Parser Expr
+    fun s f =
+      do
+        void . try $ symbol s *> symbol "("
+        xs <- sepBy aExpr $ symbol ","
+        void $ symbol ")"
+        return $ eFun f xs
+
 predParse :: Parser Expr
 predParse = withSrcPos $
   do
@@ -202,4 +218,3 @@ withSrcPos parser =
     res <- parser
     end <- getSourcePos
     return $ res & annotation . A.srcPos .~ Just (begin, end)
-
