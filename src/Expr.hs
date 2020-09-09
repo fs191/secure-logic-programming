@@ -25,7 +25,7 @@ module Expr
   , less, lessEqual
   , greater, greaterEqual
   , equal
-  , eIs
+  , eIs, eUn
   , eNeg
   , eNot
   , eInv
@@ -125,7 +125,8 @@ instance Pretty Expr where
   pretty (Sub e x y)      = pretty x <+> "-" <+> pretty y  <+> pretty e
   pretty (Lt e x y)       = pretty x <+> "<" <+> pretty y  <+> pretty e
   pretty (Le e x y)       = pretty x <+> "=<" <+> pretty y <+> pretty e
-  pretty (Eq e x y)       = pretty x <+> "=" <+> pretty y  <+> pretty e
+  pretty (Eq e x y)       = pretty x <+> "=:=" <+> pretty y  <+> pretty e
+  pretty (Un e x y)       = pretty x <+> "=" <+> pretty y <+> pretty e
   pretty (Is e x y)       = pretty x <+> "is" <+> pretty y <+> pretty e
   pretty (Gt e x y)       = pretty x <+> ">" <+> pretty y  <+> pretty e
   pretty (Ge e x y)       = pretty x <+> ">=" <+> pretty y <+> pretty e
@@ -136,6 +137,7 @@ instance Pretty Expr where
   pretty (List e x)       = (list $ pretty <$> x) <+> pretty e
   pretty (Pow e x y)      = pretty x <> "^" <> pretty y <+> pretty e
   pretty (Aggr e f p x y) = pretty f <> "(" <> pretty p <> ", " <> pretty x <> "," <> pretty y <> ")" <+> pretty e
+  pretty (Sqrt e x)       = "sqrt(" <> pretty x <> ")" <+> pretty e
 
 instance PrologSource Expr where
   prolog (Var _ x)        = pretty x

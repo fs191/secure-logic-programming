@@ -129,7 +129,7 @@ dataType =
 typing :: Parser A.Ann
 typing =
   do
-    void $ symbol ":"
+    try . void $ symbol ":" >> notFollowedBy (char '-')
     isPK <- isJust <$> (optional $ symbol "primary")
     dom <- option Unknown domainType
     dat <- dataType

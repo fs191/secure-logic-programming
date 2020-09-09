@@ -56,7 +56,7 @@ aExpr1 = binary ops aExpr1 aExpr2
       , Operator ">"   greater
       , Operator "<"   less
       , Operator "=:=" equal
-      , Operator "="   equal
+      , Operator "="   eUn
       , Operator "is"  eIs
       ]
 
@@ -189,7 +189,7 @@ typable :: Parser Expr -> Parser Expr
 typable e =
   do
     e' <- e
-    t <- optional $ try typing
+    t <- optional typing
     let f = case t of
           Just p  -> p
           Nothing -> A.empty

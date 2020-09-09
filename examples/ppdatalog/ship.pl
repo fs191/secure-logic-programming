@@ -1,5 +1,5 @@
 % TODO this program is not parsed by PrivaLog yet
-:-type(ship, [@name:public string,
+:-type(ship, [@name:primary public string,
               %we do not have a float type yet
               @latitude:private float,
               @longitude:private float,
@@ -9,15 +9,13 @@
 % the "primary key" constraint gives us a hint that we e.g. can substitute
 %"ship(Ship,X,Y,_,_,_)" and "ship(Ship,X,Y,Speed,_,_)" with "ship(Ship,X,Y,Speed,_,_)"
 % we will do this merge step e.g. after "postProcess" and before "typeInference"
-:-pk(ship,[@name]).
 
-:-type(port, [@name:public string,
+:-type(port, [@name:primary public string,
               @latitude:public float,
               @longitude:public float,
               @offloadcapacity:public int,
               %we do not have a boolean type yet
               @available:private bool]).
-:-pk(port,[@name]).
 
 % the placeholder "_" denotes an unnamed variable
 % we need use a special data construction for this
@@ -85,5 +83,5 @@ fastestDelivery(PortName, CargoType, MinTime) :-
 %not sure if it is a good idea to use repeating name "@cargotype" in the table and for the inputs
 :-inputs([@portname:private string, @cargotype:private string]).
 :-outputs([MinTime]).
-fastestDelivery(@portname,@cargotype,MinTime)?
+?-fastestDelivery(@portname,@cargotype,MinTime).
 
