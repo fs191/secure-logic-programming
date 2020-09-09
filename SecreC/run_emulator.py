@@ -7,6 +7,10 @@ import struct
 
 from subprocess import call
 
+scriptpath = './'
+filepath   = './examples/'
+runscript  = '/usr/local/sharemind/bin/sharemind-emulator'
+
 class IncompleteInput(Exception):
     pass
 
@@ -67,12 +71,10 @@ def parseArguments(inFile=sys.stdin, sizeTypeFormat='Q', sizeTypeSize=8,
 
     return args
 
-controllercfg = '--conf=client.conf'
-runscript     = './sharemind-runscript'
 logfile = '_log.txt'
 outfile = '_output.txt'
 
-outfilearg = "--outFile=" + outfile
+outfilearg = "--outFile=" + scriptpath + outfile
 
 kw_yesno  = 'does'
 kw_yesno_len = len(kw_yesno)
@@ -142,7 +144,7 @@ def format(result):
 
 
 # TODO the type and domain should come from the program, and this script generated automatically
-# python run.py market True X1=alice:private:string X2=garlic:public:string
+# python run.py market 0 X1=alice:private:string X2=garlic:public:string
 n = len(sys.argv)
 filename = sys.argv[1]
 if sys.argv[2] == '1':
@@ -155,7 +157,7 @@ else:
     niceprint = True
     k = 2
 
-s = [runscript, outfilearg, controllercfg, filename + ".sb"]
+s = [runscript, outfilearg, filepath + filename + ".sb"]
 for i in range(k,n):
     [var,decl]   = sys.argv[i].split("=")
     [value,vdom,vtype] = decl.split(":")
@@ -172,7 +174,7 @@ for i in range(k,n):
     if (vtype=="string"):
         if (vdom=="pd_shared3p"):
 
-            #TODO use this code after updating sharemind-runscript
+            #TODO use this code after updating sharemind-emulator
             #s = s + ["--str=" + var, "--str=pd_shared3p", "--str=xor_uint8", "--size=" + str(len(value)), "--xstr=" + ("".join("{:02x}".format(ord(c)) for c in value))]
 
             #this is a workaround
@@ -195,7 +197,6 @@ if os.path.exists(outfile):
   os.remove(outfile)
 
 fout = open(logfile, "w")
-os.environ["LD_LIBRARY_PATH"] = "../lib"
 result = call(s, stdout=fout)
 fout.close()
 
