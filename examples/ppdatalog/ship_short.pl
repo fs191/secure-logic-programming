@@ -29,12 +29,8 @@ arrival(Ship,Port,CargoType,Time) :-
     feasible_port(Ship,Port),
     reachability_time(Ship,Port,Time).
 
-%how fast will the cargo of type CargoType arrive at the port Port?
-fastestDelivery(Port, CargoType, MinTime) :-
-    min(arrival(Ship,Port,CargoType,Time),Time,MinTime).
-
 %the goal: how fast will the cargo of certain type arrive at a certain port?
 :-inputs([@portname:private string, @cargotype:private string]).
-:-outputs([MinTime]).
-?-fastestDelivery(@portname,@cargotype,MinTime).
+:-outputs([min(Time)]).
+?-arrival(_,@portname,@cargotype,Time).
 

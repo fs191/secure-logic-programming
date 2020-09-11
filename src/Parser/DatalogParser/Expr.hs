@@ -6,6 +6,7 @@ module Parser.DatalogParser.Expr
   , attributeParse
   , predParse
   , varParse
+  , aggregation
   ) where
 
 import Text.Megaparsec
@@ -80,6 +81,7 @@ aExpr4 :: Parser Expr
 aExpr4 = binary ops aExpr4 aExpr5
   where
     ops = 
+      -- TODO exponentiation should be evaluated from right to left
       [ Operator "^" ePow
       ]
 
@@ -130,6 +132,24 @@ list = (withSrcPos $ eList <$> (brackets $ sepBy aTerm comma)) <?> "list"
 -----------------------
 -- Helper functions
 -----------------------
+
+aggregation :: Parser (Expr, Aggregation)
+aggregation = choice
+  [ f "min"   Min
+  , f "max"   Max
+  , f "sum"   Sum
+  , f "count" Count
+  , f "avg"   Average
+  ]
+  where
+    f sym aggr =
+      do
+        try $ do
+          void $ symbol sym
+          void $ symbol "("
+        v <- varParse
+        void $ symbol ")"
+        return (v, aggr)
 
 predParse :: Parser Expr
 predParse = withSrcPos $

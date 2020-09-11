@@ -82,8 +82,27 @@ outputDir =
   do
     try . void $ symbol "outputs"
     _ins <- parens . brackets $ do
-      sepBy varParse comma
+      sepBy output comma
     return $ DP.outputDirective _ins
+
+output :: Parser DP.Output
+output = choice
+  [ do
+      v <- varParse
+      return $ DP.Output v Nothing
+  , do
+      a <- try $ choice
+        [ void (symbol "sum")   *> return Sum
+        , void (symbol "min")   *> return Min
+        , void (symbol "max")   *> return Max
+        , void (symbol "avg")   *> return Average
+        , void (symbol "count") *> return Count
+        ]
+      void $ symbol "("
+      v <- varParse
+      void $ symbol ")"
+      return . DP.Output v $ Just a
+  ]
 
 dbDir :: Parser DP.Directive
 dbDir = 

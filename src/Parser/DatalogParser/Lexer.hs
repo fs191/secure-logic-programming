@@ -52,7 +52,6 @@ variable = lexeme variable' <?> "variable"
         t <- many $ alphaNumChar <|> identifierSymbols
         return $ h:t
 
-
 identifier :: Parser String
 identifier = asum
   [ lexeme $ (try sQuote) *> identifier' <* sQuote

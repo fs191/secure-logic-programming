@@ -7,6 +7,7 @@
 -- helper functions for accessing parts of the expression tree
 module Expr
   ( Expr(..)
+  , Aggregation(..)
   , PPType(..), PPDomain(..)
   , Ann
   , isLeaf
@@ -187,6 +188,14 @@ instance PrologSource Expr where
   prolog (Aggr _ f p x y) = "findall(" <> prolog x <> "," <> prolog p <> ", Xs)," <+>
                             pretty (prologAggr f) <> "_list(Xs," <> prolog y <> ")"
   prolog x = error $ show x
+
+data Aggregation
+  = Min
+  | Max
+  | Sum
+  | Count
+  | Average
+  deriving (Show, Eq)
 
 -- map datalog aggregations to prolog aggregations
 prologAggr :: String -> String

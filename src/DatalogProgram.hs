@@ -5,6 +5,8 @@
 
 module DatalogProgram
   ( DatalogProgram
+  , Aggregation
+  , Output(..)
   , Directive
   , DBClause
   , fromRulesAndGoal
@@ -34,10 +36,20 @@ import           Data.Text.Prettyprint.Doc
 import           DBClause
 import           Language.Prolog.PrologSource
 
+data Output = Output 
+  { _oExpr :: Expr 
+  , _oAggr :: Maybe Aggregation
+  }
+  deriving (Show, Eq)
+makeLenses ''Output
+
+instance Pretty Output where
+  pretty (Output expr _) = pretty expr
+
 -- | Directives are the top-level function calls in Datalog.
 data Directive
   = InputDirective ![Expr]
-  | OutputDirective ![Expr]
+  | OutputDirective ![Output]
   | DBDirective String ![Expr]
   deriving (Show, Eq)
 
@@ -99,7 +111,7 @@ inputs = dpDirectives . traversed . _InputDirective . traversed . attrToVar
 
 -- | Traverse all output directives for output variables
 outputs :: Traversal' DatalogProgram Expr
-outputs = dpDirectives . traversed . _OutputDirective . traversed
+outputs = dpDirectives . traversed . _OutputDirective . traversed . oExpr
 
 -- | Isomorphism between variables and attributes
 attrToVar :: Iso' Expr Expr
@@ -140,7 +152,7 @@ inputDirective :: [Expr] -> Directive
 inputDirective = InputDirective
 
 -- | Creates a new output directive
-outputDirective :: [Expr] -> Directive
+outputDirective :: [Output] -> Directive
 outputDirective = OutputDirective
 
 -- | Creates a new database directive

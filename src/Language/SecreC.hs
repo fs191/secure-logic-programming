@@ -384,7 +384,7 @@ scVarType ann =
           (PPStr,  Private) -> SCArray 1 SCXorUInt8
           (PPStr,  Public)  -> SCString
           (PPStr,  Unknown) -> error $ "cannot determine data type for a string of unknown domain"
-          (PPAuto,     _)   -> SCDynamicT Nothing
+          _                 -> SCDynamicT Nothing
   in (scDom, sctype)
 
 scStructType :: (SCDomain -> SCType -> SCType -> SCType) -> Maybe Int -> Ann -> SCType
@@ -397,7 +397,7 @@ scStructType f i ann =
       (PPStr,  Private) -> f (scDomain i dom) SCXorUInt32 SCXorUInt8
       (PPStr,  Public)  -> f (scDomain i dom) SCUInt32    SCUInt8
       (PPStr,  Unknown) -> error $ "cannot determine data type for a string of unknown domain"
-      (PPAuto, _)       -> f (scDomain i dom) (SCDynamicT i) (SCDynamicS i)
+      _                 -> f (scDomain i dom) (SCDynamicT i) (SCDynamicS i)
 
 scStructPrivateType :: (SCDomain -> SCType -> SCType -> SCType) -> Maybe Int -> Ann -> SCType
 scStructPrivateType f i ann =
@@ -406,7 +406,7 @@ scStructPrivateType f i ann =
       PPBool -> f SCShared3p SCBool  SCBool
       PPInt  -> f SCShared3p SCInt32 SCInt32
       PPStr  -> f SCShared3p SCXorUInt32 SCXorUInt8
-      PPAuto -> f SCShared3p (SCDynamicT i) (SCDynamicS i)
+      _      -> f SCShared3p (SCDynamicT i) (SCDynamicS i)
 
 scColTypeI :: Int -> Ann -> SCType
 scColTypeI i = scStructType SCColumn (Just i)
