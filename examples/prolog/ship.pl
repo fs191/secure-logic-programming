@@ -90,10 +90,10 @@ fastestDelivery(PortName, CargoType, MinTime) :-
     %min(arrival(Ship,PortName,CargoType,Time),Time,MinTime).
 
 % prolog inputs with @portname=alma and @cargotype=tomato
-?-%.- fastestDelivery(alma,tomato,MinTime).
+?-fastestDelivery(alma,tomato,MinTime).
 
 % privalog inputs
 %:-inputs([@portname:private string, @cargotype:private string]).
 %:-outputs([MinTime]).
-?-%fastestDelivery(@portname,@cargotype,MinTime).
+%?-fastestDelivery(@portname,@cargotype,MinTime).
 

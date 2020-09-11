@@ -73,7 +73,7 @@ aExpr3 = binary ops aExpr3 aExpr4
   where 
     ops =
       [ Operator "*" eMul
-      , Operator "/" eDiv
+      , Operator "/" eFDiv
       ]
 
 aExpr4 :: Parser Expr

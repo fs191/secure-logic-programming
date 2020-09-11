@@ -53,7 +53,7 @@ runDatalogFromFile' p = silently $
     let _num = ((("\n"++) . (++"\t") . show) <$> ([1..] :: [Int]))
     let _numSource = concat $ (uncurry (++)) <$> _num `zip` lines _source
     res <- handleany_sh 
-      (\e -> return . Left . SwiplException $ show e) $
+      (\e -> return . Left . SwiplException $ _source <> "\n\n" <> show e) $
       Right <$> _action
     return $ T.lines <$> res
 

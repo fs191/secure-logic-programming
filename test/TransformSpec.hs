@@ -24,6 +24,7 @@ spec =
     transPreserveSem "examples/prolog/employee.pl" 1
     transPreserveSem "examples/prolog/employee.pl" 2
     transPreserveSem "examples/prolog/relatives.pl" 1
+    transPreserveSem "examples/ppdatalog/precendence.pl" 3
     transPreserveSemDB "examples/ppdatalog/market.pl" 3 marketDB
     transPreserveSemDB "examples/ppdatalog/auction.pl" 3 marketDB
     transPreserveSemDB "examples/ppdatalog/employee.pl" 3 employeeDB

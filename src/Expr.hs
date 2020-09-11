@@ -31,7 +31,7 @@ module Expr
   , eInv
   , eSqrt, ePow
   , eAdd, eSub
-  , eMul, eDiv
+  , eMul, eDiv, eFDiv
   , eAnd, eOr
   , eList
   , annotation
@@ -168,21 +168,25 @@ instance PrologSource Expr where
   prolog (Or _ x y)       = prolog x <> ";\n" <> prolog y
   prolog (And _ x y)      = prolog x <> ",\n" <> prolog y
   prolog (List _ x)       = list $ prolog <$> x
-
+  prolog (Pow _ x y)      = prolog x <> "**" <> prolog y
   -- TODO there may be more compact/better ways for aggregations
-  prolog (Aggr e "times" p x y) = "findall(" <> "X0" <> "," <> "(" <> pretty p <> "," <> "X0 is log(" <> pretty x <> ")), Xs)" <> "," <+>
+  prolog (Aggr _ "times" p x y) = "findall(" <> "X0" <> "," <> "(" <> prolog p <> "," <> "X0 is log(" <> prolog x <> ")), Xs)" <> "," <+>
                                   "sum_list(Xs,Y0)" <> "," <+>
-                                  pretty y <+> "is" <+> "exp(" <> "Y0" <> ")" <+>
-                                  (pretty $ show e)
-
-  prolog (Aggr e "avg" p x y) = "findall(" <> pretty x <> "," <> pretty p <> ", Xs)" <> "," <+>
-                                "sum_list(Xs,Y0)" <> "," <+>
-                                "length(Xs,N)" <> "," <+>
-                                pretty y <+> "is" <+> "Y0" <> "/" <> "N" <+>
-                                (pretty $ show e)
-  prolog (Aggr e f p x y) = "findall(" <> pretty x <> "," <> pretty p <> ", Xs)," <+>
-                            pretty (prologAggr f) <> "_list(Xs," <> pretty y <> ")" <+>
-                            (pretty $ show e)
+                                  prolog y <+> "is" <+> "exp(" <> "Y0" <> ")"
+  prolog (Aggr _ "avg" p x y) = vsep
+                                  [
+                                    "findall" <> tupled
+                                      [ prolog x
+                                      , prolog p
+                                      , "Xs"
+                                      ]
+                                  , "sum_list(Xs,Y0)"
+                                  , "length(Xs,N)"
+                                  , prolog y <+> "is Y0/N"
+                                  ]
+  prolog (Aggr _ f p x y) = "findall(" <> prolog x <> "," <> prolog p <> ", Xs)," <+>
+                            pretty (prologAggr f) <> "_list(Xs," <> prolog y <> ")"
+  prolog x = error $ show x
 
 -- map datalog aggregations to prolog aggregations
 prologAggr :: String -> String
