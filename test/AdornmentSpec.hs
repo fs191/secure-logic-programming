@@ -15,7 +15,7 @@ spec = describe "Adornment.adornProgram" $ do
   adornPreserveSem "examples/prolog/fib.pl"
   adornPreserveSem "examples/prolog/employee.pl"
   adornPreserveSem "examples/prolog/auction.pl"
-  adornPreserveSem "examples/prolog/ship.pl"
+  adornPreserveSem "examples/ppdatalog/ship_new.pl"
   adornPreserveSem "examples/ppdatalog/precendence.pl"
   runsSuccessfully "examples/prolog/market.pl"        adornProgram marketRes
   runsSuccessfully "examples/prolog/employee.pl"      adornProgram employeeRes

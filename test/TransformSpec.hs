@@ -32,6 +32,7 @@ spec =
     runsSuccessfully "examples/prolog/market.pl" transform marketRes
     runsSuccessfully "examples/prolog/auction.pl" transform marketRes
     runsSuccessfully "examples/prolog/employee.pl" transform employeeRes
+    runsSuccessfully "examples/ppdatalog/precendence.pl" transform ["[390625.0]"]
     runsSuccessfullyDB "examples/ppdatalog/market.pl" transform marketRes marketDB
     runsSuccessfullyDB "examples/ppdatalog/auction.pl" transform marketRes marketDB
     runsSuccessfullyDB "examples/ppdatalog/employee.pl" transform employeeRes employeeDB

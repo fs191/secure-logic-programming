@@ -175,8 +175,6 @@ bindTerms [] = return []
 bindTerms l  =
   do
     _bound <- use gsBound
-    -- Might be inefficient to sort again every time
-    -- for longer rule bodies
     let _head = head l
     -- Bind all the variables that are parameters of the best candidate
         _vars = [v | v@(Var _ _) <- U.universe _head]

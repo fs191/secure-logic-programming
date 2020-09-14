@@ -123,6 +123,7 @@ instance Pretty Expr where
   pretty (Neg e x)        = "-(" <> pretty x <> ")" <+> pretty e
   pretty (Inv e x)        = "(" <> pretty x <> ")^(-1)"    <+> pretty e
   pretty (Div e x y)      = pretty x <+> "/" <+> pretty y  <+> pretty e
+  pretty (FDiv e x y)     = pretty x <+> "/" <+> pretty y  <+> pretty e
   pretty (Sub e x y)      = pretty x <+> "-" <+> pretty y  <+> pretty e
   pretty (Lt e x y)       = pretty x <+> "<" <+> pretty y  <+> pretty e
   pretty (Le e x y)       = pretty x <+> "=<" <+> pretty y <+> pretty e
@@ -139,6 +140,7 @@ instance Pretty Expr where
   pretty (Pow e x y)      = pretty x <> "^" <> pretty y <+> pretty e
   pretty (Aggr e f p x y) = pretty f <> "(" <> pretty p <> ", " <> pretty x <> "," <> pretty y <> ")" <+> pretty e
   pretty (Sqrt e x)       = "sqrt(" <> pretty x <> ")" <+> pretty e
+  pretty x                = error $ "pretty not defined for " ++ show x
 
 instance PrologSource Expr where
   prolog (Var _ x)        = pretty x
@@ -149,27 +151,27 @@ instance PrologSource Expr where
   prolog (Attribute _ x)  = pretty x
   prolog (Hole _)         = "_"
   prolog (Pred _ n args)  = pretty n <> tupled (prolog <$> args) -- <+> (prolog $ show e)
-  prolog (Not _ e)        = "\\+" <> prolog e
-  prolog (Neg _ e)        = "-" <> prolog e
+  prolog (Not _ e)        = "\\+(" <> prolog e <> ")"
+  prolog (Neg _ e)        = "-(" <> prolog e <> ")"
   prolog (Inv _ e)        = "(" <> prolog e <> ")^(-1)"
   prolog (Sqrt _ e)       = "sqrt(" <> prolog e <> ")"
-  prolog (FDiv _ x y)     = prolog x <+> "/" <+> prolog y
+  prolog (FDiv _ x y)     = "(" <> prolog x <> ")/(" <> prolog y <> ")"
   prolog (Div _ x y)      = "div(" <> prolog x <> ", " <> prolog y <> ")"
   prolog (Mod _ x y)      = "mod(" <> prolog x <> ", " <> prolog y <> ")"
-  prolog (Sub _ x y)      = prolog x <+> "-" <+> prolog y
-  prolog (Lt _ x y)       = prolog x <+> "<" <+> prolog y
-  prolog (Le _ x y)       = prolog x <+> "=<" <+> prolog y
-  prolog (Eq _ x y)       = prolog x <+> "=:=" <+> prolog y
-  prolog (Is _ x y)       = prolog x <+> "is" <+> prolog y
-  prolog (Un _ x y)       = prolog x <+> "=" <+> prolog y
-  prolog (Gt _ x y)       = prolog x <+> ">" <+> prolog y
-  prolog (Ge _ x y)       = prolog x <+> ">=" <+> prolog y
-  prolog (Mul _ x y)      = prolog x <+> "*" <+> prolog y
-  prolog (Add _ x y)      = prolog x <+> "+" <+> prolog y
+  prolog (Sub _ x y)      = "(" <> prolog x <> ")-(" <> prolog y <> ")"
+  prolog (Lt _ x y)       = "(" <> prolog x <> ")<(" <> prolog y <> ")"
+  prolog (Le _ x y)       = "(" <> prolog x <> ")=<(" <> prolog y <> ")"
+  prolog (Eq _ x y)       = "(" <> prolog x <> ")=:=(" <> prolog y <> ")"
+  prolog (Is _ x y)       = "(" <> prolog x <> ")is(" <> prolog y <> ")"
+  prolog (Un _ x y)       = "(" <> prolog x <> ")=(" <> prolog y <> ")"
+  prolog (Gt _ x y)       = "(" <> prolog x <> ")>(" <> prolog y <> ")"
+  prolog (Ge _ x y)       = "(" <> prolog x <> ")>=(" <> prolog y <> ")"
+  prolog (Mul _ x y)      = "(" <> prolog x <> ")*(" <> prolog y <> ")"
+  prolog (Add _ x y)      = "(" <> prolog x <> ")+(" <> prolog y <> ")"
   prolog (Or _ x y)       = prolog x <> ";\n" <> prolog y
   prolog (And _ x y)      = prolog x <> ",\n" <> prolog y
   prolog (List _ x)       = list $ prolog <$> x
-  prolog (Pow _ x y)      = prolog x <> "**" <> prolog y
+  prolog (Pow _ x y)      = "(" <> prolog x <> ")^(" <> prolog y <> ")"
   -- TODO there may be more compact/better ways for aggregations
   prolog (Aggr _ "times" p x y) = "findall(" <> "X0" <> "," <> "(" <> prolog p <> "," <> "X0 is log(" <> prolog x <> ")), Xs)" <> "," <+>
                                   "sum_list(Xs,Y0)" <> "," <+>
