@@ -816,6 +816,7 @@ intPredToSC isSetSemantics ds (Pred ptype p zs) j =
       let resUnTableType = SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([resUnDomain],  resUnArgTypes)) in
       let resUnTableName = nameResUn j in
       let something (Var ztype z,i) = VarInit (variable SCPublic (scColPrivateTypeI i ztype) (pack z)) (SCVarName (nameTableArg resUnTableName i))
+          -- HACK that does something to cover the Hole case
           something (Hole _, i)     = VarInit (variable SCPublic (scColPrivateTypeI i empty) . pack $ "HOLE_" ++ show i) (SCVarName (nameTableArg resUnTableName i)) in
 
       map (\(Var xtype x,i) -> VarInit (variable SCPublic (scColTypeI i xtype) (nameArg i)) (funConstCol [SCVarName (pack x)])) setX ++

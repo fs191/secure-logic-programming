@@ -26,6 +26,7 @@ spec = parallel . describe "Parser.parseDatalog" $ do
     canParse "examples/ppdatalog/employee.pl"
     canParse "examples/ppdatalog/relatives.pl"
     canParse "examples/ppdatalog/fib_unfolded_3_fulltyped.pl"
+    canParse "examples/ppdatalog/aggregation.pl"
     canParse "examples/ppdatalog/market_unfolded_fulltyped.pl"
     canParse "examples/ppdatalog/employee_unfolded_fulltyped.pl"
     canParse "examples/ppdatalog/relatives_unfolded_3_fulltyped.pl"

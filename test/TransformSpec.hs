@@ -25,10 +25,12 @@ spec =
     transPreserveSem "examples/prolog/employee.pl" 2
     transPreserveSem "examples/prolog/relatives.pl" 1
     transPreserveSem "examples/ppdatalog/precendence.pl" 3
+    transPreserveSem "examples/ppdatalog/aggregation.pl" 1
     transPreserveSemDB "examples/ppdatalog/market.pl" 3 marketDB
     transPreserveSemDB "examples/ppdatalog/auction.pl" 3 marketDB
     transPreserveSemDB "examples/ppdatalog/employee.pl" 3 employeeDB
     runsSuccessfully "examples/prolog/fib.pl" transform ["[2]"]
+    runsSuccessfully "examples/ppdatalog/aggregation.pl" transform ["[4]"]
     runsSuccessfully "examples/prolog/market.pl" transform marketRes
     runsSuccessfully "examples/prolog/auction.pl" transform marketRes
     runsSuccessfully "examples/prolog/employee.pl" transform employeeRes
@@ -56,8 +58,4 @@ transPreserveSem f n =
 transPreserveSemDB :: String -> Int -> [Expr] -> Spec
 transPreserveSemDB f n db = 
   preservesSemanticsDB (deriveAllGroundRules n) f db
-
---
--- Expected results
---
 
