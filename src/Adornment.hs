@@ -164,6 +164,9 @@ predPattern bound (Pred _ _ as) = f <$> as
     f :: Expr -> Bool
     f (Var _ n) | n `elem` bound = True
                 | otherwise      = False
+    -- Holes are treated as fresh variables, hence unbound
+    f (Hole _) = False
+    -- Constants are always bound
     f _ = True
 predPattern _ _ = []
 

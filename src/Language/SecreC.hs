@@ -783,13 +783,13 @@ intPredToSC isSetSemantics ds (Pred ptype p zs) j =
       let is = [0..length zs - 1] in
 
       -- separate constants and variables
-      let (setZ',setC) = partition (\(zi,_) -> case zi of {Var _ _ -> True; Attribute _ _ -> True; _ -> False}) (zip zs is) in
+      let (setZ',setC) = partition (\(zi,_) -> case zi of {Var _ _ -> True; Attribute _ _ -> True; Hole _ -> True; _ -> False}) (zip zs is) in
       let setZ = map (\(z,i) -> case z of {Attribute zann zval -> (Var zann zval,i); _ -> (z,i)}) setZ' in
 
       -- all bounded variables will be inputs
       -- all free variables will be assigned in this execution
       let (setX,setY) = partition (\(z,i) -> case z of
-                                                 Var _ x -> dv !! i
+                                                 Var _ _ -> dv !! i
                                                  _       -> False) $ setZ
       in
 
@@ -815,6 +815,8 @@ intPredToSC isSetSemantics ds (Pred ptype p zs) j =
       let resUnDomain = SCShared3p in
       let resUnTableType = SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([resUnDomain],  resUnArgTypes)) in
       let resUnTableName = nameResUn j in
+      let something (Var ztype z,i) = VarInit (variable SCPublic (scColPrivateTypeI i ztype) (pack z)) (SCVarName (nameTableArg resUnTableName i))
+          something (Hole _, i)     = VarInit (variable SCPublic (scColPrivateTypeI i empty) . pack $ "HOLE_" ++ show i) (SCVarName (nameTableArg resUnTableName i)) in
 
       map (\(Var xtype x,i) -> VarInit (variable SCPublic (scColTypeI i xtype) (nameArg i)) (funConstCol [SCVarName (pack x)])) setX ++
             map (\(z,i)           -> VarInit (variable SCPublic ((scColTypeI i . (view annotation)) z) (nameArg i)) (funConstCol [scConstType z])) setC ++
@@ -835,7 +837,7 @@ intPredToSC isSetSemantics ds (Pred ptype p zs) j =
 
                 -- assign the output variables
                 -- everything becomes private after deduplication
-                ++ map (\(Var ztype z,i) -> VarInit (variable SCPublic (scColPrivateTypeI i ztype) (pack z)) (SCVarName (nameTableArg resUnTableName i))) setY
+                ++ map something setY
                 ++ [VarInit (variable resUnDomain (SCArray 1 SCBool) (nameB j)) (SCVarName (nameTableBB resUnTableName))]
            else
                 -- assign the output variables
