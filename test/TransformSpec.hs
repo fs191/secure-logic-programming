@@ -30,7 +30,6 @@ spec =
     transPreserveSemDB "examples/ppdatalog/auction.pl" 3 marketDB
     transPreserveSemDB "examples/ppdatalog/employee.pl" 3 employeeDB
     runsSuccessfully "examples/prolog/fib.pl" transform ["[2]"]
-    runsSuccessfully "examples/ppdatalog/aggregation.pl" transform ["[4]"]
     runsSuccessfully "examples/prolog/market.pl" transform marketRes
     runsSuccessfully "examples/prolog/auction.pl" transform marketRes
     runsSuccessfully "examples/prolog/employee.pl" transform employeeRes

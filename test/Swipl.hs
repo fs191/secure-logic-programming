@@ -9,6 +9,7 @@ module Swipl
   , runsSuccessfully
   , runsSuccessfullyDB
   , doesNotRun
+  , compilesSuccessfully
   ) where
 
 import Shelly
@@ -17,6 +18,7 @@ import Control.Lens
 
 import Data.Set as S
 import Data.Text (Text)
+import Data.Text.Prettyprint.Doc
 import qualified Data.Text as T
 
 import Control.Exception
@@ -28,8 +30,16 @@ import DatalogProgram
 import Expr
 import Rule
 
+import Transform
+import PreProcessing
+import PostProcessing
+import TypeInference
+import Adornment
+import Language.SecreC
+
 data SwiplException
   = SwiplException String
+  | SecreCException Text
   deriving (Exception, Eq)
 
 instance Show SwiplException where
@@ -129,4 +139,33 @@ insertDB db x = x & dpRules %~ (<> _dbRules)
   where
     _dbRules :: [Rule]
     _dbRules = [fact _n _as | Pred _ _n _as <- db]
+
+compileSC :: String -> Sh (Either SwiplException Text)
+compileSC file = withTmpDir act
+  where
+    act tmp = 
+      do
+        _prog <- liftIO $ parseDatalogFromFile file
+        let sc = secrecCode . typeInference . postProcess . deriveAllGroundRules 2 . adornProgram $ preProcess _prog
+        cp "SecreC/lp_essentials.sc" tmp
+        let _path = tmp <> "prog.sc"
+        writefile _path . T.pack . show . pretty $ sc
+        cd tmp
+        res <- run "scc" [T.pack _path, "-I", T.pack tmp, "-o", "out.sb"]
+        resCode <- lastExitCode
+        case resCode of
+          0 -> return $ Right res
+          _ -> return . Left $ SecreCException res
+
+compilesSuccessfully :: String -> Spec
+compilesSuccessfully file = it desc $ do
+  let act =
+        do
+          res <- shelly . silently $ compileSC file
+          case res of
+            Left ex -> throw ex
+            Right _ -> return ()
+  act `shouldReturn` ()
+  where
+    desc = "Translates " ++ file ++ " to SecreC successfully." 
 
