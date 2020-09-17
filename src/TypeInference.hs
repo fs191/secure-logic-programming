@@ -87,7 +87,9 @@ inferFromDB dp (Pred _ n xs) = mconcat newParams'
       where 
         y | v ^. annotation . annBound = Unknown
           | otherwise     = d
-    err v = error $ show v ++ " does not have an indentifier"
+    err v = error $ 
+      (show $ v ^. annotation . srcPos) ++ " "
+      ++ show v ++ " does not have an indentifier"
     newParams' = inferParams <$> (xs `zip` unified)
 inferFromDB _ _ = mempty
 

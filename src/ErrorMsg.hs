@@ -90,7 +90,7 @@ prettyLoc expr = "at" <+> prettyPos
   where 
     prettyPos = case expr ^. annotation . srcPos of
                   Nothing     -> "an unknown position"
-                  Just (x, y) -> hsep
+                  Just (SPos x y) -> hsep
                     [ (pretty $ sourcePosPretty x)
                     , "-"
                     , (pretty $ sourcePosPretty y)

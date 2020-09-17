@@ -221,4 +221,4 @@ withSrcPos parser =
     begin <- getSourcePos
     res <- parser
     end <- getSourcePos
-    return $ res & annotation . A.srcPos .~ Just (begin, end)
+    return $ res & annotation . A.srcPos .~ Just (A.SPos begin end)

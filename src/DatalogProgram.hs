@@ -2,6 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module DatalogProgram
   ( DatalogProgram
@@ -29,6 +30,7 @@ module DatalogProgram
 import           Control.Lens hiding (List)
 
 import           Data.Maybe
+import           Data.Data
 
 import           Rule
 import           Expr
@@ -40,7 +42,7 @@ data Output = Output
   { _oExpr :: Expr 
   , _oAggr :: Maybe Aggregation
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Data, Typeable)
 makeLenses ''Output
 
 instance Pretty Output where
@@ -51,7 +53,7 @@ data Directive
   = InputDirective ![Expr]
   | OutputDirective ![Output]
   | DBDirective String ![Expr]
-  deriving (Show, Eq)
+  deriving (Show, Eq, Data, Typeable)
 
 instance Pretty Directive where
   pretty (InputDirective as) = ":-inputs([" <> _ps <> "])"
@@ -68,7 +70,7 @@ data DatalogProgram = DatalogProgram
   , _dpGoal       :: !Expr
   , _dpDirectives :: ![Directive]
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Data, Typeable)
 
 makeLenses ''DatalogProgram
 makePrisms ''Directive

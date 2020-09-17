@@ -6,6 +6,7 @@
 module Annotation 
   ( Ann(..)
   , Typing(..)
+  , SPos(..)
   , empty, emptyTyping
   , annType, domain
   , annBound
@@ -32,6 +33,12 @@ data Typing
   = Typing PPDomain PPType
   deriving (Show)
 
+data SPos = SPos SourcePos SourcePos
+  deriving (Ord, Eq, Data, Typeable)
+
+instance Show SPos where
+  show (SPos a _) = sourcePosPretty a
+
 -- | Annotations data type for storing extra information about expressions
 data Ann = Ann
   { 
@@ -42,7 +49,7 @@ data Ann = Ann
   , _domain   :: PPDomain
     -- | Tells wether the expression is bound
   , _annBound :: Bool
-  , _srcPos   :: Maybe (SourcePos, SourcePos)
+  , _srcPos   :: Maybe SPos
   , _isPK     :: Bool
   }
   deriving (Ord, Eq, Data, Typeable)

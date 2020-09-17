@@ -197,7 +197,7 @@ data Aggregation
   | Sum
   | Count
   | Average
-  deriving (Show, Eq)
+  deriving (Show, Eq, Data, Typeable)
 
 -- map datalog aggregations to prolog aggregations
 prologAggr :: String -> String

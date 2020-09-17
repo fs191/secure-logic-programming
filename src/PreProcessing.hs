@@ -5,6 +5,7 @@ module PreProcessing
 import Control.Lens
 import Control.Monad.State
 
+import Data.Data.Lens as DL
 import Data.Generics.Uniplate.Data as U
 
 import Annotation
@@ -13,9 +14,10 @@ import Rule
 import Expr
 
 preProcess :: DatalogProgram -> DatalogProgram
-preProcess dp =
+preProcess dp = flip evalState 0 $
   dp & dpRules . traversed %~ simplify
      & dpRules . traversed %~ simplifyRuleHead
+     & id %%~ U.transformBiM holeToVar
 
 -- | Rewrites constant terms to simpler terms
 simplify :: Rule -> Rule
@@ -73,4 +75,12 @@ simplifyRuleHead r = r & ruleHead . predArgs .~ _newArgs
         i <- get
         modify (+1)
         return $ Var (x ^. annotation) $ "$A" ++ show i
+
+holeToVar :: Expr -> State Int Expr
+holeToVar (Hole e) =
+  do
+    n <- get
+    modify (+1)
+    return . Var e $ "__HOLE_" <> show n
+holeToVar x = return x
 
