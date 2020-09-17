@@ -44,6 +44,8 @@ data SwiplException
 
 instance Show SwiplException where
   show (SwiplException s) = "Failed to run swipl program:\n" ++ s
+  show (SecreCException s) = T.unpack $
+    "Failed to compile SecreC program:\n" <> s
 
 runDatalogFromFile :: FilePath -> IO (Either SwiplException [Text])
 runDatalogFromFile p = shelly $ runDatalogFromFile' p
@@ -141,7 +143,7 @@ insertDB db x = x & dpRules %~ (<> _dbRules)
     _dbRules = [fact _n _as | Pred _ _n _as <- db]
 
 compileSC :: String -> Sh (Either SwiplException Text)
-compileSC file = withTmpDir act
+compileSC file = errExit False $ withTmpDir act
   where
     act tmp = 
       do
@@ -149,13 +151,16 @@ compileSC file = withTmpDir act
         let sc = secrecCode . typeInference . postProcess . deriveAllGroundRules 2 . adornProgram $ preProcess _prog
         cp "SecreC/lp_essentials.sc" tmp
         let _path = tmp <> "prog.sc"
-        writefile _path . T.pack . show . pretty $ sc
+        let src = T.pack . show $ pretty sc
+        writefile _path src
         cd tmp
         res <- run "scc" [T.pack _path, "-I", T.pack tmp, "-o", "out.sb"]
+        err <- lastStderr
         resCode <- lastExitCode
+        let ex = err <> "\n" <> res <> "\nSOURCE:\n" <> src
         case resCode of
           0 -> return $ Right res
-          _ -> return . Left $ SecreCException res
+          _ -> return . Left $ SecreCException ex
 
 compilesSuccessfully :: String -> Spec
 compilesSuccessfully file = it desc $ do
