@@ -152,12 +152,15 @@ compileSC file = errExit False $ withTmpDir act
         cp "SecreC/lp_essentials.sc" tmp
         let _path = tmp <> "prog.sc"
         let src = T.pack . show $ pretty sc
+        let enumf :: (T.Text, Int) -> Text
+            enumf (l, i) = (T.pack $ show i) <> "\t| " <> l
+        let srcNum = fmap enumf (T.lines src `zip` [1..])
         writefile _path src
         cd tmp
         res <- run "scc" [T.pack _path, "-I", T.pack tmp, "-o", "out.sb"]
         err <- lastStderr
         resCode <- lastExitCode
-        let ex = err <> "\n" <> res <> "\nSOURCE:\n" <> src
+        let ex = err <> "\n" <> res <> "\nSOURCE:\n" <> T.intercalate "\n" srcNum
         case resCode of
           0 -> return $ Right res
           _ -> return . Left $ SecreCException ex
