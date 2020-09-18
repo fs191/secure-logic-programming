@@ -18,6 +18,7 @@ import PostProcessing
 import TypeInference
 import Adornment
 import DatalogProgram
+import MagicSets
 
 main :: IO ()
 main = 
@@ -38,15 +39,16 @@ main =
             Left ex -> throw $ CannotReadFile inFileName ex
             Right x -> x
 
-      pp   <- return $ preProcess program
-      ap   <- return $ adornProgram pp
-      tf   <- return $ deriveAllGroundRules _ite ap
-      post <- return $ 
-        if inferTypesOnly
-          then tf
-          else postProcess tf
-      ti   <- return $ typeInference post
-      sc   <- return $ secrecCode ti
+      let pp   = preProcess program
+      let ap   = adornProgram pp
+      let mag  = magicSets ap
+      let tf   = deriveAllGroundRules _ite mag
+      let post = 
+            if inferTypesOnly
+              then tf
+              else postProcess tf
+      let ti = typeInference post
+      let sc = secrecCode ti
 
       let output = show $ if inferTypesOnly
           then pretty ti

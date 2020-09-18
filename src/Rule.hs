@@ -4,7 +4,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Rule
-  ( Rule
+  ( Rule(..)
   , rule, fact
   , args
   , isFact
