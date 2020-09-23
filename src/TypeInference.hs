@@ -15,7 +15,7 @@ import Annotation
 import Expr
 import DatalogProgram
 import Rule
-import Language.SecreC.Types
+import Language.Privalog.Types
 
 -- | A substitution for typings. Substitutes types based on expression 
 -- identifier. It does not overwrite the typing, but rather tries to unify the 

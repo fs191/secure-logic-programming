@@ -24,7 +24,7 @@ import Data.Data
 import Data.Foldable
 import Data.Text.Prettyprint.Doc
 
-import Language.SecreC.Types
+import Language.Privalog.Types
 
 import Text.Megaparsec.Pos
 

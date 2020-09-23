@@ -15,7 +15,7 @@ import Data.Text.Prettyprint.Doc
 import Text.Megaparsec.Error
 import Text.Megaparsec.Pos
 
-import Language.SecreC.Types
+import Language.Privalog.Types
 
 import Expr
 import Annotation

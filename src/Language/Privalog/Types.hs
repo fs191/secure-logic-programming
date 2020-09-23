@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.SecreC.Types 
+module Language.Privalog.Types 
   ( PPType(..), PPDomain(..)
   , unifyTypes
   , unifyDomains

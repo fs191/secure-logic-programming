@@ -69,7 +69,7 @@ import Data.List as L
 import Data.Set as S hiding (empty)
 import Data.Text.Prettyprint.Doc
 
-import Language.SecreC.Types
+import Language.Privalog.Types
 import Language.Prolog.PrologSource
 
 import Annotation

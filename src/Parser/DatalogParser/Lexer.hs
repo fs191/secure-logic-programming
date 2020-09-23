@@ -21,7 +21,7 @@ import Data.Void (Void)
 import Control.Lens
 import Control.Monad (void)
 
-import Language.SecreC.Types
+import Language.Privalog.Types
 import qualified Annotation as A
 
 type Parser = Parsec Void String
