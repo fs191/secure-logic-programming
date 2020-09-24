@@ -15,6 +15,7 @@ import Control.Lens hiding(Empty)
 import Control.Monad.State.Strict
 
 import Data.List
+import Data.Maybe
 import qualified Data.Set as S
 
 import Data.Text (Text, pack, unpack)
@@ -66,7 +67,6 @@ nameTableExt p       = pack $ "extend_" ++ p
 nameGoalComp p l     = pack $ "goal_" ++ p ++ "_" ++ show l
 
 -- fixed names that are used globally in different components
-nameBB     = pack $ "b"
 nameMM     = pack $ "m"
 
 nameTableBB  t   = pack $ unpack t ++ "." ++ unpack nameBB
@@ -189,10 +189,8 @@ scSubstType ann =
 
 -- all bounded variables in predicate head are inputs
 -- all free variables in predicate head are outputs
-partitionInputsOutputs :: [Expr] -> ([(Expr,Int)], [(Expr,Int)])
-partitionInputsOutputs zs =
-    let is = [0..length zs-1] in
-    partition (\(z,i) -> z ^. annotation ^. annBound) $ zip zs is
+partitionInputsOutputs :: [Expr] -> ([Expr], [Expr])
+partitionInputsOutputs zs = partition (^. annotation . annBound) zs
 
 --------------------------------------------------
 -- convert a program to SecreC (transformation S^P)
@@ -221,14 +219,8 @@ secrecCode dp =
     extPreds = dp ^.. DP.dpDBClauses
     mapper p = (p ^. predName, xs, ys)
       where
-        (xs',ys') = partitionInputsOutputs zs
-        xs = map snd xs'
-        ys = map snd ys'
+        (xs,ys) = partitionInputsOutputs zs
         zs = predicateVars p
-    --(intPredPs, intPredXss, intPredYss) = unzip3 $ nub $ map mapper $ map (view ruleHead) rules
-    intPredPs  = nub $ rules ^.. folded . ruleHead . predName
-    intPredXss = nub $ rules ^.. folded . ruleHead . predArgs
-    intPredYss = undefined
 
 header :: [TopStatement]
 header =
@@ -287,14 +279,27 @@ extPredGet dbc =
           ++ [Return $ varToExpr result]
     return . Funct $ FunctionDecl Nothing returnType fname [ds, m, mi, ni] fbody
 
-intPredInDecl :: String -> [Int] -> SCM StructDecl
-intPredInDecl p is = 
+intPredDecl :: Rule -> SCM [StructDecl]
+intPredDecl r = 
   do
-    y  <- variable (SCDynamic "D") (SCArray 1 SCBool) nameBB
-    ys <- map (\i -> variable SCPublic (SCDynamicT (Just i)) (nameArg i)) is
-    StructDecl (Just template) (nameInTableStruct p) (y:ys)
+    let ruleArgs = r ^. ruleHead . predArgs
+    let (outVars, inVars) = partition (^. annotation . annBound) ruleArgs
+    d    <- freshDynDom
+    b    <- variable d (SCArray 1 SCBool) "b"
+    ins  <- traverse generateFactStruct inVars
+    outs <- traverse generateFactStruct outVars
+
+    return $ StructDecl (Just template) (nameInTableStruct p) ([b]<>ins<>outs)
   where
     template = SCTemplateDecl $ Just ([SCDynamic Nothing], map dynamicColT is)
+
+generateFactStruct :: Expr -> SCM SCVar
+generateFactStruct e = 
+  do
+    d <- freshDynDom
+    let colVar n = variable SCPublic (dynDomainToType d) n
+        err = error "expected identifier"
+    colVar . pack . fromMaybe err $ identifier e
 
 intPredOutDecl :: String -> [Int] -> StructDecl
 intPredOutDecl p is = struct template (nameOutTableStruct p) (y:ys)

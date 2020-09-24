@@ -4,6 +4,7 @@ module Language.SecreC.SCExpr
   ( SCTemplate(..)
   , SCDomain(..), SCKind(..), SCType(..)
   , SCExpr(..)
+  , dynDomainToType
   , angled
   ) where
 
@@ -49,7 +50,6 @@ data SCType
   | SCBool
   | SCString
   | SCDynamicT Text
-  | SCDynamicS Text
   | SCColumn SCDomain SCType SCType
   | SCSubst SCDomain SCType
   | SCStruct Text (Maybe SCTemplate)
@@ -68,8 +68,7 @@ instance Pretty SCType where
   pretty SCString    = "string"
 
   -- we are using two values for each string column: the true value S, and a hash T used for comparisons
-  pretty (SCDynamicT i) = "T" <> pretty i
-  pretty (SCDynamicS i) = "S" <> pretty i
+  pretty (SCDynamicT i) = pretty i
 
   -- the column template defines its privacy type and the two types of values
   pretty (SCColumn pt dt st) = "relColumn" <> angled [pretty pt, pretty dt, pretty st]
@@ -142,4 +141,8 @@ instance Pretty SCExpr where
 
 angled :: [Doc ann] -> Doc ann
 angled prettyContent = encloseSep (langle <> space) (rangle <> space) comma prettyContent
+
+dynDomainToType :: SCDomain -> SCType
+dynDomainToType (SCDynamic i) = SCDynamicT i
+dynDomainToType x = error $ "Expected dynamic domain, got " ++ show x
 

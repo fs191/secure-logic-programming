@@ -15,6 +15,8 @@ module Rule
   , ruleAnn
   , ruleName
   , ruleSchema
+  , boundVars
+  , unboundVars
   ) where
 
 ---------------------------------------------------------
@@ -31,6 +33,7 @@ import           Language.Prolog.PrologSource
 import           Expr
 import           Substitution
 import           DBClause
+import           Annotation
 
 -- | A rule has a list of arguments and a formula that represents rule premise
 data Rule = Rule
@@ -102,4 +105,10 @@ ruleAnn _ = error "Got a rule with a non-predicate head"
 ruleSchema :: Rule -> [Ann]
 ruleSchema (Rule (Pred _ _ zs) _) = map (view annotation) zs
 ruleSchema _ = error "Got a rule with a non-predicate head"
+
+boundVars :: Rule -> [Expr]
+boundVars = filter (view $ annotation . annBound) . args
+
+unboundVars :: Rule -> [Expr]
+unboundVars = filter (view $ annotation . annBound . to not) . args
 
