@@ -39,6 +39,7 @@ spec = parallel $
       infersTypes "examples/ppdatalog/fib_unfolded_3_fulltyped.pl"
       infersTypes "examples/ppdatalog/employee_unfolded_fulltyped.pl"
       infersTypes "examples/ppdatalog/relatives_unfolded_3_fulltyped.pl"
+      infersTypes "examples/ppdatalog/ship_short_unfolded_fulltyped.pl"
 
 inferPreserveSemDB :: String -> [Expr] -> Spec
 inferPreserveSemDB f db =

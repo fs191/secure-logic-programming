@@ -5,8 +5,8 @@ module PreProcessing
 import Control.Lens
 import Control.Monad.State
 
-import Data.Data.Lens as DL
 import Data.Generics.Uniplate.Data as U
+import Data.Maybe
 
 import Annotation
 import DatalogProgram
@@ -46,12 +46,16 @@ simplify r = r & ruleTail %~ U.rewrite f
     f _ = Nothing
 
 binarySimplify :: (Int -> Int -> Int) -> Expr -> Expr -> Expr
-binarySimplify f (ConstInt a x) (ConstInt b y) = 
-  (\e -> ConstInt e (f x y)) (unifyAnns a b)
+binarySimplify f (ConstInt a x) (ConstInt b y) = ConstInt c $ f x y
+  where
+    c = fromMaybe err $ unifyAnns a b
+    err = error $ "Failed to unify " <> show a <> " and " <> show b
 
 binarySimplifyBool :: (Int -> Int -> Bool) -> Expr -> Expr -> Expr
-binarySimplifyBool f (ConstInt a x) (ConstInt b y) = 
-  (\e -> ConstBool e (f x y)) (unifyAnns a b)
+binarySimplifyBool f (ConstInt a x) (ConstInt b y) = ConstBool c (f x y)
+  where
+    c = fromMaybe err $ unifyAnns a b
+    err = error $ "Failed to unify " <> show a <> " and " <> show b
 
 -- | Ensures that the rule head only consists of variables
 simplifyRuleHead :: Rule -> Rule

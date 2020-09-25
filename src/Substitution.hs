@@ -87,17 +87,22 @@ emptyTheta = Th $ M.empty
 -- | Substitute variable `x` with term `y`
 (|->) :: Expr -> Expr -> Subst
 v |-> y = Th (M.singleton x t)
-  where x = fromMaybe err $ identifier v
-        t = unifyExprAnns y v
+  where x = fromMaybe err  $ identifier v
+        t = fromMaybe err2 $ unifyExprAnns y v
         err =  error $ show v ++ "does not have an identifier"
+        err2 = error $ "Failed to unify " <> show v <> " and " <> show y
 
 -- | Get the substitution term for variable `x`
 evalTheta :: Subst -> Expr -> Expr
 evalTheta (Th theta) v@(Var a n) = 
   if M.member n theta 
     then 
-      theta M.! n & annotation %~ (unifyAnns a)
+      fromMaybe err $ x & annotation %%~ (unifyAnns a)
     else v
+  where 
+    x = theta M.! n
+    err = error $ "Failed to unify " <> show x <> " and " <> show a
+evalTheta _ x = error $ "Attempting to unify a non-variable: " <> show x
 
 -- | Apply a substitution to an expression
 -- TODO: unify type and domain as well

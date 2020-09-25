@@ -16,11 +16,13 @@ import Control.Monad
 
 import Data.Void (Void)
 import Data.Foldable
+import Data.Maybe
 
 import Parser.DatalogParser.Lexer
 import Expr as E hiding (identifier)
 import qualified Rule as R
 import qualified Annotation as A
+import ErrorMsg
 
 type Parser = Parsec Void String
 data Operator f = Operator String f
@@ -98,7 +100,7 @@ unary
   :: [Operator (Expr -> Expr)] 
   -> Parser Expr 
   -> Parser Expr
-unary ops next = typable $
+unary ops next = typable . withSrcPos $
   do
     f <- try $ do
       f <- choice $ try . parseOperator <$> ops
@@ -213,7 +215,8 @@ typable e =
     let f = case t of
           Just p  -> p
           Nothing -> A.empty
-    return $ applyAnnotation f e'
+    let err = error . show $ TypeApplicationFailed (f ^. annType) e'
+    return . fromMaybe err $ applyAnnotation f e'
 
 withSrcPos :: Parser Expr -> Parser Expr
 withSrcPos parser =

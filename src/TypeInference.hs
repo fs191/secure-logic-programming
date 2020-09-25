@@ -26,7 +26,9 @@ data TypeSubstitution
 
 instance Semigroup TypeSubstitution where
   (TypeSubstitution x) <> (TypeSubstitution y) = 
-    TypeSubstitution $ M.unionWith unifyTypings x y
+    TypeSubstitution $ M.unionWith (\a b -> fromMaybe err $ unifyTypings a b) x y
+    where
+      err = error $ "Failed to unify substitutions " <> show x <> " and " <> show y
 
 instance Monoid TypeSubstitution where
   mempty = TypeSubstitution M.empty
@@ -146,13 +148,13 @@ inferBuiltins r = r & ruleTail %~ U.transform ret
 inferBinRet :: Expr -> Expr -> Expr -> Expr
 inferBinRet e x y
   -- If both are bound then it is a comparison and privacy depends on subterms
-  | xb && yb  = e & annotation . annType %~ unifyTypes ut
+  | xb && yb  = e & annotation . annType %~ fromMaybe err2 . unifyTypes ut
                   & annotation . domain  .~ safelyUnifyDomains xd yd
   -- If only one variable is bound, then it is an assignment and will always
   -- return true
-  | xb        = e & annotation . annType %~ unifyTypes ut
+  | xb        = e & annotation . annType %~ fromMaybe err2 . unifyTypes ut
                   & annotation . domain  .~ Public
-  | yb        = e & annotation . annType %~ unifyTypes ut
+  | yb        = e & annotation . annType %~ fromMaybe err2 . unifyTypes ut
                   & annotation . domain  .~ Public
   -- User has written incorrect code if both sides of the expression are unbound
   | otherwise = error $ "Uninitialized subexpressions: " ++ show e
@@ -163,9 +165,11 @@ inferBinRet e x y
     yd = y ^. annotation . domain
     yb = y ^. annotation . annBound
     yt = y ^. annotation . annType
-    ut | isArithmetic e  = unifyTypes xt yt
+    ut | isArithmetic e  = fromMaybe err $ unifyTypes xt yt
        | isPredicative e = PPBool
        | otherwise       = PPAuto
+    err = error $ "Failed to unify expressions " <> show x <> " and " <> show y
+    err2 = error $ "Failed to apply typing " <> show ut <> " to " <> show e
 
 inferBinArgs :: Expr -> Expr -> Expr -> TypeSubstitution
 inferBinArgs e x y
@@ -205,7 +209,7 @@ inferFromGoal dp = dp & dpRules . traverse %~ subst
 (|->) x y = TypeSubstitution $ M.singleton x y
 
 -- | Infers types in the program goal by looking at the argument types of
--- rules which get called.
+-- rules that get called.
 inferGoal :: DatalogProgram -> DatalogProgram
 inferGoal dp = dp & dpGoal  %~ U.transform f
                   & outputs %~ f
@@ -219,9 +223,14 @@ inferGoal dp = dp & dpGoal  %~ U.transform f
                   . _Pred 
                   . _3
     foldUnify :: [Expr] -> Typing
-    foldUnify x = foldl1 unifyTypings $ x ^.. folded . annotation . typing
+    foldUnify (x:xt) = foldl (unifyWithError unifyTypings) (x ^. annotation . typing) xt
     f = applyTypeSubstToExpr .
           mconcat $ [x |-> (foldUnify y) | (Just x, y) <- goalRules]
+
+unifyWithError :: (Typing -> Typing -> Maybe Typing) -> Typing -> Expr -> Typing
+unifyWithError f x y = fromMaybe err $ f x (y ^. annotation . typing)
+  where
+    err = error $ "Could not apply typing " <> show x <> " to " <> show y
 
 -- | Infer types from the input directive
 inferFromInputs :: DatalogProgram -> DatalogProgram
@@ -232,13 +241,11 @@ inferFromInputs dp = dp & dpGoal %~ applyTypeSubstToExpr (mconcat inps)
 -- | Decides the return type of a rule by looking at the return types of the
 -- predicates in its body
 inferRuleRet :: Rule -> Rule
-inferRuleRet r = r & ruleHead . annotation . typing %~ unified
+inferRuleRet r = r & ruleHead . annotation . typing .~ unified
   where
-    predTypings =
-      do 
-        x <- andsToList (r ^. ruleTail)
-        return $ x ^. annotation . typing
-    unified = unifyTypings $ foldl1 safelyUnifyTypings predTypings
+    xt = andsToList (r ^. ruleTail)
+    x' = r ^. ruleHead . annotation . typing
+    unified = foldl (unifyWithError safelyUnifyTypings) x' xt
 
 -- | Infers the return typing of the goal statement
 inferGoalRet :: DatalogProgram -> DatalogProgram
@@ -253,14 +260,15 @@ applyTypeSubstToExpr (TypeSubstitution ts) e = U.transform f e
   where
     t :: Expr -> Typing
     t v = fromMaybe (exprTyping v) $ identifier v >>= (`M.lookup` ts)
-    f v = applyTyping (t v) v
+    f v = v & annotation . typing .~ unifyWithError unifyTypings (t v) v
 
 -- | Gets the resulting typing from unifying two expressions
 unifyExprTypings :: Expr -> Expr -> Typing
 unifyExprTypings x y = Typing d t
   where
     d = unifyDomains (x ^. annotation . domain) (y ^. annotation . domain)
-    t = unifyTypes (x ^. annotation . annType) (y ^. annotation . annType)
+    t = fromMaybe err $ unifyTypes (x ^. annotation . annType) (y ^. annotation . annType)
+    err = error $ "Failed to unify expressions " <> show x <> " and " <> show y
 
 -- | Extracts typing from an expression
 exprTyping :: Expr -> Typing

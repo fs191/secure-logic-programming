@@ -14,7 +14,7 @@
 %how much Time it takes for Ship to reach the Port?
 reachability_time(Ship,Port,Time) :-
     ship(Ship,X1,Y1,Speed,_,_),
-    port(Port,X2,Y2,_,_),
+    port(Port,X2,Y2,_),
     Time is sqrt((X1 - X2)^2 + (Y1 - Y2)^2) / Speed.
 
 %is the Port able to pick up the Ship's cargo?

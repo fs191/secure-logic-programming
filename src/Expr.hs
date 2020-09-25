@@ -415,12 +415,12 @@ hole :: Expr
 hole = Hole empty
 
 -- | Unifies the typings of the two expressions
-unifyExprAnns :: Expr -> Expr -> Expr
-unifyExprAnns x y = x & annotation %~ (unifyAnns a)
+unifyExprAnns :: Expr -> Expr -> Maybe Expr
+unifyExprAnns x y = x & annotation %%~ (unifyAnns a)
   where a = y ^. annotation
 
 -- | Returns the result of unifying the types of the two expressions
-unifyExprTypes :: Expr -> Expr -> PPType
+unifyExprTypes :: Expr -> Expr -> Maybe PPType
 unifyExprTypes x y = unifyTypes xd yd
   where
     xd = head $ x ^.. annotation . annType
@@ -435,8 +435,8 @@ unifyExprDomains x y = unifyDomains xd yd
 
 -- Unifies the given typing with the current typing of the expression
 -- and then sets the result of unification as the new typing of that expression.
-applyTyping :: Typing -> Expr -> Expr
-applyTyping t e = e & annotation . typing %~ unifyTypings t
+applyTyping :: Typing -> Expr -> Maybe Expr
+applyTyping t e = e & annotation . typing %%~ unifyTypings t
 
 -- | Returns True if expression is an arithmetic expression.
 isArithmetic :: Expr -> Bool
@@ -464,9 +464,11 @@ isPredicative (Is{})   = True
 isPredicative (Un{})   = True
 isPredicative _        = False
 
-applyAnnotation :: Ann -> Expr -> Expr
-applyAnnotation ann expr = expr & annotation .~ ann'
-  where ann' = ann & annType  %~ unifyTypes (expr ^. annotation . annType)
-                   & domain   %~ unifyDomains (expr ^. annotation . domain)
-                   & annBound .~ (expr ^. annotation . annBound)
+applyAnnotation :: Ann -> Expr -> Maybe Expr
+applyAnnotation ann expr = 
+  do
+    ann1 <- ann & annType  %%~ unifyTypes (expr ^. annotation . annType)
+    let ann2 = ann1 & domain   %~ unifyDomains (expr ^. annotation . domain)
+                    & annBound .~ (expr ^. annotation . annBound)
+    return $ expr & annotation .~ ann2
 

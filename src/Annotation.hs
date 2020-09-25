@@ -76,8 +76,8 @@ emptyTyping :: Typing
 emptyTyping = Typing Unknown PPAuto
 
 -- | Unify types and domains. Return Nothing if the types do not unify.
-unifyAnns :: Ann -> Ann -> Ann
-unifyAnns x y = x & typing %~ unifyTypings (y ^. typing)
+unifyAnns :: Ann -> Ann -> Maybe Ann
+unifyAnns x y = x & typing %%~ unifyTypings (y ^. typing)
 
 -- | Lens for accessing the typing of an annotation
 typing :: Lens' Ann Typing
@@ -90,9 +90,9 @@ typing = lens getter setter
 -- | Unifies two typings so that unknown domain gets overwritten by anything
 -- else. Useful for assigning a typing to an expression that might already have
 -- a typing.
-unifyTypings :: Typing -> Typing -> Typing
-unifyTypings (Typing xd xt) (Typing yd yt)
-  =  Typing (unifyDomains xd yd) (unifyTypes xt yt)
+unifyTypings :: Typing -> Typing -> Maybe Typing
+unifyTypings (Typing xd xt) (Typing yd yt) = 
+  Typing (unifyDomains xd yd) <$> (unifyTypes xt yt)
 
 -- | Unifies domains in a conservative way, so that if one of the terms is
 -- unknown and the other public, then the result will be unknown.
@@ -103,7 +103,7 @@ safelyUnifyDomains Unknown _ = Unknown
 safelyUnifyDomains _ Unknown = Unknown
 safelyUnifyDomains _ _       = Public
 
-safelyUnifyTypings :: Typing -> Typing -> Typing 
+safelyUnifyTypings :: Typing -> Typing -> Maybe Typing 
 safelyUnifyTypings (Typing dx tx) (Typing dy ty)
-  = Typing (safelyUnifyDomains dx dy) $ unifyTypes tx ty
+  = Typing (safelyUnifyDomains dx dy) <$> unifyTypes tx ty
 

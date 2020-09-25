@@ -4,11 +4,13 @@
 module ErrorMsg 
   ( CompilerException(..)
   , severity
+  , throw
   ) where
 
 import Control.Exception
 import Control.Lens
 
+import Data.Data
 import Data.Void
 import Data.Text.Prettyprint.Doc
 
@@ -37,6 +39,9 @@ data CompilerException
   | ExpectedConstant Expr
   | NonVariableArgument Expr
   | CannotReadFile String IOException
+  | UnificationFailed Expr Expr
+  | TypeApplicationFailed PPType Expr
+  deriving (Typeable)
 
 instance Exception CompilerException where
   displayException ex = show $ sev <+> pretty ex
@@ -48,7 +53,7 @@ instance Pretty Severity where
   pretty Warning  = "[WARNING ]"
 
 instance Show CompilerException where
-  show = show . pretty
+  show x = show $ pretty x
 
 instance HasSeverity CompilerException where
   severity _ = Error
@@ -75,6 +80,23 @@ errorMsg (CannotReadFile f ex) = vsep
   [ "Cannot read from file" <+> pretty f <> ":"
   , pretty $ show ex <> "."
   , "Ensure that the file uses a supported encoding (e.g. utf-8)."
+  ]
+errorMsg (UnificationFailed x y) = hsep
+  [ "Failed to unify expressions"
+  , pretty x
+  , prettyLoc x
+  , "and"
+  , pretty y
+  , prettyLoc y
+  ]
+errorMsg (TypeApplicationFailed t x) = vsep 
+  [ hsep
+    [ "Failed to apply type"
+    , pretty t
+    , "to expression"
+    ]
+  , pretty x
+  , prettyLoc x
   ]
 
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Privalog.Types 
+module Language.SecreC.Types 
   ( PPType(..), PPDomain(..)
   , unifyTypes
   , unifyDomains
@@ -43,13 +43,12 @@ instance Show PPDomain where
 instance Pretty PPDomain where
   pretty = pretty . show
 
-unifyTypes :: PPType -> PPType -> Maybe PPType
-unifyTypes x y | x == y  = Just x
-unifyTypes PPAuto x      = Just x
-unifyTypes x PPAuto      = Just x
-unifyTypes PPFloat PPInt = Just PPFloat
-unifyTypes PPInt PPFloat = Just PPFloat
-unifyTypes _ _           = Nothing
+unifyTypes :: PPType -> PPType -> PPType
+unifyTypes x y
+  | x == PPAuto = y
+  | y == PPAuto || x == y
+                = x
+  | otherwise   = error $ "Cannot unify types " ++ show x ++ " and " ++ show y
 
 unifyDomains :: PPDomain -> PPDomain -> PPDomain
 unifyDomains Public Public = Public

@@ -8,7 +8,6 @@ import Text.Megaparsec
 
 import Data.Void (Void)
 
-import Control.Exception (throw)
 import Control.Monad (void)
 import Control.Lens
 
@@ -37,9 +36,9 @@ datalogParser =
     let dirs = [x | DC x <- st]
     let qs   = [x | GC x <- st]
     case qs of
-      []  -> throw NoGoal
+      []  -> error $ show NoGoal
       [q] -> return $ DP.ppDatalogProgram rs q dirs
-      x   -> throw $ TooManyGoals x
+      x   -> error . show $ TooManyGoals x
 
 clause :: Parser Clause
 clause =  label "clause" $
@@ -141,7 +140,7 @@ parseDatalogFromFile filepath =
     file <- readFile filepath
     let res = parse datalogParser filepath file
     case res of
-      Left x  -> throw $ MegaparsecError x
+      Left x  -> error . show $ MegaparsecError x
       Right x -> return x
 
 -----------------------
