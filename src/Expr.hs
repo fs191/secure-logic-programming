@@ -303,7 +303,9 @@ eNot = Not empty
 
 -- | Creates a new square root expression
 eSqrt :: Expr -> Expr
-eSqrt = Sqrt empty
+eSqrt = Sqrt e
+  where
+    e = empty & annType .~ PPFloat
 
 -- | Creates a new power expression
 ePow :: Expr -> Expr -> Expr

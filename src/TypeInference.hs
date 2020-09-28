@@ -106,6 +106,8 @@ inferConstants (ConstInt _ x) = constInt x
 inferConstants (ConstBool _ x) = constBool x
 -- Ensure that the return type of all predicates is boolean
 inferConstants (Pred _ n xs) = predicate n xs 
+-- Square root should return a float
+inferConstants (Sqrt _ x) = eSqrt x
 inferConstants x = x
 
 -- | Infers domains for database clauses
