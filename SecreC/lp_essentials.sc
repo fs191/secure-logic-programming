@@ -1656,8 +1656,33 @@ D int32 [[1]] apply_op(string s, D0 int32 [[1]] x, D1 int32 [[1]] y){
     return z;
 }
 
-template<domain D, domain D0, domain D1, type T, type S>
-relColumn<D, T, S> aop(string s, relColumn<D0, T, S> x, relColumn<D1, T, S> y){
+//---
+template<type T, type S>
+relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, relColumn<public, T, S> y){
+    assert(sum((uint)x.fv) == 0);
+    assert(sum((uint)y.fv) == 0);
+
+    relColumn<pd_shared3p, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, x.val, y.val);
+    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    return z;
+}
+
+template<type T, type S>
+relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, relColumn<pd_shared3p, T, S> y){
+    assert(sum((uint)x.fv) == 0);
+    assert(sum((uint)y.fv) == 0);
+
+    relColumn<pd_shared3p, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, x.val, y.val);
+    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    return z;
+}
+
+template<domain D, type T, type S>
+relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, relColumn<D, T, S> y){
     assert(sum((uint)x.fv) == 0);
     assert(sum((uint)y.fv) == 0);
 
@@ -1668,8 +1693,33 @@ relColumn<D, T, S> aop(string s, relColumn<D0, T, S> x, relColumn<D1, T, S> y){
     return z;
 }
 
+//---
+template<type T, type S>
+relColumn<pd_shared3p, T, S> aop(string s, public T x, relColumn<pd_shared3p, T, S> y){
+    assert(sum((uint)y.fv) == 0);
+    public T [[1]] xval = reshape(x, size(y.val));
+
+    relColumn<pd_shared3p, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, xval, y.val);
+    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    return z;
+}
+
+template<type T, type S>
+relColumn<pd_shared3p, T, S> aop(string s, pd_shared3p T x, relColumn<public, T, S> y){
+    assert(sum((uint)y.fv) == 0);
+    pd_shared3p T [[1]] xval = reshape(x, size(y.val));
+
+    relColumn<pd_shared3p, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, xval, y.val);
+    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    return z;
+}
+
 template<domain D, type T, type S>
-relColumn<D, T, S> aop(string s, T x, relColumn<D, T, S> y){
+relColumn<D, T, S> aop(string s, D T x, relColumn<D, T, S> y){
     assert(sum((uint)y.fv) == 0);
     D T [[1]] xval = reshape(x, size(y.val));
 
@@ -1680,19 +1730,33 @@ relColumn<D, T, S> aop(string s, T x, relColumn<D, T, S> y){
     return z;
 }
 
-template<domain D, domain D0, domain D1, type T, type S>
-relColumn<D, T, S> aop(string s, D0 T [[1]] x, relColumn<D1, T, S> y){
-    assert(sum((uint)y.fv) == 0);
+//---
+template<type T, type S>
+relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, pd_shared3p T y){
+    assert(sum((uint)x.fv) == 0);
+    pd_shared3p T [[1]] yval = reshape(y, size(x.val));
 
-    relColumn<D, T, S> z;
+    relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x, y.val);
-    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    z.val = apply_op(s, x.val, yval);
+    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    return z;
+}
+
+template<type T, type S>
+relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, public T y){
+    assert(sum((uint)x.fv) == 0);
+    public T [[1]] yval = reshape(y, size(x.val));
+
+    relColumn<pd_shared3p, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, x.val, yval);
+    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
 
 template<domain D, type T, type S>
-relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, T y){
+relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, D T y){
     assert(sum((uint)x.fv) == 0);
     D T [[1]] yval = reshape(y, size(x.val));
 
@@ -1702,9 +1766,65 @@ relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, T y){
     z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
+//---
+template<type T, type S>
+relColumn<pd_shared3p, T, S> aop(string s, pd_shared3p T [[1]] x, relColumn<public, T, S> y){
+    assert(sum((uint)y.fv) == 0);
 
-template<domain D, domain D0, domain D1, type T, type S>
-relColumn<D, T, S> aop(string s, relColumn<D1, T, S> x, D0 T [[1]] y){
+    relColumn<pd_shared3p, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, x, y.val);
+    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    return z;
+}
+
+template<type T, type S>
+relColumn<pd_shared3p, T, S> aop(string s, public T [[1]] x, relColumn<pd_shared3p, T, S> y){
+    assert(sum((uint)y.fv) == 0);
+
+    relColumn<pd_shared3p, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, x, y.val);
+    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    return z;
+}
+
+template<domain D, type T, type S>
+relColumn<D, T, S> aop(string s, D T [[1]] x, relColumn<D, T, S> y){
+    assert(sum((uint)y.fv) == 0);
+
+    relColumn<D, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, x, y.val);
+    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    return z;
+}
+
+//---
+template<type T, type S>
+relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, pd_shared3p T [[1]] y){
+    assert(sum((uint)x.fv) == 0);
+
+    relColumn<pd_shared3p, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, x.val, y);
+    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    return z;
+}
+
+template<type T, type S>
+relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, public T [[1]] y){
+    assert(sum((uint)x.fv) == 0);
+
+    relColumn<pd_shared3p, T, S> z;
+    z.fv  = false;
+    z.val = apply_op(s, x.val, y);
+    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    return z;
+}
+
+template<domain D, type T, type S>
+relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, D T [[1]] y){
     assert(sum((uint)x.fv) == 0);
 
     relColumn<D, T, S> z;
