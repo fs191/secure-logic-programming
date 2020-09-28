@@ -18,6 +18,9 @@ import Rule
 import Language.Privalog.Types
 import ErrorMsg
 
+import Data.Text.Prettyprint.Doc
+import Debug.Trace
+
 -- | A substitution for typings. Substitutes types based on expression 
 -- identifier. It does not overwrite the typing, but rather tries to unify the 
 -- new typing with the old.
@@ -135,6 +138,9 @@ applyBin f e =
 -----------------------------------------------
 
 -- | Infers the return types for binary subexpressions
+-- Warning: if the type checker gets stuck in a loop, then it is probably
+-- due to this function. It gets called until it reaches a fixpoint, so make
+-- sure that it converges.
 inferBuiltins :: Rule -> Rule
 inferBuiltins r = r & ruleTail %~ U.transform ret
                     & id %~ U.transform subst'
@@ -247,11 +253,14 @@ inferFromInputs dp = dp & dpGoal %~ applyTypeSubstToExpr (mconcat inps)
 -- | Decides the return type of a rule by looking at the return types of the
 -- predicates in its body
 inferRuleRet :: Rule -> Rule
-inferRuleRet r = r & ruleHead . annotation . typing .~ unified
+inferRuleRet r = r & ruleHead . annotation . typing .~ unified'
   where
-    xt = andsToList (r ^. ruleTail)
+    (x:xt) = andsToList (r ^. ruleTail)
     x' = r ^. ruleHead . annotation . typing
-    unified = foldl (unifyWithError safelyUnifyTypings) x' xt
+    unified = foldl (unifyWithError safelyUnifyTypings) (x ^. annotation . typing) xt
+    unified' = fromMaybe err $ unifyTypings x' unified
+    err = error $ "Failed to unify head typing " 
+               <> show x' <> " with body typing " <> show unified'
 
 -- | Infers the return typing of the goal statement
 inferGoalRet :: DatalogProgram -> DatalogProgram
