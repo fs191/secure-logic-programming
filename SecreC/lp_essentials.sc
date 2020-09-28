@@ -1066,8 +1066,8 @@ relColumn<D, T, S> extendColumn(relColumn<D, T, S> x, uint m, uint mi, uint ni){
 
 }
 
-template<domain D, type T>
-relColumn<D, int32, int32> getDBColumn(string ds, string tableName, T _colIndex, uint m, uint mi, uint ni){
+template<domain D, type T, type T0>
+relColumn<D, T, T> getDBColumn(string ds, string tableName, T0 _colIndex, uint m, uint mi, uint ni){
     uint colIndex = (uint)_colIndex;
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
@@ -1075,7 +1075,7 @@ relColumn<D, int32, int32> getDBColumn(string ds, string tableName, T _colIndex,
     D int32 [[1]] col = tdbReadColumn(ds, tableName, colIndex);
     col = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
 
-    public relColumn<D, int32, int32> result;
+    public relColumn<D, T, T> result;
     result.fv  = reshape(false, m);
     result.val = col;
     result.str = reshape(0, m, 0);
@@ -1176,23 +1176,12 @@ void writePublicToTable(string ds, string tableName, bool [[1]] isIntColumn, str
 }
 
 //creation of constant columns
-//if column size is not specified, we assume that it is 1
-template <domain D, type T0, type T, dim N>
-T0 constColumn(D T [[N]] arg){
-    return constColumn(arg, 1 :: uint);
-}
-
-//a boolean column is just a vector of booleans
-template <domain D>
-D bool [[1]] constColumn(D bool b, uint m){
-    return reshape(true,m);
-}
 
 //string column
 //convert a string to uint32 hash
 
 //public->public
-relColumn<public, uint32, uint8> constColumn(string arg, uint m){
+relColumn<public, uint32, uint8> constStrColumn(string arg, uint m){
     pd_shared3p xor_uint8 [[1]] blstr = bl_str(arg);
     uint8 [[1]] str = declassify(blstr);
     uint32 val = declassify(CRC32(blstr));
@@ -1203,8 +1192,18 @@ relColumn<public, uint32, uint8> constColumn(string arg, uint m){
     return result;
 }
 
+//private->private
+relColumn<pd_shared3p, xor_uint32, xor_uint8> constStrColumn(pd_shared3p xor_uint8 [[1]] arg, uint m){
+    pd_shared3p xor_uint32 val = CRC32(arg);
+    relColumn<pd_shared3p, xor_uint32, xor_uint8> result;
+    result.val = reshape(val,m);
+    result.str = reshape(copyBlock(arg,{size(arg)},{m}),m,size(arg));
+    result.fv = reshape(false,m);
+    return result;
+}
+
 //public->private
-relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(string arg, uint m){
+relColumn<pd_shared3p, xor_uint32, xor_uint8> constStrColumn(string arg, uint m){
     pd_shared3p xor_uint8 [[1]] str = bl_str(arg);
     pd_shared3p xor_uint32 val = CRC32(str);
     relColumn<pd_shared3p, xor_uint32, xor_uint8> result;
@@ -1214,22 +1213,13 @@ relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(string arg, uint m){
     return result;
 }
 
-//private->private
-relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(pd_shared3p xor_uint8 [[1]] arg, uint m){
-    pd_shared3p xor_uint32 val = CRC32(arg);
-    relColumn<pd_shared3p, xor_uint32, xor_uint8> result;
-    result.val = reshape(val,m);
-    result.str = reshape(copyBlock(arg,{size(arg)},{m}),m,size(arg));
-    result.fv = reshape(false,m);
-    return result;
-}
 
 //int column
 
 //public->public
 //private->private
 template <domain D, type T>
-relColumn<D, int32, int32> constColumn(D T arg0, uint m){
+relColumn<D, int32, int32> constIntColumn(D T arg0, uint m){
     D int32 arg = (int32)arg0;
     relColumn<D, int32, int32> result;
     result.val = reshape(arg,m);
@@ -1240,7 +1230,7 @@ relColumn<D, int32, int32> constColumn(D T arg0, uint m){
 
 //public->private
 template <domain D, type T>
-relColumn<D, int32, int32> constColumn(T arg0){
+relColumn<D, int32, int32> constIntColumn(T arg0){
     D int32 arg = (int32)arg0;
     relColumn<D, int32, int32> result;
     result.val = reshape(arg,1);
@@ -1249,6 +1239,100 @@ relColumn<D, int32, int32> constColumn(T arg0){
     return result;
 }
 
+//float column
+
+//public->public
+//private->private
+template <domain D, type T>
+relColumn<D, float32, float32> constFloatColumn(D T arg0, uint m){
+    D float32 arg = (float32)arg0;
+    relColumn<D, float32, float32> result;
+    result.val = reshape(arg,m);
+    result.str = reshape(0,m,0);
+    result.fv = reshape(false,m);
+    return result;
+}
+
+//public->private
+template <domain D, type T>
+relColumn<D, float32, float32> constFloatColumn(T arg0){
+    D float32 arg = (float32)arg0;
+    relColumn<D, float32, float32> result;
+    result.val = reshape(arg,1);
+    result.str = reshape(0,1,0);
+    result.fv = reshape(false,1);
+    return result;
+}
+
+//bool column
+
+//public->public
+//private->private
+template <domain D, type T>
+relColumn<D, bool, bool> constBoolColumn(D T arg0, uint m){
+    D bool arg = (bool)arg0;
+    relColumn<D, bool, bool> result;
+    result.val = reshape(arg,m);
+    result.str = reshape(0,m,0);
+    result.fv = reshape(false,m);
+    return result;
+}
+
+//public->private
+template <domain D, type T>
+relColumn<D, bool, bool> constBoolColumn(T arg0){
+    D bool arg = (bool)arg0;
+    relColumn<D, bool, bool> result;
+    result.val = reshape(arg,1);
+    result.str = reshape(0,1,0);
+    result.fv = reshape(false,1);
+    return result;
+}
+
+//dynamic type column (determined by the output type)
+
+//public->public
+//private->private
+template <domain D, type T, type T0>
+relColumn<D, T, T> constColumn(D T0 arg0, uint m){
+    D T arg = (T)arg0;
+    relColumn<D, T, T> result;
+    result.val = reshape(arg,m);
+    result.str = reshape(0,m,0);
+    result.fv = reshape(false,m);
+    return result;
+}
+
+relColumn<public, uint32, uint8> constColumn(string arg, uint m){
+    return constStrColumn(arg, m);
+}
+
+relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(pd_shared3p xor_uint8 [[1]] arg, uint m){
+    return constStrColumn(arg, m);
+}
+
+//public->private
+template <domain D, type T, type T0>
+relColumn<D, T, T> constColumn(T0 arg0){
+    D T arg = (T)arg0;
+    relColumn<D, T, T> result;
+    result.val = reshape(arg,1);
+    result.str = reshape(0,1,0);
+    result.fv = reshape(false,1);
+    return result;
+}
+
+relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(string arg, uint m){
+    return constStrColumn(arg, m);
+}
+
+//if column size is not specified, we assume that it is 1
+template <domain D, type T0, type T, dim N>
+T0 constColumn(D T [[N]] arg){
+    return constColumn(arg, 1 :: uint);
+}
+
+//an empty column with all-free-variables
 template <domain D, type T, type S>
 relColumn<D, T, S> freeVarColumn(uint m){
     relColumn<D, T, S> result;
@@ -1263,6 +1347,8 @@ relColumn<D, T, S> freeVarColumn(){
     return freeVarColumn(1 :: uint);
 }
 
+//a column of booleans
+//used for non-prolog internal SecreC booleans only
 bool [[1]] trueColumn(uint m){
     return reshape(true,m);
 }
@@ -1620,6 +1706,7 @@ D bool [[1]] bop(string s, relColumn<D1, T1, S1> x, D0 T0 [[1]] y){
     return b;
 }
 
+//integer division that rounds the result down to the nearest integer
 template<domain D, domain D0, domain D1>
 D int32 [[1]] div(D0 int32 [[1]] x, D1 int32 [[1]] y){
     D0 bool [[1]] xpos = (x >= 0);
@@ -1654,6 +1741,18 @@ D int32 [[1]] apply_op(string s, D0 int32 [[1]] x, D1 int32 [[1]] y){
     }
     else assert(false);
     return z;
+}
+
+//--
+template<domain D, type T, type S>
+relColumn<D, float32, float32> cast_float32(relColumn<D, T, S> x){
+    assert(sum((uint)x.fv) == 0);
+
+    relColumn<D, float32, float32> y;
+    y.fv  = x.fv;
+    y.val = (float32)x.val;
+    y.str = (float32)x.str;
+    return y;
 }
 
 //---

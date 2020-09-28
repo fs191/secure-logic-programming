@@ -333,7 +333,11 @@ funGetDBCol = SCFunCall "getDBColumn"
 funCat      = SCFunCall "myCat"
 funPermute  = SCFunCall "applyPermutation"
 funReshape  = SCFunCall "reshape"
-funConstCol = SCFunCall "constColumn"
+funConstIntCol   = SCFunCall "constIntColumn"
+funConstFloatCol = SCFunCall "constFloatColumn"
+funConstBoolCol  = SCFunCall "constBoolColumn"
+funConstStrCol   = SCFunCall "constStrColumn"
+funConstCol      = SCFunCall "constColumn"
 funTrueCol  = SCFunCall "trueColumn"
 funFreeVCol = SCFunCall "freeVarColumn"
 funColSize  = SCFunCall "colSize"
@@ -947,7 +951,7 @@ formulaToSC ds q j =
                         where
                           dom   = scDomainFromAnn ann
                           bcomp = VarInit (variable dom      (SCArray 1 SCBool) (nameB j)) $ exprToSC (Eq        ann e1 e2)
-                          btrue = VarInit (variable SCPublic (SCArray 1 SCBool) (nameB j)) $ exprToSC (ConstBool ann True)
+                          btrue = VarInit (variable SCPublic (SCArray 1 SCBool) (nameB j)) $ funTrueCol [SCVarName nameMM]
 
                           -- if x is a fresh variable, init x
                           ex = case e1 of
@@ -977,10 +981,10 @@ formulaToSC ds q j =
 exprToSC :: Expr -> SCExpr
 exprToSC e =
   case e of 
-    ConstInt   _ c -> funConstCol [SCConstInt c, SCVarName nameMM]
-    ConstFloat _ c -> funConstCol [SCConstFloat c, SCVarName nameMM]
-    ConstStr   _ c -> funConstCol [SCConstStr c, SCVarName nameMM]
-    ConstBool  _ c -> funConstCol [SCConstBool c, SCVarName nameMM]
+    ConstInt   _ c -> funConstIntCol [SCConstInt c, SCVarName nameMM]
+    ConstFloat _ c -> funConstFloatCol [SCConstFloat c, SCVarName nameMM]
+    ConstStr   _ c -> funConstStrCol [SCConstStr c, SCVarName nameMM]
+    ConstBool  _ c -> funConstBoolCol [SCConstBool c, SCVarName nameMM]
 
     -- should we distinguish between DB and Free variables? it seems that not.
     Var   _ x -> SCVarName $ pack x
