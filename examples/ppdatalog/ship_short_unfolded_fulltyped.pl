@@ -12,13 +12,13 @@
 
 :-inputs([@portname : private string, @cargotype : private string]).
 
-:-outputs([Time : private int]).
+:-outputs([Time : private float]).
 
 
 arrival_fbbf( X_0 : public string
             , X_1 : private string
             , X_2 : private string
-            , X_3 : private int ) : private bool :-
+            , X_3 : private float ) : private bool :-
    ship( X_0 : public string
    , X_5 : private float
    , X_6 : private float
@@ -46,13 +46,13 @@ arrival_fbbf( X_0 : public string
    , X_29 : public float
    , X_30 : public float
    , X_31 : public int) : public bool,
-   (A:private float) is ((X_23:private float - X_29:public float):private float)^(2:public int):private float: public bool,
-   (B:private float) is ((X_24:private float - X_30:public float):private float)^(2:public int):private float: public bool,
+   (A:private float) is ((X_23:private float - X_29:public float):private float)^2:public int:private float: public bool,
+   (B:private float) is ((X_24:private float - X_30:public float):private float)^2:public int:private float: public bool,
    (S:private float is sqrt(A:private float + B:private float:private float) : private float):public bool,
-   (X_3:private int) is ((S:private float)/(X_25:public int):private float):public bool.
+   (X_3:private float is S:private float/X_25:public int:private float):public bool.
 
 
 ?- arrival_fbbf( __HOLE_14 : public string
 , portname : private string
 , cargotype : private string
-, Time : private int ) : private bool.
+, Time : private float ) : private bool.

@@ -16,6 +16,7 @@ import Expr
 import DatalogProgram
 import Rule
 import Language.Privalog.Types
+import ErrorMsg
 
 -- | A substitution for typings. Substitutes types based on expression 
 -- identifier. It does not overwrite the typing, but rather tries to unify the 
@@ -137,6 +138,7 @@ applyBin f e =
 inferBuiltins :: Rule -> Rule
 inferBuiltins r = r & ruleTail %~ U.transform ret
                     & id %~ U.transform subst'
+                    & ruleTail %~ U.transform rewr
   where
     ret :: Expr -> Expr
     ret x = fromMaybe x $ applyBin inferBinRet x
@@ -144,6 +146,10 @@ inferBuiltins r = r & ruleTail %~ U.transform ret
     subst x = mconcat . catMaybes $ applyBin inferBinArgs <$> x
     subst' :: Rule -> Rule
     subst' x = applyTypeSubst (x ^. ruleTail . to (subst . U.universe)) x
+    rewr e@(Sqrt a x) = Sqrt (a & typing %~ fromMaybe err . unifyTypings xt) x
+      where err = error . show $ TypeApplicationFailed (xt ^. tType) e
+            xt = x ^. annotation . typing
+    rewr x = x
 
 inferBinRet :: Expr -> Expr -> Expr -> Expr
 inferBinRet e x y

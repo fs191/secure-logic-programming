@@ -10,6 +10,7 @@ module Annotation
   , empty, emptyTyping
   , annType, domain
   , annBound
+  , tDom, tType
   , isPK
   , unifyAnns
   , unifyTypings
@@ -29,9 +30,12 @@ import Language.Privalog.Types
 import Text.Megaparsec.Pos
 
 -- | A data type used for unifying type and domain simultaneously
-data Typing
-  = Typing PPDomain PPType
+data Typing = Typing 
+  { _tDom  :: PPDomain 
+  , _tType :: PPType
+  }
   deriving (Show)
+makeLenses ''Typing
 
 data SPos = SPos SourcePos SourcePos
   deriving (Ord, Eq, Data, Typeable)

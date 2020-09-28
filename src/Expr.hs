@@ -449,6 +449,7 @@ isArithmetic (Mod{}) = True
 isArithmetic (Neg{}) = True
 isArithmetic (Inv{}) = True
 isArithmetic (Sqrt{}) = True
+isArithmetic (Pow{}) = True
 isArithmetic _       = False
 
 -- | Returns True if the expression is a predicate, built-in or otherwise
