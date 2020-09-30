@@ -406,6 +406,7 @@ scStructPrivateType f i ann =
       PPBool -> f SCShared3p SCBool  SCBool
       PPInt  -> f SCShared3p SCInt32 SCInt32
       PPStr  -> f SCShared3p SCXorUInt32 SCXorUInt8
+      PPFloat -> f SCShared3p SCFloat32 SCFloat32
       _      -> f SCShared3p (SCDynamicT i) (SCDynamicS i)
 
 scColTypeI :: Int -> Ann -> SCType
@@ -659,7 +660,7 @@ concreteGoal rules xs ys goalPred = mainFun $
 
   -- shuffle the results and leave only those whose truth bit is 1
   , VarInit (variable SCPublic SCUInt32 n) (funDeclassify [funSum [SCTypeCast SCUInt32 (SCVarName (nameB j))]])
-  , VarInit (variable outDomain (SCArray 1 SCUInt32) pi) (funShuffle [SCVarName (nameB j)])
+  , VarInit (variable SCShared3p (SCArray 1 SCUInt32) pi) (funShuffle [SCVarName (nameB j)])
   ] ++
 
   zipWith (\y i -> funPublishCol
@@ -1042,9 +1043,10 @@ tableGenerationCode ds dbc (tableHeader:tableRows) =
         is = [0..length xs - 1]
         isInt = map (\x -> let dtype  = x ^. annotation ^. annType in
                         case dtype of
-                            PPBool -> False
-                            PPInt  -> True
-                            PPStr  -> False
+                            PPBool  -> False
+                            PPInt   -> True
+                            PPStr   -> False
+                            PPFloat -> False
                             PPAuto -> error $ "Cannot create a table without knowing column data type."
                 ) xs
 

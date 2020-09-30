@@ -1072,7 +1072,7 @@ relColumn<D, T, T> getDBColumn(string ds, string tableName, T0 _colIndex, uint m
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
 
-    D int32 [[1]] col = tdbReadColumn(ds, tableName, colIndex);
+    D T [[1]] col = tdbReadColumn(ds, tableName, colIndex);
     col = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
 
     public relColumn<D, T, T> result;
@@ -1720,23 +1720,29 @@ D int32 [[1]] div(D0 int32 [[1]] x, D1 int32 [[1]] y){
     return (int32)z * (1 - 2*(int32)diffSign);
 }
 
-//arithmetic operations
+//integer division that rounds the result down to the nearest integer
 template<domain D, domain D0, domain D1>
-D int32 [[1]] apply_op(string s, D0 int32 [[1]] x, D1 int32 [[1]] y){
-    D int32 [[1]] z;
+D float32 [[1]] div(D0 float32 [[1]] x, D1 float32 [[1]] y){
+  return x/y;
+}
+
+//arithmetic operations
+template<domain D, domain D0, domain D1, type T>
+D T [[1]] apply_op(string s, D0 T [[1]] x, D1 T [[1]] y){
+    D T [[1]] z;
     if      (s == "+") z = x + y;
     else if (s == "-") z = x - y;
     else if (s == "*") z = x * y;
     else if (s == "/") z = div(x, y);
     //TODO can we do it more efficiently if one argument is public?
     else if (s == "min"){
-        D int32 [[1]] xpr = x;
-        D int32 [[1]] ypr = y;
+        D T [[1]] xpr = x;
+        D T [[1]] ypr = y;
         z = min(xpr, ypr);
     }
     else if (s == "max"){
-        D int32 [[1]] xpr = x;
-        D int32 [[1]] ypr = y;
+        D T [[1]] xpr = x;
+        D T [[1]] ypr = y;
         z = max(xpr, ypr);
     }
     else assert(false);

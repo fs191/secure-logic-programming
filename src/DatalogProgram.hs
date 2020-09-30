@@ -79,7 +79,7 @@ instance Pretty DatalogProgram where
   pretty p = vsep
     [ hcat $ (<>".\n\n") . pretty <$> _dpDirectives p
     , hcat $ (<>".\n\n") . pretty <$> _dpRules p
-    , pretty (_dpGoal p) <> "?"
+    , "?-" <> pretty (_dpGoal p) <> "."
     ]
 
 instance PrologSource DatalogProgram where
