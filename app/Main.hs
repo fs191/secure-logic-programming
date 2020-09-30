@@ -40,7 +40,7 @@ main =
 
       pp   <- return $ preProcess program
       ap   <- return $ adornProgram pp
-      tf   <- return $ deriveAllGroundRules _ite ap
+      tf   <- deriveAllGroundRules _ite ap
       post <- return $ 
         if inferTypesOnly
           then tf

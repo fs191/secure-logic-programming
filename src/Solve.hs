@@ -74,3 +74,4 @@ declareVars s (v:vs) = do
   SMT.declare s v (SMT.Atom "Int")
   declareVars s vs
 declareVars s [] = return s
+

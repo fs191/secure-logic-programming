@@ -14,33 +14,35 @@ import Data.List
 import Data.Maybe
 
 import Control.Lens as L
+import Control.Monad
 
 import Annotation
 import Rule
 import Expr
 import Simplify
---import Solve
+import Solve
 import Substitution
 import qualified DatalogProgram as DP
 
 -- | Generates all possible ground rules for `n` iterations by inlining
 -- predicates with matching rules. Each predicate gets inlined once per
 -- iteration.
-deriveAllGroundRules :: Int -> DP.DatalogProgram -> DP.DatalogProgram
-deriveAllGroundRules n program = program' & DP.dpRules %~ f
+deriveAllGroundRules :: Int -> DP.DatalogProgram -> IO DP.DatalogProgram
+deriveAllGroundRules n program = program' & DP.dpRules %%~ f
   where
     -- Input program but db clauses are converted to rules
     program' = program
-    f :: [Rule] -> [Rule]
-    f = foldl (.) id $ replicate n pipeline
-    pipeline :: [Rule] -> [Rule]
-    pipeline 
-      = removeDuplicateFacts 
-      . removeFalseFacts 
-      . (traversed . ruleTail %~ simplifyAnds :: [Rule] -> [Rule])
-      . (traversed %~ simplifyRule)
-      . map (refreshRule "X_") 
-      . inlineOnce
+    f :: [Rule] -> IO [Rule]
+    f rs = foldM pipeline rs [1..n]
+    pipeline :: [Rule] -> Int -> IO [Rule]
+    pipeline rs _ = 
+      do
+        let pl0 = removeDuplicateFacts rs
+            pl1 = removeFalseFacts pl0
+            pl2 = pl1 & traversed . ruleTail %~ simplifyAnds
+        pl3 <- filterM checkConsistency pl2
+        let pl4 = refreshRule "X_" <$> pl3
+        return $ inlineOnce pl4
 
 -- | Tries to unify each predicate in each rule body with an appropriate rule
 inlineOnce :: [Rule] -> [Rule]
@@ -70,24 +72,8 @@ isAnd And{} = True
 isAnd _     = False
 
 -- rewrite the assignments and look for contradictions
-simplifyRule :: Rule -> Rule
-simplifyRule r =
-
-    let rName = ruleName r in
-    let rBody = simplifyAnds' $ r ^. ruleTail in
-    let rArgs = args r in
-    let (boundedVars, freeVars) = partition (\z -> z ^. annotation ^. annBound) rArgs in
-    let boundedVarNames = concat $ map varNames boundedVars in
-    let freeVarNames = concat $ map varNames freeVars in
-    let newRuleBody = simplify rBody (boundedVarNames, freeVarNames) in
-
-    -- TODO run z3 if the corresponding flag is set to true
-    -- we need to reside in an IO monad for this
-    -- z3 should be pre-installed, check that "z3 -in" indeed runs an interactive session
-    -- result <- Solve.checkSat rBody
-
-    let newRuleTail = foldr1 eAnd . nub . filter (not . isAnd) $ newRuleBody in
-    rule rName rArgs newRuleTail
+checkConsistency :: Rule -> IO Bool
+checkConsistency r = Solve.checkSat $ r ^. ruleTail . to andsToList
 
 -- | Removes facts that always evaluate to False
 removeFalseFacts :: [Rule] -> [Rule]
