@@ -1743,6 +1743,8 @@ D int32 [[1]] apply_op(string s, D0 int32 [[1]] x, D1 int32 [[1]] y){
     return z;
 }
 
+<<<<<<< Updated upstream
+//--
 template<domain D, type T, type S>
 relColumn<D, float32, float32> cast_float32(relColumn<D, T, S> x){
     assert(sum((uint)x.fv) == 0);
@@ -1754,13 +1756,14 @@ relColumn<D, float32, float32> cast_float32(relColumn<D, T, S> x){
     return y;
 }
 
-template<domain D, type T, type S>
-relColumn<D, float32, float32> apply_sqrt(relColumn<D, T, S> x){
-    relColumn<D, float32, float32> z = cast_float32(x);
-    z.val = sqrt(z.val);
-    return z;
+||||||| constructed merge base
+=======
+template<domain D, type T>
+D float32 [[1]] apply_sqrt(D T x){
+    return sqrt(x);
 }
 
+>>>>>>> Stashed changes
 //---
 template<type T, type S>
 relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, relColumn<public, T, S> y){

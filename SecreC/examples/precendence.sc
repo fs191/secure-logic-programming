@@ -39,7 +39,7 @@ T0 extend_f_bbbbf ( public T1 result
     return result;
 }
 
-out_f_bbbbf< public,relColumn< D4,T4,S4> >  goal_f_bbbbf_0 ( public string ds
+out_f_bbbbf< public,float32>  goal_f_bbbbf_0 ( public string ds
 , public in_f_bbbbf< public
 ,relColumn< public,int32,int32> 
 ,relColumn< public,int32,int32> 
@@ -70,19 +70,17 @@ out_f_bbbbf< public,relColumn< D4,T4,S4> >  goal_f_bbbbf_0 ( public string ds
     //evaluate the clause body
     
     //q1
-    public relColumn< D,T,S>  X_4 = aop( "pow"
-    , (float32)aop( "sqrt"
+    public float32 X_4 = aop( "pow"
+    , aop( "sqrt"
     , aop( "+"
-    , aop("pow", (float32)aop("-", X_0, X_2), (float32)constColumn(2, m))
-    , aop("pow", (float32)aop("-", X_1, X_3), (float32)constColumn(2, m)) ) )
-    , (float32)aop( "pow"
-    , (float32)constColumn(2, m)
-    , (float32)constColumn(3, m) ) );
+    , aop("pow", aop("-", X_0, X_2), constColumn(2, m))
+    , aop("pow", aop("-", X_1, X_3), constColumn(2, m)) ) )
+    , aop("pow", constColumn(2, m), constColumn(3, m)) );
     public bool [[1]] b1 = constColumn(true, m);
     
     //output the updated predicate arguments
     public bool [[1]] b = (table0.b) & (b1);
-    public out_f_bbbbf< public,relColumn< D4,T4,S4> >  result;
+    public out_f_bbbbf< public,float32>  result;
     result.b = b;
     result.arg4 = X_4;
     return result;
@@ -110,8 +108,7 @@ template< type T0,type T1>
 T0 getTable_f_bbbbf (public string ds, public T1 args)
 {
     public T0 result;
-    public out_f_bbbbf< public,relColumn< D,T,S> >  result0 = goal_f_bbbbf_0( ds
-    , args );
+    public out_f_bbbbf< public,float32>  result0 = goal_f_bbbbf_0(ds, args);
     result = cat_f_bbbbf(result, result0);
     return result;
 }
@@ -149,8 +146,7 @@ void main ()
     args1.arg1 = arg1;
     args1.arg2 = arg2;
     args1.arg3 = arg3;
-    public out_f_bbbbf< public
-    ,relColumn< D4,T4,S4> >  res1 = getTable_f_bbbbf(ds, args1);
+    public out_f_bbbbf< public,float32>  res1 = getTable_f_bbbbf(ds, args1);
     public out_f_bbbbf< pd_shared3p
     ,relColumn< pd_shared3p,T4,S4> >  resUnique1 = deduplicate_f_bbbbf(res1);
     public relColumn< pd_shared3p,T4,S4>  D = resUnique1.arg4;

@@ -13,14 +13,10 @@ module Language.SecreC
 import Control.Lens hiding(Empty)
 
 import Data.List
-import Data.Maybe
-import qualified Data.Map as M
 import qualified Data.Set as S
 
 import Data.Text (Text, pack, unpack)
 import Data.Text.Prettyprint.Doc
-
-import Debug.Trace
 
 import Annotation
 import qualified DatalogProgram as DP
@@ -134,8 +130,6 @@ data SCExpr
   | SCGe  SCExpr SCExpr
   | SCMul SCExpr SCExpr
   | SCAdd SCExpr SCExpr
-  | SCMin SCExpr SCExpr
-  | SCMax SCExpr SCExpr
   | SCAnd SCExpr SCExpr
   | SCOr  SCExpr SCExpr
   | SCSum  [SCExpr]
@@ -402,7 +396,7 @@ scStructType f i ann =
       (PPStr,  Private) -> f (scDomain i dom) SCXorUInt32 SCXorUInt8
       (PPStr,  Public)  -> f (scDomain i dom) SCUInt32    SCUInt8
       (PPStr,  Unknown) -> error $ "cannot determine data type for a string of unknown domain"
-      (PPFloat, _)      -> SCFloat32
+      (PPFloat, _)      -> f (scDomain i dom) SCFloat32 SCFloat32
       _                 -> f (scDomain i dom) (SCDynamicT i) (SCDynamicS i)
 
 scStructPrivateType :: (SCDomain -> SCType -> SCType -> SCType) -> Maybe Int -> Ann -> SCType
@@ -431,9 +425,6 @@ scConstType (ConstStr   _ c) = SCConstStr c
 scConstType (Attribute  _ c) = SCConstStr c
 scConstType e                 = error $ "Expecting a constant, not " ++ show e
 
-scSubstType :: Int -> Ann -> SCType
-scSubstType i ann = SCSubst (scDomain (Just i) (ann ^. domain)) (scColTypeI i ann)
-
 dynamicColD i = SCDynamic  (Just i)
 dynamicColT i = SCDynamicT (Just i)
 dynamicColS i = SCDynamicS (Just i)
@@ -447,7 +438,7 @@ dynamicSubst  i = SCSubst  (dynamicColD i) (dynamicColumn i)
 partitionInputsOutputs :: [Expr] -> ([(Expr,Int)], [(Expr,Int)])
 partitionInputsOutputs zs =
     let is = [0..length zs-1] in
-    partition (\(z,i) -> z ^. annotation ^. annBound) $ zip zs is
+    partition (\(z,_) -> z ^. annotation ^. annBound) $ zip zs is
 
 --------------------------------------------------
 -- convert a program to SecreC (transformation S^P)
@@ -994,7 +985,7 @@ exprToSC e =
     Not  _ e0 -> funBoolOp [SCConstStr "not", exprToSC e0]
     Neg  _ e0 -> funArithOp [SCConstStr "neg", exprToSC e0]
     Inv  _ e0 -> funArithOp [SCConstStr "inv", exprToSC e0]
-    Sqrt _ e0 -> funArithOp [SCConstStr "sqrt", exprToSC e0]
+    Sqrt _ e0 -> SCFunCall "apply_sqrt" [exprToSC e0]
 
     FDiv _ e1 e2 -> funArithOp [SCConstStr "/", exprToSC e1, exprToSC e2]
     Div  _ e1 e2 -> funArithOp [SCConstStr "div", exprToSC e1, exprToSC e2]
@@ -1007,7 +998,11 @@ exprToSC e =
     Ge   _ e1 e2 -> funBoolOp [SCConstStr ">=", exprToSC e1, exprToSC e2]
     Mul  _ e1 e2 -> funArithOp [SCConstStr "*", exprToSC e1, exprToSC e2]
     Add  _ e1 e2 -> funArithOp [SCConstStr "+", exprToSC e1, exprToSC e2]
-    Pow  _ e1 e2 -> funArithOp [SCConstStr "pow", SCTypeCast SCFloat32 (exprToSC e1), SCTypeCast SCFloat32 (exprToSC e2)]
+    Pow  _ e1 e2 -> funArithOp 
+      [ SCConstStr "pow"
+      , exprToSC e1
+      , exprToSC e2
+      ]
     And  _ e1 e2 -> funBoolOp [SCConstStr "and", exprToSC e1, exprToSC e2]
     Or   _ e1 e2 -> funBoolOp [SCConstStr "or", exprToSC e1, exprToSC e2]
 
