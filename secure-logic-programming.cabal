@@ -47,6 +47,8 @@ library
       PostProcessing
       PreProcessing
       Rule
+      Simplify
+      Solve
       Substitution
       Table
       Transform
@@ -71,6 +73,7 @@ library
     , prettyprinter
     , semigroups
     , shelly
+    , simple-smt
     , split
     , text
     , transformers
@@ -103,6 +106,7 @@ executable lpsec
     , secure-logic-programming
     , semigroups
     , shelly
+    , simple-smt
     , split
     , text
     , transformers
@@ -144,6 +148,7 @@ test-suite test
     , secure-logic-programming
     , semigroups
     , shelly
+    , simple-smt
     , split
     , text
     , transformers

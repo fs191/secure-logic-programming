@@ -35,6 +35,11 @@ module Expr
   , eMul, eDiv, eFDiv
   , eAnd, eOr
   , eList
+  , eNeq
+  , eTrue
+  , eFalse
+  , isConstExpr
+  , varNames
   , annotation
   , leftHand, rightHand
   , aggrName, aggrPred, sourceExpr, targetExpr
@@ -44,6 +49,9 @@ module Expr
   , _Var
   , _ConstStr
   , andsToList
+  , predicateVarNames
+  , predicateBoundedVarNames
+  , predicateFreeVarNames
   , predicateVarNames
   , predicateVars
   , predicateArity
@@ -94,8 +102,9 @@ data Expr
   | Lt   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Le   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Eq   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
-  | Is   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Un   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Is   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
+  | Neq  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Gt   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Ge   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Mul  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
@@ -131,6 +140,7 @@ instance Pretty Expr where
   pretty (Eq e x y)       = pretty x <+> "=:=" <+> pretty y  <+> pretty e
   pretty (Un e x y)       = pretty x <+> "=" <+> pretty y <+> pretty e
   pretty (Is e x y)       = pretty x <+> "is" <+> pretty y <+> pretty e
+  pretty (Neq _ x y)       = pretty x <+> "=\\=" <+> pretty y
   pretty (Gt e x y)       = pretty x <+> ">" <+> pretty y  <+> pretty e
   pretty (Ge e x y)       = pretty x <+> ">=" <+> pretty y <+> pretty e
   pretty (Mul e x y)      = pretty x <+> "*" <+> pretty y  <+> pretty e
@@ -163,8 +173,9 @@ instance PrologSource Expr where
   prolog (Lt _ x y)       = "(" <> prolog x <> ")<(" <> prolog y <> ")"
   prolog (Le _ x y)       = "(" <> prolog x <> ")=<(" <> prolog y <> ")"
   prolog (Eq _ x y)       = "(" <> prolog x <> ")=:=(" <> prolog y <> ")"
-  prolog (Is _ x y)       = "(" <> prolog x <> ")is(" <> prolog y <> ")"
   prolog (Un _ x y)       = "(" <> prolog x <> ")=(" <> prolog y <> ")"
+  prolog (Is _ x y)       = "(" <> prolog x <> ")is(" <> prolog y <> ")"
+  prolog (Neq _ x y)      = "(" <> prolog x <> ")=\\=(" <> prolog y <> ")"
   prolog (Gt _ x y)       = "(" <> prolog x <> ")>(" <> prolog y <> ")"
   prolog (Ge _ x y)       = "(" <> prolog x <> ")>=(" <> prolog y <> ")"
   prolog (Mul _ x y)      = "(" <> prolog x <> ")*(" <> prolog y <> ")"
@@ -360,6 +371,22 @@ eAggr = Aggr empty
 eIs :: Expr -> Expr -> Expr
 eIs = Is empty
 
+eNeq :: Expr -> Expr -> Expr
+eNeq = Neq empty
+
+eTrue :: Expr
+eTrue = constBool True
+
+eFalse :: Expr
+eFalse = constBool False
+
+-- | Is the expression constant (i.e. does not contain any variables)?
+isConstExpr :: Expr -> Bool
+isConstExpr e = L.null [x | x@(Var _ _) <- U.universe e]
+
+varNames :: Expr -> [String]
+varNames e = nub [v | (Var _ v) <- U.universe e]
+
 -- | Turns all `And`s to a list, 
 -- starting from the root of the expression
 andsToList :: Expr -> [Expr]
@@ -375,6 +402,16 @@ predicateVars _ = error "Expecting a predicate"
 predicateVarNames :: Expr -> [String]
 predicateVarNames (Pred _ _ vs) = [n | (Var _ n) <- vs]
 predicateVarNames _ = error "Expecting a predicate"
+
+-- | Gets the names of all bounded variables in the predicate arguments
+predicateBoundedVarNames :: Expr -> [String]
+predicateBoundedVarNames (Pred _ _ vs) = [n | (Var ann n) <- vs, ann ^. annBound]
+predicateBoundedVarNames _ = error "Expecting a predicate"
+
+-- | Gets the names of all free variables in the predicate arguments
+predicateFreeVarNames :: Expr -> [String]
+predicateFreeVarNames (Pred _ _ vs) = [n | (Var ann n) <- vs, not (ann ^. annBound)]
+predicateFreeVarNames _ = error "Expecting a predicate"
 
 -- | Gets the arity of a predicate (the number of arguments)
 predicateArity :: Expr -> Int
