@@ -916,14 +916,24 @@ formulaToSC ds q j =
                            [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (funReshape [SCConstBool b, SCVarName nameMM])]
 
         Pred ann p zs    -> let dom = scDomainFromAnn ann in
-                            let bb = VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ SCAnds $ map (\i -> SCVarName $ nameB (ind j i)) [0..length zs - 1] in
+
                             --add database attributes to the set of declared variables
                             let predArgNames = S.fromList $ map (unpack . nameTableArg (nameTable j)) [0..length zs - 1] in
 
                             -- TODO if we extract all comparisons into one expression, we can get a nicer indexation
-                            let stmts' = concat $ zipWith (\z i -> formulaToSC ds (Un ann z (Var (z ^. annotation) (unpack $ nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
+                            --let stmts = concat $ zipWith (\z i -> formulaToSC ds (Un ann z (Var (z ^. annotation) (unpack $ nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
+                            --let bb = VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ SCAnds comps in
+                            --stmts ++ [bb]
 
-                            stmts' ++ [bb]
+
+                            -- TODO it would be nice to have access to data types of extensional predicates here
+                            let stmts = zipWith (\z i -> formulaToSC ds (Un ann z (Var (z ^. annotation) (unpack $ nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
+                            let (comps', asgns') = partition snd $ zipWith (\s z -> (s, z ^. annotation ^. annBound)) stmts zs in
+                            let comps = map ((\(VarInit _ bexpr) -> bexpr) . last . fst) comps' in
+                            let asgns = concat $ map (init . fst) asgns' in
+
+                            let bb = VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ if length comps > 0 then SCAnds comps else funTrueCol [SCVarName nameMM] in
+                            asgns ++ [bb]
 
         Not ann (Pred _ p zs) ->
             let dom = scDomainFromAnn ann in
@@ -950,13 +960,13 @@ formulaToSC ds q j =
                           -- if x is a fresh variable, init x
                           ex = case e1 of
                                    (Var annx x) -> if not (e1 ^. annotation ^. annBound) then
-                                                       [VarInit (variable SCPublic (scColType annx) (pack x)) (exprToSC e2), btrue]
+                                                       [VarInit (variable SCPublic (scColType annx) (pack x)) (funCopyCol [exprToSC e2]), btrue]
                                                    else ey
                                    _            -> ey
                           -- if y is a fresh variable, init y
                           ey = case e2 of
                                    (Var anny y) -> if not (e2 ^. annotation ^. annBound) then
-                                                       [VarInit (variable SCPublic (scColType anny) (pack y)) (exprToSC e1), btrue]
+                                                       [VarInit (variable SCPublic (scColType anny) (pack y)) (funCopyCol [exprToSC e1]), btrue]
                                                    else ez
                                    _            -> ez
                           -- if both x and y are not fresh, then compare

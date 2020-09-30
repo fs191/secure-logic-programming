@@ -414,6 +414,7 @@ relColumn<D,T,S> applyPermutation (relColumn<public,T,S> a, D U [[1]] pi){
     return b;
 }
 
+
 //equivalent of stdlib 'cat'
 template <type T>
 T[[1]] myCat(T[[1]] X, T[[1]] Y) {
@@ -916,9 +917,42 @@ struct relColumn{
     D S [[2]] str;
 }
 
-template<domain D0, domain D1, type T0, type T1, type S0, type S1>
-relColumn<D1,T1,S1> copyColumn(relColumn<D0,T0,S0> a){
-    relColumn<D1,T1,S1> b;
+template<domain D, type T>
+relColumn<D,T,T> copyColumn(relColumn<D,T,T> a){
+    relColumn<D,T,T> b;
+    b.fv = a.fv;
+    b.str = a.str;
+    b.val = a.val;
+    return b;
+}
+
+template<domain D, type T>
+relColumn<D,T,T> copyColumn(relColumn<public,T,T> a){
+    relColumn<D,T,T> b;
+    b.fv = a.fv;
+    b.str = a.str;
+    b.val = a.val;
+    return b;
+}
+
+relColumn<pd_shared3p,xor_uint32,xor_uint8> copyColumn(relColumn<pd_shared3p,xor_uint32,xor_uint8> a){
+    relColumn<pd_shared3p,xor_uint32,xor_uint8> b;
+    b.fv = a.fv;
+    b.str = a.str;
+    b.val = a.val;
+    return b;
+}
+
+relColumn<public,uint32,uint8> copyColumn(relColumn<public,uint32,uint8> a){
+    relColumn<public,uint32,uint8> b;
+    b.fv = a.fv;
+    b.str = a.str;
+    b.val = a.val;
+    return b;
+}
+
+relColumn<pd_shared3p,xor_uint32,xor_uint8> copyColumn(relColumn<public,uint32,uint8> a){
+    relColumn<pd_shared3p,xor_uint32,xor_uint8> b;
     b.fv = a.fv;
     b.str = a.str;
     b.val = a.val;
@@ -1072,7 +1106,7 @@ relColumn<D, T, T> getDBColumn(string ds, string tableName, T0 _colIndex, uint m
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
 
-    D T [[1]] col = tdbReadColumn(ds, tableName, colIndex);
+    D int32 [[1]] col = tdbReadColumn(ds, tableName, colIndex);
     col = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
 
     public relColumn<D, T, T> result;
@@ -1230,12 +1264,12 @@ relColumn<D, int32, int32> constIntColumn(D T arg0, uint m){
 
 //public->private
 template <domain D, type T>
-relColumn<D, int32, int32> constIntColumn(T arg0){
+relColumn<D, int32, int32> constIntColumn(T arg0, uint m){
     D int32 arg = (int32)arg0;
     relColumn<D, int32, int32> result;
-    result.val = reshape(arg,1);
-    result.str = reshape(0,1,0);
-    result.fv = reshape(false,1);
+    result.val = reshape(arg,m);
+    result.str = reshape(0,m,0);
+    result.fv = reshape(false,m);
     return result;
 }
 
@@ -1255,12 +1289,12 @@ relColumn<D, float32, float32> constFloatColumn(D T arg0, uint m){
 
 //public->private
 template <domain D, type T>
-relColumn<D, float32, float32> constFloatColumn(T arg0){
+relColumn<D, float32, float32> constFloatColumn(T arg0, uint m){
     D float32 arg = (float32)arg0;
     relColumn<D, float32, float32> result;
-    result.val = reshape(arg,1);
-    result.str = reshape(0,1,0);
-    result.fv = reshape(false,1);
+    result.val = reshape(arg,m);
+    result.str = reshape(0,m,0);
+    result.fv = reshape(false,m);
     return result;
 }
 
@@ -1280,12 +1314,12 @@ relColumn<D, bool, bool> constBoolColumn(D T arg0, uint m){
 
 //public->private
 template <domain D, type T>
-relColumn<D, bool, bool> constBoolColumn(T arg0){
+relColumn<D, bool, bool> constBoolColumn(T arg0, uint m){
     D bool arg = (bool)arg0;
     relColumn<D, bool, bool> result;
-    result.val = reshape(arg,1);
-    result.str = reshape(0,1,0);
-    result.fv = reshape(false,1);
+    result.val = reshape(arg,m);
+    result.str = reshape(0,m,0);
+    result.fv = reshape(false,m);
     return result;
 }
 
@@ -1720,11 +1754,32 @@ D int32 [[1]] div(D0 int32 [[1]] x, D1 int32 [[1]] y){
     return (int32)z * (1 - 2*(int32)diffSign);
 }
 
-//integer division that rounds the result down to the nearest integer
 template<domain D, domain D0, domain D1>
 D float32 [[1]] div(D0 float32 [[1]] x, D1 float32 [[1]] y){
-  return x/y;
+   return x / y;
 }
+
+//power operation
+template<type T, type T0>
+pd_shared3p T [[1]] power(pd_shared3p T [[1]] x, pd_shared3p T0 [[1]] y){
+   pd_shared3p float32 [[1]] pry = (float32)y;
+   return (T)pow((float32)x, pry);
+}
+
+template<type T, type T0>
+T [[1]] power(public T [[1]] x, public T0 [[1]] y){
+   pd_shared3p float32 [[1]] prx = (float32)x;
+   pd_shared3p float32 [[1]] pry = (float32)y;
+   return (T)declassify(pow(prx, pry));
+}
+
+template<type T, type T0>
+pd_shared3p T [[1]] power(pd_shared3p T [[1]] x, public T0 [[1]] y){
+   pd_shared3p float32 [[1]] pry = (float32)y;
+   return (T)pow((float32)x, pry);
+}
+
+
 
 //arithmetic operations
 template<domain D, domain D0, domain D1, type T>
@@ -1734,6 +1789,7 @@ D T [[1]] apply_op(string s, D0 T [[1]] x, D1 T [[1]] y){
     else if (s == "-") z = x - y;
     else if (s == "*") z = x * y;
     else if (s == "/") z = div(x, y);
+    else if (s == "pow") z = power(x,y);
     //TODO can we do it more efficiently if one argument is public?
     else if (s == "min"){
         D T [[1]] xpr = x;
@@ -1749,6 +1805,7 @@ D T [[1]] apply_op(string s, D0 T [[1]] x, D1 T [[1]] y){
     return z;
 }
 
+//--
 template<domain D, type T, type S>
 relColumn<D, float32, float32> cast_float32(relColumn<D, T, S> x){
     assert(sum((uint)x.fv) == 0);
@@ -1760,10 +1817,13 @@ relColumn<D, float32, float32> cast_float32(relColumn<D, T, S> x){
     return y;
 }
 
-template<domain D, type T, type S>
-relColumn<D, float32, float32> apply_sqrt(relColumn<D, T, S> x){
-    relColumn<D, float32, float32> z = cast_float32(x);
-    z.val = sqrt(z.val);
+//---
+template<domain D, type T>
+relColumn<D, float32, float32> apply_sqrt(relColumn<D, T, T> x){
+    relColumn<D, float32, float32> z;
+    z.fv  = false;
+    z.val = sqrt((float32)x.val);
+    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
 
