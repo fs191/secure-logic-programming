@@ -40,10 +40,10 @@ main =
                 Left ex -> throw $ CannotReadFile inFileName ex
                 Right x -> x
 
-          let pp   = preProcess program
-          let ap   = adornProgram pp
+          let ap   = adornProgram program
+          let pp   = preProcess ap
           --let mag  = magicSets ap
-          let tf   = deriveAllGroundRules _ite ap
+          let tf   = deriveAllGroundRules _ite pp
           let post = 
                 if inferTypesOnly
                   then tf
