@@ -189,5 +189,5 @@ findDBFact dp n = fromMaybe err $ extensionalFacts dp
                     ^? folded 
                      . filtered ((==n) . ruleName)
   where
-    err = error $ "DB fact not found: " ++ show n
+    err = error $ "DB fact not found: " ++ show n ++ "\n" ++ show (pretty dp)
 

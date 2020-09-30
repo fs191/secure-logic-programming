@@ -15,8 +15,11 @@ import Data.Maybe
 
 import Control.Lens as L
 
+import Annotation
 import Rule
 import Expr
+import Simplify
+--import Solve
 import Substitution
 import qualified DatalogProgram as DP
 
@@ -34,7 +37,8 @@ deriveAllGroundRules n program = program' & DP.dpRules %~ f
     pipeline 
       = removeDuplicateFacts 
       . removeFalseFacts 
-      . (traversed . ruleTail %~ simplifyAnds :: [Rule] -> [Rule]) 
+      . (traversed . ruleTail %~ simplifyAnds :: [Rule] -> [Rule])
+      . (traversed %~ simplifyRule)
       . map (refreshRule "X_") 
       . inlineOnce
 
@@ -64,6 +68,26 @@ simplifyAnds' x = [x]
 isAnd :: Expr -> Bool
 isAnd And{} = True
 isAnd _     = False
+
+-- rewrite the assignments and look for contradictions
+simplifyRule :: Rule -> Rule
+simplifyRule r =
+
+    let rName = ruleName r in
+    let rBody = simplifyAnds' $ r ^. ruleTail in
+    let rArgs = args r in
+    let (boundedVars, freeVars) = partition (\z -> z ^. annotation ^. annBound) rArgs in
+    let boundedVarNames = concat $ map varNames boundedVars in
+    let freeVarNames = concat $ map varNames freeVars in
+    let newRuleBody = simplify rBody (boundedVarNames, freeVarNames) in
+
+    -- TODO run z3 if the corresponding flag is set to true
+    -- we need to reside in an IO monad for this
+    -- z3 should be pre-installed, check that "z3 -in" indeed runs an interactive session
+    -- result <- Solve.checkSat rBody
+
+    let newRuleTail = foldr1 eAnd . nub . filter (not . isAnd) $ newRuleBody in
+    rule rName rArgs newRuleTail
 
 -- | Removes facts that always evaluate to False
 removeFalseFacts :: [Rule] -> [Rule]

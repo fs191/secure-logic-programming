@@ -10,6 +10,7 @@ module Substitution
   , unify
   , compress
   , (|->)
+  , keys, elems
   ) where
 
 ---------------------------------------------------------
@@ -170,9 +171,13 @@ unify' ((Add _ x1 x2, Add _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
 unify' ((Sub _ x1 x2, Sub _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
 unify' ((Mul _ x1 x2, Mul _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
 unify' ((Div _ x1 x2, Div _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
+unify' ((Pow _ x1 x2, Pow _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
+--unify' ((Min _ x1 x2, Min _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
+--unify' ((Max _ x1 x2, Max _ y1 y2):t) = unify' $ [x1,x2] `zip` [y1,y2] <> t
 unify' ((Not _ x, Not _ y):t) = unify' $ [x] `zip` [y] <> t
 unify' ((Neg _ x, Neg _ y):t) = unify' $ [x] `zip` [y] <> t
 unify' ((Inv _ x, Inv _ y):t) = unify' $ [x] `zip` [y] <> t
+unify' ((Sqrt _ x, Sqrt _ y):t) = unify' $ [x] `zip` [y] <> t
 -- Swap
 unify' ((x, y@(Var{})):t) = unify' $ (y, x):t
 -- Delete / conflict
@@ -194,3 +199,5 @@ valEq _ _                             = False
 vars :: [(Expr, Expr)] -> [Expr]
 vars x = filter (is _Var) . uncurry (<>) $ unzip x
 
+keys (Th theta) = map var (M.keys theta)
+elems (Th theta) = M.elems theta

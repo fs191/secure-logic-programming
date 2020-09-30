@@ -34,6 +34,7 @@ dependencies:
 - lens
 - prettyprinter
 - union-find
+- simple-smt
 # Testing only
 # For some reason there are errors in ghcide if these are not in the dependencies
 - hspec
