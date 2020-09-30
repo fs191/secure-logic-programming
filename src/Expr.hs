@@ -50,8 +50,8 @@ module Expr
   , annotateWithBindings
   , identifier
   , hole
-  , unifyExprAnns
-  , unifyExprTypes
+  , unifyExprAnns, unifyExprAnnsWithError
+  , unifyExprTypes, unifyExprTypesWithError
   , unifyExprDomains
   , isArithmetic, isPredicative
   , applyAnnotation
@@ -66,6 +66,7 @@ import Control.Lens hiding (transform, children, List)
 import Data.Data
 import Data.Generics.Uniplate.Data as U
 import Data.List as L
+import Data.Maybe
 import Data.Set as S hiding (empty)
 import Data.Text.Prettyprint.Doc
 
@@ -421,12 +422,20 @@ unifyExprAnns :: Expr -> Expr -> Maybe Expr
 unifyExprAnns x y = x & annotation %%~ (unifyAnns a)
   where a = y ^. annotation
 
+unifyExprAnnsWithError :: Expr -> Expr -> Expr
+unifyExprAnnsWithError x y = fromMaybe err $ unifyExprAnns x y
+  where err = undefined
+
 -- | Returns the result of unifying the types of the two expressions
 unifyExprTypes :: Expr -> Expr -> Maybe PPType
 unifyExprTypes x y = unifyTypes xd yd
   where
     xd = head $ x ^.. annotation . annType
     yd = head $ y ^.. annotation . annType
+
+unifyExprTypesWithError :: Expr -> Expr -> PPType
+unifyExprTypesWithError x y = fromMaybe err $ unifyExprTypes x y
+  where err = undefined
 
 -- | Returns the result of unifying the domains of the two expressions
 unifyExprDomains :: Expr -> Expr -> PPDomain

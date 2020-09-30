@@ -983,31 +983,35 @@ exprToSC e =
     Var   _ x -> SCVarName $ pack x
 
     Not  _ e0 -> funBoolOp [SCConstStr "not", exprToSC e0]
-    Neg  _ e0 -> funArithOp [SCConstStr "neg", exprToSC e0]
-    Inv  _ e0 -> funArithOp [SCConstStr "inv", exprToSC e0]
+    Neg  _ e0 -> SCFunCall "neg" [exprToSC e0]
+    Inv  _ e0 -> SCFunCall "inv" [exprToSC e0]
     Sqrt _ e0 -> SCFunCall "apply_sqrt" [exprToSC e0]
 
-    FDiv _ e1 e2 -> funArithOp [SCConstStr "/", exprToSC e1, exprToSC e2]
-    Div  _ e1 e2 -> funArithOp [SCConstStr "div", exprToSC e1, exprToSC e2]
-    Mod  _ e1 e2 -> funArithOp [SCConstStr "%", exprToSC e1, exprToSC e2]
-    Sub  _ e1 e2 -> funArithOp [SCConstStr "-", exprToSC e1, exprToSC e2]
+    FDiv _ e1 e2 -> binArith "/" e1 e2
+    Div  _ e1 e2 -> binArith "div" e1 e2
+    Mod  _ e1 e2 -> binArith "%" e1 e2
+    Sub  _ e1 e2 -> binArith "-" e1 e2
     Lt   _ e1 e2 -> funBoolOp [SCConstStr "<", exprToSC e1, exprToSC e2]
     Le   _ e1 e2 -> funBoolOp [SCConstStr "<=", exprToSC e1, exprToSC e2]
     Eq   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2]
     Gt   _ e1 e2 -> funBoolOp [SCConstStr ">", exprToSC e1, exprToSC e2]
     Ge   _ e1 e2 -> funBoolOp [SCConstStr ">=", exprToSC e1, exprToSC e2]
-    Mul  _ e1 e2 -> funArithOp [SCConstStr "*", exprToSC e1, exprToSC e2]
-    Add  _ e1 e2 -> funArithOp [SCConstStr "+", exprToSC e1, exprToSC e2]
-    Pow  _ e1 e2 -> funArithOp 
-      [ SCConstStr "pow"
-      , exprToSC e1
-      , exprToSC e2
-      ]
+    Mul  _ e1 e2 -> binArith "*" e1 e2
+    Add  _ e1 e2 -> binArith "+" e1 e2
+    Pow  _ e1 e2 -> binArith "pow" e1 e2
     And  _ e1 e2 -> funBoolOp [SCConstStr "and", exprToSC e1, exprToSC e2]
     Or   _ e1 e2 -> funBoolOp [SCConstStr "or", exprToSC e1, exprToSC e2]
 
     Pred _ _ _ -> error $ "High order predicates are not supported"
-
+  where
+    binArith s x y = funArithOp [SCConstStr s, cast x y x, cast x y y]
+    -- Cast arguments to float if either one is already float
+    cast :: Expr -> Expr -> Expr -> SCExpr
+    cast x y z 
+      | (typeof x == PPFloat || typeof y == PPFloat) && typeof z /= PPFloat
+        = SCFunCall "cast_float32" [exprToSC z]
+      | otherwise = exprToSC z
+    typeof = view $ annotation . annType
 
 --------------------------------------------------
 -- create a script that writes data from .csv file to Sharemind database

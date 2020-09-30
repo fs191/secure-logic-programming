@@ -12,7 +12,7 @@ module Annotation
   , annBound
   , tDom, tType
   , isPK
-  , unifyAnns
+  , unifyAnns, unifyAnnsWithError
   , unifyTypings
   , safelyUnifyDomains, safelyUnifyTypings
   , typing
@@ -23,6 +23,7 @@ import Control.Lens
 
 import Data.Data
 import Data.Foldable
+import Data.Maybe
 import Data.Text.Prettyprint.Doc
 
 import Language.Privalog.Types
@@ -110,4 +111,7 @@ safelyUnifyDomains _ _       = Public
 safelyUnifyTypings :: Typing -> Typing -> Maybe Typing 
 safelyUnifyTypings (Typing dx tx) (Typing dy ty)
   = Typing (safelyUnifyDomains dx dy) <$> unifyTypes tx ty
+
+unifyAnnsWithError :: Ann -> Ann -> Ann
+unifyAnnsWithError x y = fromMaybe undefined $ unifyAnns x y
 
