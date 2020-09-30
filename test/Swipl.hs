@@ -148,7 +148,7 @@ compileSC file = errExit False $ withTmpDir act
     act tmp = 
       do
         _prog <- liftIO $ parseDatalogFromFile file
-        let sc = secrecCode . typeInference . postProcess . deriveAllGroundRules 2 . adornProgram $ preProcess _prog
+        let sc = secrecCode . typeInference . postProcess . deriveAllGroundRules 2 . preProcess $ adornProgram _prog
         cp "SecreC/lp_essentials.sc" tmp
         let _path = tmp <> "prog.sc"
         let src = T.pack . show $ pretty sc

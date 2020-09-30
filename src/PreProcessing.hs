@@ -72,7 +72,10 @@ simplifyRuleHead r = r & ruleHead . predArgs .~ _newArgs
       do
         i <- get
         modify (+1)
-        return $ equal (Var (x ^. annotation) $ "$A" ++ show i) x
+        let f = if x ^. annotation . annBound
+                  then equal
+                  else eUn
+        return $ f (Var (x ^. annotation) $ "$A" ++ show i) x
     _genArgs x@(Var{}) = return x
     _genArgs x =
       do
