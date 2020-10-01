@@ -43,7 +43,7 @@ spec = parallel $
 
 inferPreserveSemDB :: String -> [Expr] -> Spec
 inferPreserveSemDB f db =
-  preservesSemanticsDB (typeInference . adornProgram) f db
+  preservesSemanticsDB (return . typeInference . adornProgram) f db
 
 infersTypes :: String -> Spec
 infersTypes n = it desc $

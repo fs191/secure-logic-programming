@@ -51,7 +51,8 @@ exprToSExpr (Add _ x y) = SMT.add (exprToSExpr x) (exprToSExpr y)
 --exprToSExpr (Max _ x y) = Solve.max (exprToSExpr x) (exprToSExpr y)
 exprToSExpr (And _ x y) = SMT.and (exprToSExpr x) (exprToSExpr y)
 exprToSExpr (Or _ x y)  = SMT.or (exprToSExpr x) (exprToSExpr y)
-exprToSExpr _ = error "conversion not yet implemented"
+-- TODO: Should probably print a warning if expression type is not supported
+exprToSExpr _ = SMT.bool True
 
 --min :: SMT.SExpr -> SMT.SExpr -> SMT.SExpr
 --min x y = SMT.ite (SMT.lt y x) y x

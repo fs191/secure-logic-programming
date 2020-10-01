@@ -40,16 +40,38 @@ main =
                 Left ex -> throw $ CannotReadFile inFileName ex
                 Right x -> x
 
+<<<<<<< HEAD
           let ap   = adornProgram program
           let pp   = preProcess ap
           --let mag  = magicSets ap
-          tf <- deriveAllGroundRules _ite pp
+          let tf   = deriveAllGroundRules _ite pp
           let post = 
                 if inferTypesOnly
                   then tf
                   else postProcess tf
           let ti = typeInference post
           let sc = secrecCode ti
+||||||| 6d49ad0
+      pp   <- return $ preProcess program
+      ap   <- return $ adornProgram pp
+      tf   <- return $ deriveAllGroundRules _ite ap
+      post <- return $ 
+        if inferTypesOnly
+          then tf
+          else postProcess tf
+      ti   <- return $ typeInference post
+      sc   <- return $ secrecCode ti
+=======
+      pp   <- return $ preProcess program
+      ap   <- return $ adornProgram pp
+      tf   <- deriveAllGroundRules _ite ap
+      post <- return $ 
+        if inferTypesOnly
+          then tf
+          else postProcess tf
+      ti   <- return $ typeInference post
+      sc   <- return $ secrecCode ti
+>>>>>>> integrate-z3-solver
 
           let output = show $ if inferTypesOnly
               then pretty ti

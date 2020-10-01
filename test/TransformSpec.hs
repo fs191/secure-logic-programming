@@ -38,7 +38,7 @@ spec =
     runsSuccessfullyDB "examples/ppdatalog/auction.pl" transform marketRes marketDB
     runsSuccessfullyDB "examples/ppdatalog/employee.pl" transform employeeRes employeeDB
     
-transform :: DatalogProgram -> DatalogProgram
+transform :: DatalogProgram -> IO DatalogProgram
 transform = deriveAllGroundRules 2
 
 canDeriveOn :: String -> Int -> Spec

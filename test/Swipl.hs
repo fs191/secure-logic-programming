@@ -81,13 +81,13 @@ runDatalogProgram dp = shelly $ withTmpDir action
         runDatalogFromFile' _path
 
 preservesSemantics 
-  :: (DatalogProgram -> DatalogProgram) 
+  :: (DatalogProgram -> IO DatalogProgram) 
   -> String 
   -> Spec
 preservesSemantics f p = preservesSemanticsDB f p []
 
 preservesSemanticsDB
-  :: (DatalogProgram -> DatalogProgram) 
+  :: (DatalogProgram -> IO DatalogProgram) 
   -> String 
   -> [Expr]
   -> Spec
@@ -95,7 +95,8 @@ preservesSemanticsDB f p db = it desc $
   do
     _prog <- parseDatalogFromFile p
     _pre  <- runDatalogProgram $ insertDB db _prog
-    _post <- runDatalogProgram . insertDB db $ f _prog
+    _fprog <- f _prog
+    _post <- runDatalogProgram $ insertDB db _fprog
     case _pre of
       Left e -> expectationFailure $ show e
       Right _ -> 
@@ -103,20 +104,21 @@ preservesSemanticsDB f p db = it desc $
           then return ()
           else expectationFailure $ 
             "\nORIGINAL:\n" <> (show $ prolog _prog)     <> "\n\n" <>
-            "MODIFIED:\n"   <> (show . prolog $ f _prog) <> "\n\n" <>
+            "MODIFIED:\n"   <> (show $ prolog _fprog) <> "\n\n" <>
             "expected:\n"   <> show _pre                 <> "\n\n" <>
             "got:\n"        <> show _post
   where
     desc = "preserves semantics of " <> p
 
-runsSuccessfully :: String -> (DatalogProgram -> DatalogProgram) -> [Text] -> Spec
+runsSuccessfully :: String -> (DatalogProgram -> IO DatalogProgram) -> [Text] -> Spec
 runsSuccessfully n p res = runsSuccessfullyDB n p res []
 
-runsSuccessfullyDB :: String -> (DatalogProgram -> DatalogProgram) -> [Text] -> [Expr] -> Spec
+runsSuccessfullyDB :: String -> (DatalogProgram -> IO DatalogProgram) -> [Text] -> [Expr] -> Spec
 runsSuccessfullyDB n p res db = it desc $
   do
     _prog <- parseDatalogFromFile n
-    let p' = insertDB db . p $ _prog
+    _fprog <- p _prog
+    let p' = insertDB db _fprog
     _res <- runDatalogProgram p'
     if (S.fromList <$> _res) == (Right $ S.fromList res)
       then return ()
@@ -148,7 +150,8 @@ compileSC file = errExit False $ withTmpDir act
     act tmp = 
       do
         _prog <- liftIO $ parseDatalogFromFile file
-        let sc = secrecCode . typeInference . postProcess . deriveAllGroundRules 2 . preProcess $ adornProgram _prog
+        trans <- liftIO $ deriveAllGroundRules 2 . preProcess $ adornProgram _prog
+        let sc = secrecCode . typeInference $ postProcess trans
         cp "SecreC/lp_essentials.sc" tmp
         let _path = tmp <> "prog.sc"
         let src = T.pack . show $ pretty sc

@@ -6,8 +6,6 @@ module ProgramOptions
 
 import Control.Lens
 
-import System.Log.Logger
-
 data ProgramOptions = ProgramOptions
   { _iterations     :: Int
   , _dbCreateTables :: Bool

@@ -25,7 +25,6 @@ dependencies:
 - split
 - transformers
 - mtl
-- hslogger
 - megaparsec
 - uniplate
 - optparse-applicative
