@@ -940,6 +940,18 @@ formulaToSC ds q j =
             let dom = scDomainFromAnn ann in
             [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (SCNot (SCAnds $ zipWith (\z i -> SCEq (exprToSC z) (SCVarName (nameTableArg (nameTable j) i))) zs [0..]))]
 
+        Or ann e1 e2 ->
+            let dom = scDomainFromAnn ann in
+            let sc1 = exprToSC e1 in
+            let sc2 = exprToSC e2 in
+            [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ SCOr sc1 sc2]
+
+        And ann e1 e2 ->
+            let dom = scDomainFromAnn ann in
+            let sc1 = exprToSC e1 in
+            let sc2 = exprToSC e2 in
+            [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ SCAnd sc1 sc2]
+
         Lt  ann _ _ -> let dom = scDomainFromAnn ann in [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (exprToSC q')]
         Le  ann _ _ -> let dom = scDomainFromAnn ann in [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (exprToSC q')]
         Gt  ann _ _ -> let dom = scDomainFromAnn ann in [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (exprToSC q')]
@@ -1015,6 +1027,7 @@ exprToSC e =
     Or   _ e1 e2 -> funBoolOp [SCConstStr "or", exprToSC e1, exprToSC e2]
 
     Pred _ _ _ -> error $ "High order predicates are not supported"
+    _          -> error $ "Unexpected expression: " ++ show (pretty e)
   where
     binArith s x y = funArithOp [SCConstStr s, cast x y x, cast x y y]
     -- Cast arguments to float if either one is already float
