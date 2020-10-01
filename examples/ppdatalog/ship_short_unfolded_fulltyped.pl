@@ -28,7 +28,7 @@ arrival_fbbf( X_0 : public string
    port( X_1 : private string
    , X_11 : public float
    , X_12 : public float
-   , X_13 : public int ) : public bool,
+   , X_13 : public int ) : private bool,
    ship( X_0 : public string
    , X_15 : private float
    , X_16 : private float
@@ -45,7 +45,7 @@ arrival_fbbf( X_0 : public string
    port( X_1 : private string
    , X_29 : public float
    , X_30 : public float
-   , X_31 : public int) : public bool,
+   , X_31 : public int) : private bool,
    (A:private float) is ((X_23:private float - X_29:public float):private float)^2:public int:private float: public bool,
    (B:private float) is ((X_24:private float - X_30:public float):private float)^2:public int:private float: public bool,
    (S:private float is sqrt(A:private float + B:private float:private float) : private float):public bool,

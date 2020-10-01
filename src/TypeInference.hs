@@ -122,8 +122,12 @@ inferDBRet dp = dp & dpRules . traversed . ruleTail %~ U.transform f
         dbf = findDBFact dp n
         (Pred _ _ ys) = dbf ^. ruleHead
         -- See if a bound variable is compared to a private DB column
-        privateComp (x, y) = x ^. annotation . annBound && 
-                             y ^. annotation . domain . to (==Private)
+        privateComp (x, y) = 
+          x ^. annotation . annBound &&
+                               ( x ^. annotation . domain . to (==Private) ||
+                                 y ^. annotation . domain . to (==Private))
+
+
         anyPC = any privateComp $ xs `zip` ys
         anyUnk = any (==Unknown) $ xs ^.. folded . annotation . domain
     f x = x
