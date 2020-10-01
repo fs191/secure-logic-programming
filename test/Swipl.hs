@@ -65,7 +65,7 @@ runDatalogFromFile' p = silently $
     let _num = ((("\n"++) . (++"\t") . show) <$> ([1..] :: [Int]))
     let _numSource = concat $ (uncurry (++)) <$> _num `zip` lines _source
     res <- handleany_sh 
-      (\e -> return . Left . SwiplException $ _source <> "\n\n" <> show e) $
+      (\e -> return . Left . SwiplException $ enumerateLines' _source <> "\n\n" <> show e) $
       Right <$> _action
     return $ T.lines <$> res
 
@@ -103,8 +103,8 @@ preservesSemanticsDB f p db = it desc $
         if (S.fromList <$> _pre) == (S.fromList <$> _post)
           then return ()
           else expectationFailure $ 
-            "\nORIGINAL:\n" <> (show $ prolog _prog)     <> "\n\n" <>
-            "MODIFIED:\n"   <> (show $ prolog _fprog) <> "\n\n" <>
+            "\nORIGINAL:\n" <> (enumerateLines' . show $ prolog _prog)     <> "\n\n" <>
+            "MODIFIED:\n"   <> (enumerateLines' . show $ prolog _fprog) <> "\n\n" <>
             "expected:\n"   <> show _pre                 <> "\n\n" <>
             "got:\n"        <> show _post
   where
@@ -123,8 +123,8 @@ runsSuccessfullyDB n p res db = it desc $
     if (S.fromList <$> _res) == (Right $ S.fromList res)
       then return ()
       else expectationFailure $ 
-        "\nORIGINAL:\n" <> (show $ prolog _prog) <> "\n\n" <>
-        "MODIFIED:\n" <> (show $ prolog p') <> "\n\n" <>
+        "\nORIGINAL:\n" <> (enumerateLines' . show $ prolog _prog) <> "\n\n" <>
+        "MODIFIED:\n" <> (enumerateLines' . show $ prolog p') <> "\n\n" <>
         "expected: " <> show res <> "\n" <>
         "got: " <> show _res
   where
@@ -155,15 +155,13 @@ compileSC file = errExit False $ withTmpDir act
         cp "SecreC/lp_essentials.sc" tmp
         let _path = tmp <> "prog.sc"
         let src = T.pack . show $ pretty sc
-        let enumf :: (T.Text, Int) -> Text
-            enumf (l, i) = (T.pack $ show i) <> "\t| " <> l
-        let srcNum = fmap enumf (T.lines src `zip` [1..])
+        let srcNum = enumerateLines src
         writefile _path src
         cd tmp
         res <- run "scc" [T.pack _path, "-I", T.pack tmp, "-o", "out.sb"]
         err <- lastStderr
         resCode <- lastExitCode
-        let ex = err <> "\n" <> res <> "\nSOURCE:\n" <> T.intercalate "\n" srcNum
+        let ex = err <> "\n" <> res <> "\nSOURCE:\n" <> srcNum
         case resCode of
           0 -> return $ Right res
           _ -> return . Left $ SecreCException ex
@@ -180,3 +178,10 @@ compilesSuccessfully file = it desc $ do
   where
     desc = "Translates " ++ file ++ " to SecreC successfully." 
 
+enumerateLines' :: String -> String
+enumerateLines' = T.unpack . enumerateLines . T.pack
+
+enumerateLines :: Text -> Text
+enumerateLines s = T.intercalate "\n" $ enumf <$> T.lines s `zip` [1..]
+  where enumf :: (Text, Int) -> Text
+        enumf (l, i) = (T.pack $ show i) <> "\t| " <> l

@@ -154,36 +154,37 @@ instance Pretty Expr where
   pretty x                = error $ "pretty not defined for " ++ show x
 
 instance PrologSource Expr where
-  prolog (Var _ x)        = pretty x
-  prolog (ConstInt _ x)   = pretty x
-  prolog (ConstStr _ x)   = pretty x
-  prolog (ConstBool _ x)  = pretty x
-  prolog (ConstFloat _ x) = pretty x
-  prolog (Attribute _ x)  = pretty x
-  prolog (Hole _)         = "_"
-  prolog (Pred _ n args)  = pretty n <> tupled (prolog <$> args) -- <+> (prolog $ show e)
-  prolog (Not _ e)        = "\\+(" <> prolog e <> ")"
-  prolog (Neg _ e)        = "-(" <> prolog e <> ")"
-  prolog (Inv _ e)        = "(" <> prolog e <> ")^(-1)"
-  prolog (Sqrt _ e)       = "sqrt(" <> prolog e <> ")"
-  prolog (Div _ x y)      = "div(" <> prolog x <> ", " <> prolog y <> ")"
-  prolog (Mod _ x y)      = "mod(" <> prolog x <> ", " <> prolog y <> ")"
-  prolog (FDiv _ x y)     = "(" <> prolog x <> ")/(" <> prolog y <> ")"
-  prolog (Sub _ x y)      = "(" <> prolog x <> ")-(" <> prolog y <> ")"
-  prolog (Lt _ x y)       = "(" <> prolog x <> ")<(" <> prolog y <> ")"
-  prolog (Le _ x y)       = "(" <> prolog x <> ")=<(" <> prolog y <> ")"
-  prolog (Eq _ x y)       = "(" <> prolog x <> ")=:=(" <> prolog y <> ")"
-  prolog (Un _ x y)       = "(" <> prolog x <> ")=(" <> prolog y <> ")"
-  prolog (Is _ x y)       = "(" <> prolog x <> ")is(" <> prolog y <> ")"
-  prolog (Neq _ x y)      = "(" <> prolog x <> ")=\\=(" <> prolog y <> ")"
-  prolog (Gt _ x y)       = "(" <> prolog x <> ")>(" <> prolog y <> ")"
-  prolog (Ge _ x y)       = "(" <> prolog x <> ")>=(" <> prolog y <> ")"
-  prolog (Mul _ x y)      = "(" <> prolog x <> ")*(" <> prolog y <> ")"
-  prolog (Add _ x y)      = "(" <> prolog x <> ")+(" <> prolog y <> ")"
-  prolog (Or _ x y)       = prolog x <> ";\n" <> prolog y
-  prolog (And _ x y)      = prolog x <> ",\n" <> prolog y
-  prolog (List _ x)       = list $ prolog <$> x
-  prolog (Pow _ x y)      = "(" <> prolog x <> ")^(" <> prolog y <> ")"
+  prolog (Var _ x)           = pretty x
+  prolog (ConstInt _ x)      = pretty x
+  prolog (ConstStr _ x)      = pretty x
+  prolog (ConstBool _ True)  = "true"
+  prolog (ConstBool _ False) = "false"
+  prolog (ConstFloat _ x)    = pretty x
+  prolog (Attribute _ x)     = pretty x
+  prolog (Hole _)            = "_"
+  prolog (Pred _ n args)     = pretty n <> tupled (prolog <$> args) -- <+> (prolog $ show e)
+  prolog (Not _ e)           = "(\\+" <> prolog e <> ")"
+  prolog (Neg _ e)           = "(-" <> prolog e <> ")"
+  prolog (Inv _ e)           = "(" <> prolog e <+> "^(-1))"
+  prolog (Sqrt _ e)          = "sqrt(" <> prolog e <> ")"
+  prolog (Div _ x y)         = "div(" <> prolog x <> ", " <> prolog y <> ")"
+  prolog (Mod _ x y)         = "mod(" <> prolog x <> ", " <> prolog y <> ")"
+  prolog (FDiv _ x y)        = "(" <> prolog x <+> "/"    <+> prolog y <> ")"
+  prolog (Sub _ x y)         = "(" <> prolog x <+> "-"    <+> prolog y <> ")"
+  prolog (Lt _ x y)          = "(" <> prolog x <+> "<"    <+> prolog y <> ")"
+  prolog (Le _ x y)          = "(" <> prolog x <+> "=<"   <+> prolog y <> ")"
+  prolog (Eq _ x y)          = "(" <> prolog x <+> "=:="  <+> prolog y <> ")"
+  prolog (Un _ x y)          = "(" <> prolog x <+> "="    <+> prolog y <> ")"
+  prolog (Is _ x y)          = "(" <> prolog x <+> "is"   <+> prolog y <> ")"
+  prolog (Neq _ x y)         = "(" <> prolog x <+> "=\\=" <+> prolog y <> ")"
+  prolog (Gt _ x y)          = "(" <> prolog x <+> ">"    <+> prolog y <> ")"
+  prolog (Ge _ x y)          = "(" <> prolog x <+> ">="   <+> prolog y <> ")"
+  prolog (Mul _ x y)         = "(" <> prolog x <+> "*"    <+> prolog y <> ")"
+  prolog (Add _ x y)         = "(" <> prolog x <+> "+"    <+> prolog y <> ")"
+  prolog (Pow _ x y)         = "(" <> prolog x <+> "^"    <+> prolog y <> ")"
+  prolog (Or _ x y)          = prolog x <> ";\n" <> prolog y
+  prolog (And _ x y)         = prolog x <> ",\n" <> prolog y
+  prolog (List _ x)          = list $ prolog <$> x
   -- TODO there may be more compact/better ways for aggregations
   prolog (Aggr _ "times" p x y) = "findall(" <> "X0" <> "," <> "(" <> prolog p <> "," <> "X0 is log(" <> prolog x <> ")), Xs)" <> "," <+>
                                   "sum_list(Xs,Y0)" <> "," <+>

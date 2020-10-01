@@ -15,11 +15,9 @@ checkSat es = do
   let sExprs = asum $ exprToSExpr <$> es
   void $ traverse (SMT.assert s) sExprs
   result <- SMT.check s
-  let res = case result of
+  return $ case result of
                SMT.Unsat -> False
                _         -> True
-
-  return $ res
 
 exprToSExpr :: Expr -> Maybe SMT.SExpr
 exprToSExpr (ConstInt _ x) = return $ SMT.Atom (show x)
