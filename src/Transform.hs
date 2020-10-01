@@ -27,23 +27,22 @@ import qualified DatalogProgram as DP
 -- | Generates all possible ground rules for `n` iterations by inlining
 -- predicates with matching rules. Each predicate gets inlined once per
 -- iteration.
-deriveAllGroundRules :: Int -> DP.DatalogProgram -> DP.DatalogProgram
-deriveAllGroundRules n program = program' & DP.dpRules %~ f
+deriveAllGroundRules :: Int -> DP.DatalogProgram -> IO DP.DatalogProgram
+deriveAllGroundRules n program = program' & DP.dpRules %%~ f
   where
     -- Input program but db clauses are converted to rules
     program' = program
-    f :: [Rule] -> [Rule]
-    f rs' = let rs = concat $ map ruleNonDetSplit rs' in
-            foldl pipeline rs [1..n]
-    pipeline :: [Rule] -> Int -> [Rule]
+    f :: [Rule] -> IO [Rule]
+    f rs = foldM pipeline rs [1..n]
+    pipeline :: [Rule] -> Int -> IO [Rule]
     pipeline rs _ = 
-        let pl0 = inlineOnce rs in
-        let pl1 = refreshRule "X_" <$> pl0 in
-        let pl2 = pl1 & traversed . ruleTail %~ simplifyAnds in
-        let pl3 = pl2 in
-        --pl3 <- filterM checkConsistency pl2
-        let pl4 = removeFalseFacts pl3 in
-        removeDuplicateFacts pl4
+      do
+        let pl0 = removeDuplicateFacts rs
+            pl1 = removeFalseFacts pl0
+            pl2 = pl1 & traversed . ruleTail %~ simplifyAnds
+        pl3 <- filterM checkConsistency pl2
+        let pl4 = refreshRule "X_" <$> pl3
+        return $ inlineOnce pl4
 
 -- | Tries to unify each predicate in each rule body with an appropriate rule
 inlineOnce :: [Rule] -> [Rule]
@@ -83,13 +82,4 @@ removeFalseFacts = filter (\x -> x ^. ruleTail /= constBool False)
 -- | Removes duplicates of facts that appear more than once
 removeDuplicateFacts :: [Rule] -> [Rule]
 removeDuplicateFacts = nub
-
--- | splits non-deterministic choices into several distrinct rules
-ruleNonDetSplit :: Rule -> [Rule]
-ruleNonDetSplit r =
-    let rHead   = r ^. ruleHead in
-    let oldTail = r ^. ruleTail in
-    let dnfTail = toDNF oldTail in
-    let newTails = orsToList dnfTail in
-    map (Rule rHead) newTails
 

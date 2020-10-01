@@ -14,10 +14,11 @@ import Rule
 import Expr
 
 preProcess :: DatalogProgram -> DatalogProgram
-preProcess dp = flip evalState 0 $
-  dp & dpRules . traversed %~ simplify
-     & dpRules . traversed %~ simplifyRuleHead
-     & id %%~ U.transformBiM holeToVar
+preProcess dp = dp' & dpRules %~ concatMap ruleNonDetSplit
+  where dp' = flip evalState 0 $
+          dp & dpRules . traversed %~ simplify
+             & dpRules . traversed %~ simplifyRuleHead
+             & id %%~ U.transformBiM holeToVar
 
 -- | Rewrites constant terms to simpler terms
 simplify :: Rule -> Rule
@@ -91,3 +92,10 @@ holeToVar (Hole e) =
     return . Var e $ "__HOLE_" <> show n
 holeToVar x = return x
 
+ruleNonDetSplit :: Rule -> [Rule]
+ruleNonDetSplit r =
+    let rHead   = r ^. ruleHead in
+    let oldTail = r ^. ruleTail in
+    let dnfTail = toDNF oldTail in
+    let newTails = orsToList dnfTail in
+    map (Rule rHead) newTails
