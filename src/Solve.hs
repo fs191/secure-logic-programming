@@ -1,9 +1,7 @@
 module Solve (checkSat) where
 
-import Data.Maybe
-import qualified Data.Traversable as T
 import qualified SimpleSMT as SMT
-import qualified Data.Map as M
+import Data.Foldable
 import Control.Monad.State
 import Data.List
 import Data.Generics.Uniplate.Data
@@ -14,7 +12,8 @@ checkSat :: [Expr] -> IO Bool
 checkSat es = do
   s <- SMT.newSolver "z3" ["-in"] Nothing
   declareVars s (vars es)
-  asserts s es
+  let sExprs = asum $ exprToSExpr <$> es
+  void $ traverse (SMT.assert s) sExprs
   result <- SMT.check s
   let res = case result of
                SMT.Unsat -> False
@@ -22,37 +21,30 @@ checkSat es = do
 
   return $ res
 
-asserts :: SMT.Solver -> [Expr] -> IO SMT.Solver
-asserts s (Pred {}:es) = asserts s es
-asserts s (e:es) = do
-  SMT.assert s (exprToSExpr e)
-  asserts s es
-asserts s [] = return s
-
-exprToSExpr :: Expr -> SMT.SExpr
-exprToSExpr (ConstInt _ x) = SMT.Atom (show x)
-exprToSExpr (Var _ x)      = SMT.Atom x
-exprToSExpr (Not _ x)   = SMT.not $ exprToSExpr x
-exprToSExpr (Neg _ x)   = SMT.neg $ exprToSExpr x
-exprToSExpr (Inv _ x)   = Solve.inv $ exprToSExpr x
-exprToSExpr (Div _ x y) = SMT.div (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (Sub _ x y) = SMT.sub (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (Lt _ x y)  = SMT.lt (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (Le _ x y)  = SMT.leq (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (Eq _ x y)  = SMT.eq (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (Neq _ x y) = Solve.neq (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (Un _ x y)  = SMT.eq (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (Is _ x y)  = SMT.eq (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (Gt _ x y)  = SMT.gt (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (Ge _ x y)  = SMT.geq (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (Mul _ x y) = SMT.mul (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (Add _ x y) = SMT.add (exprToSExpr x) (exprToSExpr y)
---exprToSExpr (Min _ x y) = Solve.min (exprToSExpr x) (exprToSExpr y)
---exprToSExpr (Max _ x y) = Solve.max (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (And _ x y) = SMT.and (exprToSExpr x) (exprToSExpr y)
-exprToSExpr (Or _ x y)  = SMT.or (exprToSExpr x) (exprToSExpr y)
+exprToSExpr :: Expr -> Maybe SMT.SExpr
+exprToSExpr (ConstInt _ x) = return $ SMT.Atom (show x)
+exprToSExpr (Var _ x)      = return $ SMT.Atom x
+exprToSExpr (Not _ x)   = SMT.not <$> exprToSExpr x
+exprToSExpr (Neg _ x)   = SMT.neg <$> exprToSExpr x
+exprToSExpr (Inv _ x)   = Solve.inv <$> exprToSExpr x
+exprToSExpr (Div _ x y) = SMT.div <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Sub _ x y) = SMT.sub <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Lt _ x y)  = SMT.lt <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Le _ x y)  = SMT.leq <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Eq _ x y)  = SMT.eq <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Neq _ x y) = Solve.neq <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Un _ x y)  = SMT.eq <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Is _ x y)  = SMT.eq <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Gt _ x y)  = SMT.gt <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Ge _ x y)  = SMT.geq <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Mul _ x y) = SMT.mul <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Add _ x y) = SMT.add <$> exprToSExpr x <*> exprToSExpr y
+--exprToSExpr (Min _ x y) = Solve.min <$> exprToSExpr x <*> exprToSExpr y
+--exprToSExpr (Max _ x y) = Solve.max <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (And _ x y) = SMT.and <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Or _ x y)  = SMT.or <$> exprToSExpr x <*> exprToSExpr y
 -- TODO: Should probably print a warning if expression type is not supported
-exprToSExpr _ = SMT.bool True
+exprToSExpr _           = Nothing
 
 --min :: SMT.SExpr -> SMT.SExpr -> SMT.SExpr
 --min x y = SMT.ite (SMT.lt y x) y x
