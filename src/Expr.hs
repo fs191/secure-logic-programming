@@ -49,6 +49,7 @@ module Expr
   , _Var
   , _ConstStr
   , andsToList
+  , orsToList
   , predicateVarNames
   , predicateBoundedVarNames
   , predicateFreeVarNames
@@ -63,6 +64,8 @@ module Expr
   , unifyExprDomains
   , isArithmetic, isPredicative
   , applyAnnotation
+  , toDNF
+  , toCNF
   ) where
 
 ---------------------------------------------------------
@@ -384,6 +387,9 @@ eFalse = constBool False
 isConstExpr :: Expr -> Bool
 isConstExpr e = L.null [x | x@(Var _ _) <- U.universe e]
 
+varExprs :: Expr -> [Expr]
+varExprs e = nub [v | v@(Var _ _) <- U.universe e]
+
 varNames :: Expr -> [String]
 varNames e = nub [v | (Var _ v) <- U.universe e]
 
@@ -392,6 +398,12 @@ varNames e = nub [v | (Var _ v) <- U.universe e]
 andsToList :: Expr -> [Expr]
 andsToList (And _ l r) = andsToList l <> andsToList r
 andsToList x = [x]
+
+-- | Turns all `Or`s to a list, 
+-- starting from the root of the expression
+orsToList :: Expr -> [Expr]
+orsToList (Or _ l r) = orsToList l <> orsToList r
+orsToList x = [x]
 
 -- | Gets predicate arguments as expressions
 predicateVars :: Expr -> [Expr]
@@ -520,4 +532,65 @@ applyAnnotation ann expr =
     let ann2 = ann1 & domain   %~ unifyDomains (expr ^. annotation . domain)
                     & annBound .~ (expr ^. annotation . annBound)
     return $ expr & annotation .~ ann2
+
+-- a term is ground if all its variables are bounded
+groundTerm :: Expr -> Bool
+groundTerm e =
+    let vs = varExprs e in
+    let bs = L.map (\v -> v ^.annotation ^. annBound) vs in
+    L.foldr (&&) True bs
+
+-- annotation-preserving CNF and DNF
+-- subexpressions that only contain bounded variables are not being decomposed
+toNNF :: Expr -> Expr
+toNNF (Not _ (Not _ expr)) = toNNF expr
+
+toNNF (And ann expr1 expr2) = And ann (toNNF expr1) (toNNF expr2)
+
+toNNF (Not ann (And _ expr1 expr2)) =
+    let ann1 = expr1 ^. annotation in
+    let ann2 = expr2 ^. annotation in
+    toNNF $ Or ann (Not ann1 expr1) (Not ann2 expr2)
+
+toNNF (Or ann expr1 expr2) = Or ann (toNNF expr1) (toNNF expr2)
+
+toNNF (Not ann (Or _ expr1 expr2)) =
+    let ann1 = expr1 ^. annotation in
+    let ann2 = expr2 ^. annotation in
+    toNNF $ And ann (Not ann1 expr1) (Not ann2 expr2)
+
+toNNF expr = expr
+
+
+toCNF :: Expr -> Expr
+toCNF = toCNF' . toNNF
+  where
+    toCNF' :: Expr -> Expr
+    toCNF' (And ann expr1 expr2) = And  ann (toCNF' expr1) (toCNF' expr2)
+    toCNF' expr@(Or ann expr1 expr2)  = 
+      case groundTerm expr of
+        True  -> expr
+        False -> dist ann (toCNF' expr1) (toCNF' expr2)
+    toCNF' expr                  = expr
+    
+    dist :: Ann -> Expr -> Expr -> Expr
+    dist ann (And _ e11 e12) e2 = And ann (dist ann e11 e2) (dist ann e12 e2)
+    dist ann e1 (And _ e21 e22) = And ann (dist ann e1 e21) (dist ann e1 e22)
+    dist ann e1 e2              = Or  ann e1 e2
+
+toDNF :: Expr -> Expr
+toDNF = toDNF' . toNNF
+  where
+    toDNF' :: Expr -> Expr
+    toDNF' expr@(And ann expr1 expr2) = 
+      case groundTerm expr of
+        True  -> expr
+        False -> dist ann (toDNF' expr1) (toDNF' expr2)
+    toDNF' (Or  ann expr1 expr2) = Or   ann (toDNF' expr1) (toDNF' expr2)
+    toDNF' expr                  = expr
+
+    dist :: Ann -> Expr -> Expr -> Expr
+    dist ann e1@(Or _ e11 e12) e2 = Or ann (dist ann e11 e2) (dist ann e12 e2)
+    dist ann e1 e2@(Or _ e21 e22) = Or ann (dist ann e1 e21) (dist ann e1 e22)
+    dist ann e1 e2 = And ann e1 e2
 

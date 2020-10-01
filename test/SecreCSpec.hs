@@ -19,3 +19,4 @@ spec = describe "Language.SecreC" $ do
     compilesSuccessfully "examples/ppdatalog/ship.pl"
     compilesSuccessfully "examples/ppdatalog/ship_short.pl"
     compilesSuccessfully "examples/ppdatalog/precendence.pl"
+    compilesSuccessfully "examples/ppdatalog/disjunction.pl"

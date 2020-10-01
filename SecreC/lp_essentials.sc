@@ -1236,6 +1236,7 @@ relColumn<pd_shared3p, xor_uint32, xor_uint8> constStrColumn(pd_shared3p xor_uin
     return result;
 }
 
+/*
 //public->private
 relColumn<pd_shared3p, xor_uint32, xor_uint8> constStrColumn(string arg, uint m){
     pd_shared3p xor_uint8 [[1]] str = bl_str(arg);
@@ -1246,7 +1247,7 @@ relColumn<pd_shared3p, xor_uint32, xor_uint8> constStrColumn(string arg, uint m)
     result.fv = reshape(false,m);
     return result;
 }
-
+*/
 
 //int column
 
@@ -1356,9 +1357,9 @@ relColumn<D, T, T> constColumn(T0 arg0){
     return result;
 }
 
-relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(string arg, uint m){
-    return constStrColumn(arg, m);
-}
+//relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(string arg, uint m){
+//    return constStrColumn(arg, m);
+//}
 
 //if column size is not specified, we assume that it is 1
 template <domain D, type T0, type T, dim N>
