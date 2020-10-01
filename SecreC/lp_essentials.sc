@@ -1106,7 +1106,7 @@ relColumn<D, T, T> getDBColumn(string ds, string tableName, T0 _colIndex, uint m
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
 
-    D int32 [[1]] col = tdbReadColumn(ds, tableName, colIndex);
+    D T [[1]] col = tdbReadColumn(ds, tableName, colIndex);
     col = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
 
     public relColumn<D, T, T> result;
