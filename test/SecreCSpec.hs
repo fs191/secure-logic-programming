@@ -5,7 +5,7 @@ import Test.Hspec
 import Swipl
 
 spec :: Spec
-spec = describe "Language.SecreC" $ do
+spec = parallel . describe "Language.SecreC" $ do
     compilesSuccessfully "examples/ppdatalog/fib.pl"
     compilesSuccessfully "examples/ppdatalog/market.pl"
     compilesSuccessfully "examples/ppdatalog/auction.pl"
