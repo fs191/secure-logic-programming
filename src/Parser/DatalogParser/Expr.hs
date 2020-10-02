@@ -135,23 +135,21 @@ list = (withSrcPos $ eList <$> (brackets $ sepBy aTerm comma)) <?> "list"
 -- Helper functions
 -----------------------
 
-aggregation :: Parser (Expr, Aggregation)
-aggregation = choice
-  [ f "min"   Min
-  , f "max"   Max
-  , f "sum"   Sum
-  , f "count" Count
-  , f "avg"   Average
-  ]
+aggregation :: Parser Expr
+aggregation = choice $ f <$> [minBound..maxBound]
   where
-    f sym aggr =
+    f ag =
       do
         try $ do
-          void $ symbol sym
+          void . symbol $ show ag
           void $ symbol "("
+        p <- predParse
+        void $ symbol ","
         v <- varParse
+        void $ symbol ","
+        o <- varParse
         void $ symbol ")"
-        return (v, aggr)
+        return $ eAggr ag p v o
 
 predParse :: Parser Expr
 predParse = withSrcPos $

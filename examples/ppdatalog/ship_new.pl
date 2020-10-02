@@ -80,6 +80,6 @@ arrival(Ship,Port,CargoType,Time) :-
 
 %not sure if it is a good idea to use repeating name "@cargotype" in the table and for the inputs
 :-inputs([@portname:private string, @cargotype:private string]).
-:-outputs([min(Time)]).
-?-arrival(_, @portname, @cargotype, Time).
+:-outputs([MinTime]).
+?-min(arrival(_, @portname, @cargotype, Time), Time, MinTime).
 

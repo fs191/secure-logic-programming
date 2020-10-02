@@ -460,7 +460,7 @@ secrecCode dp = program $
   ++ [Funct goal]
  where
    rules = dp ^. DP.dpRules
-   goal  = concreteGoal rules (dp ^.. DP.inputs) (dp ^.. DP.outputs) (dp ^. DP.dpGoal)
+   goal  = concreteGoal dp
    extPreds = dp ^.. DP.dpDBClauses
    (intPredPs, intPredXss, intPredYss) = unzip3 $ nub 
                                          $ map (\p -> let zs = predicateVars p in
@@ -639,8 +639,8 @@ intPredDedup p is = function template returnType fname fargs fbody
 
 --------------------------------------------------
 -- convert a predicate to SecreC (transformation S^G)
-concreteGoal :: [Rule] -> [Expr] -> [Expr] -> Expr -> FunctionDecl
-concreteGoal rules xs ys goalPred = mainFun $
+concreteGoal :: DP.DatalogProgram -> FunctionDecl
+concreteGoal dp = mainFun $
 
   -- get user inputs
   map (\(Var xtype x) -> let (xdom,xsctype) = scVarType xtype in VarInit (variable xdom xsctype (pack x)) (funGetArg [SCConstStr x])) xs ++
@@ -651,9 +651,7 @@ concreteGoal rules xs ys goalPred = mainFun $
 
   -- construct a table that contains results for goalPred
 
-  -- TODO this is for testing aggregations, remove after we implement parsing aggregations
-  -- ++ (prepareGoal ds xnames (Aggr ((last ys) ^. annotation) "max" goalPred (last ys) (Var ((last ys) ^. annotation) "Y")) j) ++
-  ++ (prepareGoal ds xnames goalPred j) ++
+  ++ (prepareGoal ds xnames fullGoal j) ++
 
   -- close connection
   [funTdbCloseConnection [SCVarName ds]
@@ -674,9 +672,12 @@ concreteGoal rules xs ys goalPred = mainFun $
   ) ynames [0..length ynames-1]
 
   where
-    ds     = "ds"
-    pi     = "pi"
-    n      = "n"
+    xs       = dp ^.. DP.inputs
+    ys       = dp ^.. DP.outputs
+    fullGoal = dp ^.  DP.dpFullGoal
+    ds       = "ds"
+    pi       = "pi"
+    n        = "n"
 
     -- a dummy index (not important if we have one statement in the goal)
     j = 1
@@ -890,7 +891,7 @@ aggrToSC ds (Aggr ann f pr@(Pred ptype p zs) e1 e2) j =
 
                           -- TODO here we assume that y is always a fresh variable, generalize it later
                           intPredStmts ++
-                          [VarInit (variable SCPublic (scColType ann) (pack y)) $ funAggr f [ SCVarName (nameTableArg (nameResUn j1) xi)
+                          [VarInit (variable SCPublic (scColType ann) (pack y)) $ funAggr (show f) [ SCVarName (nameTableArg (nameResUn j1) xi)
                                                                                             , SCVarName (nameTableBB (nameResUn j1))
                                                                                             , funSize [SCVarName (nameTableBB (nameResUn j1))]]
 
@@ -901,9 +902,9 @@ prepareGoal :: Text -> (S.Set String) -> Expr -> Int -> [Statement]
 prepareGoal ds dv goalPred j =
     case goalPred of
         -- we remove duplicates before publishing final results
-        Pred _ _ _     -> intPredToSC True ds goalPred j
-        Aggr _ _ _ _ _ -> aggrToSC ds goalPred j
-        _              -> error $ "only a single predicate or an aggregation is supported in the goal"
+        Pred{} -> intPredToSC True ds goalPred j
+        Aggr{} -> aggrToSC ds goalPred j
+        _      -> error $ "only a single predicate or an aggregation is supported in the goal"
 
 --------------------------------------------------
 -- convert a formula to SecreC (transformation S^F)

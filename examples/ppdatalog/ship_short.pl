@@ -31,6 +31,6 @@ arrival(Ship,Port,CargoType,Time) :-
 
 %the goal: how fast will the cargo of certain type arrive at a certain port?
 :-inputs([@portname:private string, @cargotype:private string]).
-:-outputs([min(Time)]).
-?-arrival(_,@portname,@cargotype,Time).
+:-outputs([MinTime]).
+?-min(arrival(_,@portname,@cargotype,Time), Time, MinTime).
 

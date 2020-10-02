@@ -7,14 +7,13 @@
 module DatalogProgram
   ( DatalogProgram
   , Aggregation
-  , Output(..)
   , Directive
   , DBClause
   , fromRulesAndGoal
   , ppDatalogProgram
   , dpRules
   , dpDBClauses
-  , dpGoal
+  , dpGoal, dpFullGoal
   , prolog
   , inputs, outputs
   , intentionalFacts
@@ -38,20 +37,10 @@ import           Data.Text.Prettyprint.Doc
 import           DBClause
 import           Language.Prolog.PrologSource
 
-data Output = Output 
-  { _oExpr :: Expr 
-  , _oAggr :: Maybe Aggregation
-  }
-  deriving (Show, Eq, Data, Typeable)
-makeLenses ''Output
-
-instance Pretty Output where
-  pretty (Output expr _) = pretty expr
-
 -- | Directives are the top-level function calls in Datalog.
 data Directive
   = InputDirective ![Expr]
-  | OutputDirective ![Output]
+  | OutputDirective ![Expr]
   | DBDirective String ![Expr]
   deriving (Show, Eq, Data, Typeable)
 
@@ -67,7 +56,7 @@ instance Pretty Directive where
 -- and directives.
 data DatalogProgram = DatalogProgram
   { _dpRules      :: ![Rule]
-  , _dpGoal       :: !Expr
+  , _dpFullGoal   :: !Expr
   , _dpDirectives :: ![Directive]
   }
   deriving (Show, Eq, Data, Typeable)
@@ -79,13 +68,13 @@ instance Pretty DatalogProgram where
   pretty p = vsep
     [ hcat $ (<>".\n\n") . pretty <$> _dpDirectives p
     , hcat $ (<>".\n\n") . pretty <$> _dpRules p
-    , "?-" <> pretty (_dpGoal p) <> "."
+    , "?-" <> pretty (p ^. dpGoal) <> "."
     ]
 
 instance PrologSource DatalogProgram where
   prolog dp = vsep
     [ vsep $ prolog <$> dp ^. dpRules
-    , prologGoal (_dpGoal dp) (dp ^.. inputs) $ dp ^.. outputs
+    , prologGoal (dp ^. dpGoal) (dp ^.. inputs) $ dp ^.. outputs
     ]
 
 instance PrologSource Directive where
@@ -113,7 +102,7 @@ inputs = dpDirectives . traversed . _InputDirective . traversed . attrToVar
 
 -- | Traverse all output directives for output variables
 outputs :: Traversal' DatalogProgram Expr
-outputs = dpDirectives . traversed . _OutputDirective . traversed . oExpr
+outputs = dpDirectives . traversed . _OutputDirective . traversed
 
 -- | Isomorphism between variables and attributes
 attrToVar :: Iso' Expr Expr
@@ -154,7 +143,7 @@ inputDirective :: [Expr] -> Directive
 inputDirective = InputDirective
 
 -- | Creates a new output directive
-outputDirective :: [Output] -> Directive
+outputDirective :: [Expr] -> Directive
 outputDirective = OutputDirective
 
 -- | Creates a new database directive
@@ -190,4 +179,22 @@ findDBFact dp n = fromMaybe err $ extensionalFacts dp
                      . filtered ((==n) . ruleName)
   where
     err = error $ "DB fact not found: " ++ show n ++ "\n" ++ show (pretty dp)
+
+dpGoal :: Lens' DatalogProgram Expr
+dpGoal = lens getter setter
+  where 
+    getter dp = 
+      case dp ^. dpFullGoal of
+        p@Pred{}            -> p
+        Aggr{_aggrPred = p} -> p
+        x                   -> err x
+    setter dp x =
+      case dp ^. dpFullGoal of
+        Pred{} -> dp & dpFullGoal .~ x
+        Aggr{} -> dp & dpFullGoal . aggrPred .~ x
+        a      -> err a
+    err a =
+      error $ "Invalid goal expression. Expected a predicate or an aggregation, got"
+        <> (show $ pretty a)
+
 

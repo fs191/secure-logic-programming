@@ -23,6 +23,7 @@ import Control.Monad (void)
 
 import Language.Privalog.Types
 import qualified Annotation as A
+import Expr (Aggregation)
 
 type Parser = Parsec Void String
 

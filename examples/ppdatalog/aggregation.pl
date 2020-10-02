@@ -10,5 +10,5 @@ fib(N, F) :-
         fib(N2, F2),
         F is F1+F2.
 
-:-outputs([sum(Y)]).
-?-fib(3,Y).
+:-outputs([Y]).
+?-sum(fib(3,X), X, Y).

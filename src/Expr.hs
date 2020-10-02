@@ -38,11 +38,12 @@ module Expr
   , eNeq
   , eTrue
   , eFalse
+  , eAggr
   , isConstExpr
   , varNames
   , annotation
   , leftHand, rightHand
-  , aggrName, aggrPred, sourceExpr, targetExpr
+  , aggr, aggrPred, sourceExpr, targetExpr
   , arg
   , annType, domain
   , applyTyping
@@ -86,6 +87,26 @@ import Language.Prolog.PrologSource
 
 import Annotation
 
+data Aggregation
+  = Min
+  | Max
+  | Sum
+  | Count
+  | Average
+  | Prod
+  deriving (Eq, Ord, Data, Typeable, Enum, Bounded)
+
+instance Show Aggregation where
+  show Min     = "min"
+  show Max     = "max"
+  show Sum     = "sum"
+  show Count   = "count"
+  show Average = "avg"
+  show Prod    = "prod"
+
+instance Pretty Aggregation where
+  pretty = pretty . show
+
 -- | A datatype for representing datalog expression trees.
 data Expr
   = ConstInt   {_annotation :: !Ann, _intVal :: !Int}
@@ -118,8 +139,8 @@ data Expr
   | Pred {_annotation :: !Ann, _predName :: !String, _predArgs :: ![Expr]}
   | List {_annotation :: !Ann, _vals :: ![Expr]}
   | Hole {_annotation :: !Ann}
-  | Aggr {_annotation :: !Ann, _aggrName :: !String, _aggrPred :: !Expr, _sourceExpr :: !Expr, _targetExpr :: !Expr}
-  deriving (Ord,Show,Eq,Data,Typeable)
+  | Aggr {_annotation :: !Ann, _aggr :: !Aggregation, _aggrPred :: !Expr, _sourceExpr :: !Expr, _targetExpr :: !Expr}
+  deriving (Show, Eq, Ord, Data, Typeable)
 makeLenses ''Expr
 makePrisms ''Expr
 
@@ -189,10 +210,10 @@ instance PrologSource Expr where
   prolog (And _ x y)         = prolog x <> ",\n" <> prolog y
   prolog (List _ x)          = list $ prolog <$> x
   -- TODO there may be more compact/better ways for aggregations
-  prolog (Aggr _ "times" p x y) = "findall(" <> "X0" <> "," <> "(" <> prolog p <> "," <> "X0 is log(" <> prolog x <> ")), Xs)" <> "," <+>
+  prolog (Aggr _ Prod p x y) = "findall(" <> "X0" <> "," <> "(" <> prolog p <> "," <> "X0 is log(" <> prolog x <> ")), Xs)" <> "," <+>
                                   "sum_list(Xs,Y0)" <> "," <+>
                                   prolog y <+> "is" <+> "exp(" <> "Y0" <> ")"
-  prolog (Aggr _ "avg" p x y) = vsep
+  prolog (Aggr _ Average p x y) = vsep
                                   [
                                     "findall" <> tupled
                                       [ prolog x
@@ -204,16 +225,8 @@ instance PrologSource Expr where
                                   , prolog y <+> "is Y0/N"
                                   ]
   prolog (Aggr _ f p x y) = "findall(" <> prolog x <> "," <> prolog p <> ", Xs)," <+>
-                            pretty (prologAggr f) <> "_list(Xs," <> prolog y <> ")"
+                            pretty (prologAggr $ show f) <> "_list(Xs," <> prolog y <> ")"
   prolog x = error $ show x
-
-data Aggregation
-  = Min
-  | Max
-  | Sum
-  | Count
-  | Average
-  deriving (Show, Eq, Data, Typeable)
 
 -- map datalog aggregations to prolog aggregations
 prologAggr :: String -> String
@@ -368,7 +381,7 @@ eList :: [Expr] -> Expr
 eList = List empty
 
 -- | Creates a new aggr expression
-eAggr :: String -> Expr -> Expr -> Expr -> Expr
+eAggr :: Aggregation -> Expr -> Expr -> Expr -> Expr
 eAggr = Aggr empty
 
 -- | Creates a new 'is' expression

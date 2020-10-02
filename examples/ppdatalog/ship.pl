@@ -73,15 +73,8 @@ arrival(Ship,Port,CargoType,Time) :-
     feasible_port(Ship,Port),
     reachability_time(Ship,Port,Time).
 
-%TODO aggregations are not implemented yet
-%aggr(Pred, Expr, Variable)
-%aggr can be one of: count, sum, avg, min, max, times
-% TODO think how it would be better to compute several aggregations without computing several instances of 'arrival'
-fastestDelivery(PortName, CargoType, MinTime) :-
-    min(arrival(Ship,PortName,CargoType,Time),Time,MinTime).
-
 %not sure if it is a good idea to use repeating name "@cargotype" in the table and for the inputs
 :-inputs([@portname:private string, @cargotype:private string]).
 :-outputs([MinTime]).
-?-fastestDelivery(@portname,@cargotype,MinTime).
+?-min(arrival(Ship,PortName,CargoType,Time),Time,MinTime).
 

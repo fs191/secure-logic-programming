@@ -144,13 +144,13 @@ insertDB db x = x & dpRules %~ (<> _dbRules)
     _dbRules :: [Rule]
     _dbRules = [fact _n _as | Pred _ _n _as <- db]
 
-compileSC :: String -> Sh (Either SwiplException Text)
-compileSC file = errExit False $ withTmpDir act
+compileSC :: String -> Int -> Sh (Either SwiplException Text)
+compileSC file iterations = errExit False $ withTmpDir act
   where
     act tmp = 
       do
         _prog <- liftIO $ parseDatalogFromFile file
-        trans <- liftIO $ deriveAllGroundRules 2 . preProcess $ adornProgram _prog
+        trans <- liftIO $ deriveAllGroundRules iterations . preProcess $ adornProgram _prog
         let sc = secrecCode . typeInference $ postProcess trans
         cp "SecreC/lp_essentials.sc" tmp
         let _path = tmp <> "prog.sc"
@@ -166,11 +166,11 @@ compileSC file = errExit False $ withTmpDir act
           0 -> return $ Right res
           _ -> return . Left $ SecreCException ex
 
-compilesSuccessfully :: String -> Spec
-compilesSuccessfully file = it desc $ do
+compilesSuccessfully :: String -> Int -> Spec
+compilesSuccessfully file iterations = it desc $ do
   let act =
         do
-          res <- shelly . silently $ compileSC file
+          res <- shelly . silently $ compileSC file iterations
           case res of
             Left ex -> throw ex
             Right _ -> return ()
