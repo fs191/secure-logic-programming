@@ -51,6 +51,8 @@ main =
           let ti = typeInference post
           let sc = secrecCode ti
 
+          putStrLn $ show (pretty tf)
+
           let output = show $ if inferTypesOnly
               then pretty ti
               else pretty sc

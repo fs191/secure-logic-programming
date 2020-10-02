@@ -37,12 +37,14 @@ deriveAllGroundRules n program = program' & DP.dpRules %%~ f
     pipeline :: [Rule] -> Int -> IO [Rule]
     pipeline rs _ = 
       do
-        let pl0 = removeDuplicateFacts rs
-            pl1 = removeFalseFacts pl0
+        let pl0 = inlineOnce rs
+            pl1 = refreshRule "X_" <$> pl0
             pl2 = pl1 & traversed . ruleTail %~ simplifyAnds
-        pl3 <- filterM checkConsistency pl2
-        let pl4 = refreshRule "X_" <$> pl3
-        return $ inlineOnce pl4
+            pl3 = map simplifyRule  pl2
+            pl4 = pl3
+        pl4 <- filterM checkConsistency pl3
+        let pl5 = removeFalseFacts pl4
+        return $ removeDuplicateFacts pl5
 
 -- | Tries to unify each predicate in each rule body with an appropriate rule
 inlineOnce :: [Rule] -> [Rule]
@@ -72,6 +74,21 @@ isAnd And{} = True
 isAnd _     = False
 
 -- rewrite the assignments and look for contradictions
+simplifyRule :: Rule -> Rule
+simplifyRule r =
+
+    let rName = ruleName r in
+    let rBody = simplifyAnds' $ r ^. ruleTail in
+    let rArgs = args r in
+    let (boundedVars, freeVars) = partition (\z -> z ^. annotation ^. annBound) rArgs in
+    let boundedVarNames = concat $ map varNames boundedVars in
+    let freeVarNames = concat $ map varNames freeVars in
+    let newRuleBody = simplify rBody (boundedVarNames, freeVarNames) in
+
+    let newRuleTail = foldr1 eAnd . nub . filter (not . isAnd) $ newRuleBody in
+    rule rName rArgs newRuleTail
+
+-- look for contradictions
 checkConsistency :: Rule -> IO Bool
 checkConsistency r = Solve.checkSat $ r ^. ruleTail . to andsToList
 

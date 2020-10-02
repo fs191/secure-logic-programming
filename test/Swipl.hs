@@ -158,7 +158,8 @@ compileSC file = errExit False $ withTmpDir act
         let srcNum = enumerateLines src
         writefile _path src
         cd tmp
-        res <- run "scc" [T.pack _path, "-I", T.pack tmp, "-o", "out.sb"]
+        --res <- run "scc" [T.pack _path, "-I", T.pack tmp, "-o", "out.sb"]
+        res <- run "/home/alisa/git/secure-logic-programming/compileAndUploadFullpath.sh" [T.pack _path]
         err <- lastStderr
         resCode <- lastExitCode
         let ex = err <> "\n" <> res <> "\nSOURCE:\n" <> srcNum

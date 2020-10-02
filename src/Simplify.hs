@@ -273,10 +273,14 @@ simplifyExpr e@(Neq _ x y) m
     bounds = neqBounds xb yb
     m' = if isVar x then M.insert (_varName x) (fromJust bounds) m else m
     m'' = if isVar y then M.insert (_varName y) (fromJust bounds) m' else m'
+
+{-
 simplifyExpr (Lt a x y) m = lessThan True a x y m
 simplifyExpr (Le a x y) m = lessThan False a x y m
 simplifyExpr e@Gt {} m = (switch lt, m') where (lt, m') = simplifyExpr (switch e) m
 simplifyExpr e@Ge {} m = (switch le, m') where (le, m') = simplifyExpr (switch e) m
+-}
+
 simplifyExpr e m = (simplifyConst e, m)
 
 -- | Helper funtion that simplifies an inequality
@@ -360,6 +364,8 @@ getBounds (Div _ x y) m
   where
     (_, ex, _, _) = getBounds x m
     (_, ey, _, _) = getBounds y m
+
+getBounds _ _ = (Nothing, Nothing, Nothing, [])
 
 add :: Maybe Int -> Maybe Int -> Maybe Int
 add (Just x) (Just y) = Just $ x + y

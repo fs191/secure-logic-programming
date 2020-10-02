@@ -11,6 +11,6 @@ zeroSum(AliceBefore,AliceAfter,BobBefore,BobAfter) :-
 % A + 'b' = 'c' + D unifies to A = 'c', D = 'b' (although evaluating '+' on strings would cause type error, this is fine as far as no '=:=' is applied)
 % 'c' + 'b' =:= 'c' + 'b' fails (trying to evaluate '+' on strings)
 
-:-inputs([@x1,@y1]).
+:-inputs([@x1,@y2]).
 :-outputs([X2,Y2]).
-?-zeroSum(@x1, X2, @y1, Y2).
+?-zeroSum(@x1, X2, Y1, @y2).
