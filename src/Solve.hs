@@ -4,6 +4,7 @@ import qualified SimpleSMT as SMT
 import Data.Foldable
 import Control.Monad.State
 import Data.List
+import Data.Maybe
 import Data.Generics.Uniplate.Data
 
 import Expr
@@ -12,7 +13,7 @@ checkSat :: [Expr] -> IO Bool
 checkSat es = do
   s <- SMT.newSolver "z3" ["-in"] Nothing
   declareVars s (vars es)
-  let sExprs = asum $ exprToSExpr <$> es
+  let sExprs = map fromJust $ filter (\x -> case x of Nothing -> False; _ -> True) $ exprToSExpr <$> es
   void $ traverse (SMT.assert s) sExprs
   result <- SMT.check s
   return $ case result of

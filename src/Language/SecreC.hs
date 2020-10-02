@@ -354,6 +354,7 @@ funTdbGetRowCount = SCFunCall "tdbGetRowCount"
 
 funPublishCol         = FunCall "publishCol"
 funPublishVal         = FunCall "publishVal"
+funCreateTable        = FunCall "createTable"
 funWriteToTable       = FunCall "writePublicToTable"
 funTdbOpenConnection  = FunCall "tdbOpenConnection"
 funTdbCloseConnection = FunCall "tdbCloseConnection"
@@ -417,6 +418,9 @@ scColPrivateTypeI i = scStructPrivateType SCColumn (Just i)
 
 scColType :: Ann -> SCType
 scColType = scStructType SCColumn Nothing
+
+scColPrivateType :: Ann -> SCType
+scColPrivateType = scStructPrivateType SCColumn Nothing
 
 scConstType :: Expr -> SCExpr
 scConstType (ConstInt   _ c) = SCConstInt c
@@ -858,10 +862,9 @@ ind i1 i2 = i1 * 1000 + i2
 -- aggregation creates an intensional predicate table that will not be used anywhere else,
 -- so we do not need to increase the crros product table
 aggrToSC :: Text -> Expr -> Int -> [Statement]
-aggrToSC ds (Aggr ann f pr@(Pred ptype p zs) e1 e2) j =
+aggrToSC ds (Aggr _ f pr@(Pred ptype p zs) e1 e2) j =
 
                           let is = [0..length zs-1] in
-                          let (dom, dtype) = scVarType ann in
 
                           --extract aggregated variable name
                           -- TODO this can be generalized by defining a mapping from variables of x to indices of result table
@@ -869,6 +872,12 @@ aggrToSC ds (Aggr ann f pr@(Pred ptype p zs) e1 e2) j =
                                       Var _ x -> x
                                       _       -> error $ "aggregation over complex expressions is not supported yet"
                           in
+                          -- extract the type of x
+                          let aggrAnns = filter (\z -> case z of {Var _ zn -> zn == x; _ -> False}) zs in
+                          let ann = if length aggrAnns > 0 then (head aggrAnns) ^. annotation
+                                    else error $ "aggregation variable not found among goal arguments" in
+
+                          let (_, dtype) = scVarType ann in
 
                           --extract aggregation result variable name
                           -- TODO this can be generalized by adding a subcall of formulaToSC
@@ -891,7 +900,7 @@ aggrToSC ds (Aggr ann f pr@(Pred ptype p zs) e1 e2) j =
 
                           -- TODO here we assume that y is always a fresh variable, generalize it later
                           intPredStmts ++
-                          [VarInit (variable SCPublic (scColType ann) (pack y)) $ funAggr (show f) [ SCVarName (nameTableArg (nameResUn j1) xi)
+                          [VarInit (variable SCPublic (scColPrivateType ann) (pack y)) $ funAggr (show f) [ SCVarName (nameTableArg (nameResUn j1) xi)
                                                                                             , SCVarName (nameTableBB (nameResUn j1))
                                                                                             , funSize [SCVarName (nameTableBB (nameResUn j1))]]
 
@@ -1052,34 +1061,53 @@ csvImportCode dp = do
                      ++ [Funct $ mainFun $
                                      [ VarInit (variable SCPublic SCString ds) strDataset
                                      , funTdbOpenConnection [SCVarName ds]]
-                                     ++ zipWith (tableGenerationCode ds) extPreds tableData ++
+                                     ++ concat (zipWith (tableGenerationCode ds) extPreds tableData) ++
                                      [funTdbCloseConnection [SCVarName ds]]]
 
-tableGenerationCode :: Text -> DBClause -> [[String]] -> Statement
+tableGenerationCode :: Text -> DBClause -> [[String]] -> [Statement]
 tableGenerationCode ds dbc (tableHeader:tableRows) =
 
-  funWriteToTable [ SCVarName ds, SCConstStr p, SCConstArr (map  SCConstBool isInt)
-                  , SCConstStr headerStr, SCConstArr (map SCConstInt hlengths)
-                  , SCConstStr valuesStr, SCConstArr (map SCConstInt vlengths)
-                  , SCConstArr (map SCConstAny intData)]
+  [ funCreateTable  [ SCVarName ds, SCConstStr p, SCConstArr (map  SCConstInt types), SCConstArr (map  SCConstInt domains)
+                    , SCConstStr headerStr, SCConstArr (map SCConstInt hlengths)]
+  , funWriteToTable [ SCVarName ds, SCConstStr p, SCConstArr (map  SCConstInt types), SCConstArr (map  SCConstInt domains)
+                    , SCConstArr (map SCConstAny boolData)
+                    , SCConstArr (map SCConstAny intData)
+                    , SCConstArr (map SCConstAny floatData)
+                    , SCConstStr strData
+                    , SCConstArr (map SCConstInt vlengths)]
+  ]
+
   where
         p  = name dbc
         xs = vars dbc
         is = [0..length xs - 1]
-        isInt = map (\x -> let dtype  = x ^. annotation ^. annType in
+        types = map (\x -> let dtype  = x ^. annotation ^. annType in
                         case dtype of
-                            PPBool  -> False
-                            PPInt   -> True
-                            PPStr   -> False
-                            PPFloat -> False
-                            PPAuto -> error $ "Cannot create a table without knowing column data type."
+                            PPBool  -> 0
+                            PPInt   -> 1
+                            PPFloat -> 2
+                            PPStr   -> 3
+                            _       -> error $ "Can only create a table for bool, int, float, string datatypes."
                 ) xs
+
+        domains = map (\x -> let dom  = x ^. annotation ^. domain in
+                        case dom of
+                            Public  -> 0
+                            Private -> 1
+                            _       -> error $ "Can only create a table for known privacy domain."
+                ) xs
+
 
         hlengths  = map length tableHeader
         headerStr = concat $ tableHeader
 
-        (_intData, _strData) = unzip $ map (\vs -> (partition snd) (zip vs isInt)) tableRows
-        intData = map fst . concat $ _intData
-        strData = map fst . concat $ _strData
-        vlengths = map length strData
-        valuesStr = concat $ strData
+        tableData = concat $ map (zip types) tableRows
+
+        boolData  = map snd $ filter (\x -> fst x == 0) tableData
+        intData   = map snd $ filter (\x -> fst x == 1) tableData
+        floatData = map snd $ filter (\x -> fst x == 2) tableData
+        strData'  = map snd $ filter (\x -> fst x == 3) tableData
+
+        vlengths = map length strData'
+        strData  = concat $ strData'
+

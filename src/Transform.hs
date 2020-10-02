@@ -37,12 +37,12 @@ deriveAllGroundRules n program = program' & DP.dpRules %%~ f
     pipeline :: [Rule] -> Int -> IO [Rule]
     pipeline rs _ = 
       do
-        let pl0 = removeDuplicateFacts rs
-            pl1 = removeFalseFacts pl0
+        let pl0 = inlineOnce rs
+            pl1 = refreshRule "X_" <$> pl0
             pl2 = pl1 & traversed . ruleTail %~ simplifyAnds
         pl3 <- filterM checkConsistency pl2
-        let pl4 = refreshRule "X_" <$> pl3
-        return $ inlineOnce pl4
+        let pl4 = removeFalseFacts pl3
+        return $ removeDuplicateFacts pl4
 
 -- | Tries to unify each predicate in each rule body with an appropriate rule
 inlineOnce :: [Rule] -> [Rule]
