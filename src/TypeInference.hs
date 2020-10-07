@@ -119,7 +119,8 @@ inferDBRet dp = dp & dpRules . traversed . ruleTail %~ U.transform f
       | anyUnk    = p
       | otherwise = p & annotation . domain .~ Public
       where
-        dbf = findDBFact dp n
+        dbf = fromMaybe err $ findDBFact dp n
+        err = error $ "DB fact not found: " ++ show n ++ "\n" ++ show (pretty dp)
         (Pred _ _ ys) = dbf ^. ruleHead
         -- See if a bound variable is compared to a private DB column
         privateComp (x, y) = 

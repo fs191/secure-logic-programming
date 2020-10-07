@@ -10,58 +10,66 @@ module Transform
 ---------------------------------------------------------
 
 import Data.Generics.Uniplate.Operations as U
-import Data.List
+import qualified Data.List.Safe as S
 import Data.Maybe
 
 import Control.Lens as L
 import Control.Monad
 
-import Annotation
 import Rule
 import Expr
-import Simplify
 import Solve
 import Substitution
-import qualified DatalogProgram as DP
+import DatalogProgram
 
 -- | Generates all possible ground rules for `n` iterations by inlining
 -- predicates with matching rules. Each predicate gets inlined once per
 -- iteration.
-deriveAllGroundRules :: Int -> DP.DatalogProgram -> IO DP.DatalogProgram
-deriveAllGroundRules n program = program' & DP.dpRules %%~ f
+deriveAllGroundRules :: Int -> DatalogProgram -> IO DatalogProgram
+deriveAllGroundRules n program = f program'
   where
     -- Input program but db clauses are converted to rules
     program' = program
-    f :: [Rule] -> IO [Rule]
+    f :: DatalogProgram -> IO DatalogProgram 
     f rs = foldM pipeline rs [1..n]
-    pipeline :: [Rule] -> Int -> IO [Rule]
-    pipeline rs _ = 
+    pipeline :: DatalogProgram -> Int -> IO DatalogProgram
+    pipeline dp _ = 
       do
-        let pl0 = removeDuplicateFacts rs
-            pl1 = removeFalseFacts pl0
-            pl2 = pl1 & traversed . ruleTail %~ simplifyAnds
-        pl3 <- filterM checkConsistency pl2
-        let pl4 = refreshRule "X_" <$> pl3
-        return $ inlineOnce pl4
+        pl <- dp & dpRules %~ removeDuplicateFacts
+                     & dpRules %~ removeFalseFacts
+                     & dpRules . traversed . ruleTail %~ simplifyAnds
+                     & dpRules %%~ filterM checkConsistency
+        let pl1 = pl & dpRules . traversed %~ refreshRule "X_"
+        return $ inlineOnce pl1
 
--- | Tries to unify each predicate in each rule body with an appropriate rule
-inlineOnce :: [Rule] -> [Rule]
-inlineOnce rs =
-  rs <> inlined
+-- | Tries to unify the first predicate in each rule body with an appropriate rule
+inlineOnce :: DatalogProgram -> DatalogProgram
+inlineOnce dp = dp & dpRules .~ rs'
   where
-    inlined = catMaybes $ do
+    rs' = potentialSrc <> inlined
+    rs  = dp ^. dpRules
+    potentialSrc = filter (isGround dp) rs
+    inlined = do
       tgt <- refreshRule "T_" <$> rs
-      src <- rs
-      let shd = src ^. ruleHead
-      let stl = src ^. ruleTail
       let ttl = tgt ^. ruleTail
-      (p@Pred{}, mut) <- U.contexts ttl
-      let subst = unify shd p
-      [flip applySubst (tgt & ruleTail .~ mut stl) <$> subst]
+      let fil (x,_) = isPredicate x && isIDBFact dp x
+      let tlPreds = filter fil $ U.contexts ttl
+      (p,mut) <- S.head tlPreds
+      let res
+            | null tlPreds = return tgt
+            | otherwise = 
+                do
+                  src <- findRules dp $ p ^. predName
+                  let shd = src ^. ruleHead
+                  let stl = src ^. ruleTail
+                  let subst = unify shd p
+                  let subster x = applySubst x (tgt & ruleTail .~ mut stl)
+                  maybeToList $ subster <$> subst
+      res
 
 -- Removes duplicate terms from AND operations at the root expression
 simplifyAnds :: Expr -> Expr
-simplifyAnds x = foldr1 eAnd . nub . filter (not . isAnd) $ simplifyAnds' x
+simplifyAnds x = foldr1 eAnd . S.nub . filter (not . isAnd) $ simplifyAnds' x
 
 simplifyAnds' :: Expr -> [Expr]
 simplifyAnds' (And _ x y) = simplifyAnds' x <> simplifyAnds' y
@@ -70,6 +78,13 @@ simplifyAnds' x = [x]
 isAnd :: Expr -> Bool
 isAnd And{} = True
 isAnd _     = False
+
+isPredicate :: Expr -> Bool
+isPredicate Pred{} = True
+isPredicate _      = False
+
+isGround :: DatalogProgram -> Rule -> Bool
+isGround dp r = all (not . isIDBFact dp) . U.universe $ r ^. ruleTail
 
 -- rewrite the assignments and look for contradictions
 checkConsistency :: Rule -> IO Bool
@@ -81,5 +96,5 @@ removeFalseFacts = filter (\x -> x ^. ruleTail /= constBool False)
 
 -- | Removes duplicates of facts that appear more than once
 removeDuplicateFacts :: [Rule] -> [Rule]
-removeDuplicateFacts = nub
+removeDuplicateFacts = S.nub
 

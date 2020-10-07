@@ -35,6 +35,7 @@ aTerm :: Parser Expr
 aTerm = (withSrcPos $ asum
   [ varParse
   , predParse
+  , boolParse
   , strParse
   , attributeParse
   , try floatParse
@@ -200,6 +201,12 @@ attributeParse = withSrcPos $
   do
     s <- attributeIdentifier
     typable . return $ E.attribute s
+
+boolParse :: Parser Expr
+boolParse = choice
+  [ symbol "true"  *> return constTrue
+  , symbol "false" *> return constFalse
+  ]
 
 --
 -- Useful combinators for expression parsing

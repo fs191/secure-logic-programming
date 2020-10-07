@@ -24,6 +24,8 @@ module DatalogProgram
   , dbDirective
   , findRules
   , findDBFact
+  , isEDBFact
+  , isIDBFact
   ) where
 
 import           Control.Lens hiding (List)
@@ -173,8 +175,8 @@ variablizeInputs ins (Pred e n xs) = Pred e n $ f <$> xs
 variablizeInputs _ x = error $ "Attempting to variablize " ++ show x
 
 -- | Finds an extensional fact with the name `n` from the program
-findDBFact :: DatalogProgram -> String -> Rule
-findDBFact dp n = fromMaybe err $ extensionalFacts dp 
+findDBFact :: DatalogProgram -> String -> Maybe Rule
+findDBFact dp n = extensionalFacts dp 
                     ^? folded 
                      . filtered ((==n) . ruleName)
   where
@@ -197,4 +199,11 @@ dpGoal = lens getter setter
       error $ "Invalid goal expression. Expected a predicate or an aggregation, got"
         <> (show $ pretty a)
 
+isEDBFact :: DatalogProgram -> Expr -> Bool
+isEDBFact dp (Pred{_predName=n}) = isJust $ findDBFact dp n
+isEDBFact _ _ = False
+
+isIDBFact :: DatalogProgram -> Expr -> Bool
+isIDBFact dp (p@Pred{}) = not $ isEDBFact dp p
+isIDBFact _ _ = False
 

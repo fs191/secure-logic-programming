@@ -66,7 +66,7 @@ suitable_ship(Ship,WantedCargo) :-
    %  "="   is the unification (translated to Un construction)
    %  ";"   denotes an OR operation  (translated to Or construction)
    %        let us only allow to apply OR "to ground terms which do not contain intensional predicates"
-   (WantedCargo = ShipCargo ; ShipCargo = 'all').
+   (WantedCargo = ShipCargo ; ShipCargo = all).
 
 arrival(Ship,Port,CargoType,Time) :-
     suitable_ship(Ship,CargoType),
