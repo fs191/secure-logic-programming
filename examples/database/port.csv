@@ -1,3 +1,4 @@
+name;latitude;longitude;offloadcapacity;available
 alma;0;0;10;true
 cow;10;10;10;true
 lehm;1;0;10;false

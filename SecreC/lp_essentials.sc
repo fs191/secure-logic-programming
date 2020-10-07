@@ -1112,54 +1112,101 @@ relColumn<D, T, T> getDBColumn(string ds, string tableName, T0 _colIndex, uint m
     public relColumn<D, T, T> result;
     result.fv  = reshape(false, m);
     result.val = col;
-    result.str = reshape(0, m, 0);
+    result.str = reshape((T)0, m, 0);
     return result;
 }
 
-
-template<domain D, type T, type T1, type T2>
-relColumn<D, T1, T2> getDBColumn(string ds, string tableName, T _colIndex, uint m, uint mi, uint ni){
+//TODO check out why it does not work with polymorphic T (like public string column)
+//template< type T>
+relColumn<pd_shared3p, xor_uint32, xor_uint8> getDBColumn(string ds, string tableName, int64 _colIndex, uint m, uint mi, uint ni){
     uint colIndex = (uint)_colIndex;
     uint rv;
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
 
-    D T1 [[1]] col     = reshape(0,mi);
-    D T2 [[2]] col_str = reshape(0,mi,0);
+    pd_shared3p xor_uint32 [[1]] col     = reshape(0,mi);
+    pd_shared3p xor_uint8 [[2]] col_str = reshape(0,mi,0);
     rv = tdbReadColumn(ds, tableName, colIndex);
     for (uint i = 0; i < mi; i++){
-        //TODO we hope to find a better solution for public columns
         pd_shared3p xor_uint8 [[1]] temp = tdbVmapGetVlenValue(rv, "values", i);
 
-        col[i] = declassifyIfNeed(CRC32(temp));
+        col[i] = CRC32(temp);
         uint n = size(temp);
 
-        D T2 [[2]] temp2 = reshape(0, shape(col_str)[0], max(shape(col_str)[1], n));
+        pd_shared3p xor_uint8 [[2]] temp2 = reshape(0, shape(col_str)[0], max(shape(col_str)[1], n));
         temp2 = mySetSlice(col_str, temp2, 0, shape(col_str)[0], 0, shape(col_str)[1]);
-        D T2 [[1]] temp3 = declassifyIfNeed(temp);
+        pd_shared3p xor_uint8 [[1]] temp3 = declassifyIfNeed(temp);
         temp2 = mySetSlice(myReshape(temp3, 1, n), temp2, i, i+1, 0, n);
         col_str = temp2;
     }
     col     = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
     col_str = copyBlock(myReplicate(col_str, ms, ns), {mi * ni}, {m / (mi * ni)});
 
-    public relColumn<D, T1, T2> result;
+    public relColumn<pd_shared3p, xor_uint32, xor_uint8> result;
     result.fv  = reshape(false, m);
     result.val = col;
     result.str = col_str;
     return result;
 }
 
-// write public data to secret-shared database
-// this is meant for testing only
 template<type T>
-void writePublicToTable(string ds, string tableName, bool [[1]] isIntColumn, string headers, T [[1]] _ns, string strData, T [[1]] _ms, T [[1]] _intData) {
-    uint [[1]] ns = (uint)_ns;
-    uint [[1]] ms = (uint)_ms;
-    int32 [[1]] intData = (int32)_intData;
+relColumn<public, uint32, uint8> getDBColumn(string ds, string tableName, T _colIndex, uint m, uint mi, uint ni){
+    uint colIndex = (uint)_colIndex;
+    uint rv;
+    uint [[1]] ms (mi); ms = 1;
+    uint [[1]] ns (mi); ns = ni;
 
-    pd_shared3p int32     temp_D_int32;
-    pd_shared3p xor_uint8 temp_D_string;
+    public uint32 [[1]] col     = reshape(0,mi);
+    public uint8 [[2]] col_str = reshape(0,mi,0);
+    rv = tdbReadColumn(ds, tableName, colIndex);
+    for (uint i = 0; i < mi; i++){
+        //TODO we hope to find a better solution for public columns (need a public CRC32 function)
+        uint8 [[1]] _temp = tdbVmapGetVlenValue(rv, "values", i);
+        pd_shared3p xor_uint8 [[1]] temp = _temp;
+
+        col[i] = declassify(CRC32(temp));
+        uint n = size(temp);
+
+        public uint8 [[2]] temp2 = reshape(0, shape(col_str)[0], max(shape(col_str)[1], n));
+        temp2 = mySetSlice(col_str, temp2, 0, shape(col_str)[0], 0, shape(col_str)[1]);
+        public uint8 [[1]] temp3 = declassifyIfNeed(temp);
+        temp2 = mySetSlice(myReshape(temp3, 1, n), temp2, i, i+1, 0, n);
+        col_str = temp2;
+    }
+    col     = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
+    col_str = copyBlock(myReplicate(col_str, ms, ns), {mi * ni}, {m / (mi * ni)});
+
+    public relColumn<public, uint32, uint8> result;
+    result.fv  = reshape(false, m);
+    result.val = col;
+    result.str = col_str;
+    return result;
+}
+
+// write public data to secret-shared database (create table step)
+// this is meant for testing only
+// colDataType:
+// - 0: bool
+// - 1: int32
+// - 2: float32
+// - 3: string
+template<type T>
+void createTable(string ds, string tableName, T [[1]] _colDataType, T [[1]] _colDomain, string headers, T [[1]] _ns) {
+
+    uint [[1]] colDataType = (uint)_colDataType;
+    uint [[1]] colDomain   = (uint)_colDomain;
+    uint [[1]] ns = (uint)_ns;
+
+    pd_shared3p bool      private_bool;
+    pd_shared3p int32     private_int32;
+    pd_shared3p float32   private_float32;
+    pd_shared3p xor_uint8 private_string;
+
+    bool    public_bool;
+    int32   public_int32;
+    float32 public_float32;
+    uint8   public_string;
+
     uint params;
 
     if (tdbTableExists(ds, tableName)) {
@@ -1170,34 +1217,104 @@ void writePublicToTable(string ds, string tableName, bool [[1]] isIntColumn, str
 
     params = tdbVmapNew();
     uint n = size(ns);
-    uint m = size(ms);
     uint offset = 0;
     for (uint j = 0; j < n; j++){
-        if (isIntColumn[j]){
-            tdbVmapAddType(params, "types", temp_D_int32);
+        if (colDataType[j] == 0){
+            if (colDomain[j] == 0){
+                tdbVmapAddType(params, "types", public_bool);
+            }else{
+                tdbVmapAddType(params, "types", private_bool);
+            }
+        }else if (colDataType[j] == 1){
+            if (colDomain[j] == 0){
+                tdbVmapAddType(params, "types", public_int32);
+            }else{
+                tdbVmapAddType(params, "types", private_int32);
+            }
+        }else if (colDataType[j] == 2){
+            if (colDomain[j] == 0){
+                tdbVmapAddType(params, "types", public_float32);
+            }else{
+                tdbVmapAddType(params, "types", private_float32);
+            }
         }else{
-            tdbVmapAddVlenType(params, "types", temp_D_string);
+            if (colDomain[j] == 0){
+                tdbVmapAddVlenType(params, "types", public_string);
+            }else{
+                tdbVmapAddVlenType(params, "types", private_string);
+            }
         }
         tdbVmapAddString(params, "names", substring(headers, offset, offset + ns[j]));
         offset = offset + ns[j];
     }
     tdbTableCreate(ds, tableName, params);
     tdbVmapDelete(params);
+}
+
+// write public data to secret-shared database (write a batch of data step)
+// this is meant for testing only
+template<type T, type T0, type T1, type T2>
+void writePublicToTable(string ds, string tableName, T [[1]] _colDataType, T [[1]] _colDomain,
+                        T0 [[1]] _boolData,
+                        T1 [[1]] _intData,
+                        T2 [[1]] _floatData,
+                        string strData, T [[1]] _ms) {
+
+    uint [[1]] colDataType = (uint)_colDataType;
+    uint [[1]] colDomain   = (uint)_colDomain;
+    uint [[1]] ms = (uint)_ms;
+    bool    [[1]] boolData  = (bool)_boolData;
+    int32   [[1]] intData   = (int32)_intData;
+    float32 [[1]] floatData = (float32)_floatData;
+
+    uint params;
 
     params = tdbVmapNew();
     uint strCnt = 0;
     uint intCnt = 0;
+    uint boolCnt = 0;
+    uint floatCnt = 0;
 
-    offset = 0;
+    uint m = size(ms);
+    uint n = size(colDataType);
+    uint offset = 0;
     while (true){
         for (uint j = 0; j < n; j++){
-            if (isIntColumn[j]){
-                pd_shared3p int32 temp = intData[intCnt];
-                tdbVmapAddValue(params, "values", temp);
+            if (colDataType[j] == 0){
+                if (colDomain[j] == 0){
+                  bool temp = boolData[boolCnt];
+                  tdbVmapAddValue(params, "values", temp);
+                }else{
+                  pd_shared3p bool temp = boolData[boolCnt];
+                  tdbVmapAddValue(params, "values", temp);
+                }
+                boolCnt++;
+            }else if (colDataType[j] == 1){
+                if (colDomain[j] == 0){
+                  int32 temp = intData[intCnt];
+                  tdbVmapAddValue(params, "values", temp);
+                }else{
+                  pd_shared3p int32 temp = intData[intCnt];
+                  tdbVmapAddValue(params, "values", temp);
+                }
                 intCnt++;
+            }else if (colDataType[j] == 2){
+                if (colDomain[j] == 0){
+                  float32 temp = floatData[floatCnt];
+                  tdbVmapAddValue(params, "values", temp);
+                }else{
+                  pd_shared3p float32 temp = floatData[floatCnt];
+                  tdbVmapAddValue(params, "values", temp);
+                }
+                floatCnt++;
             } else {
-                pd_shared3p xor_uint8 [[1]] temp = __bytes_from_string(substring(strData, offset, offset + ms[strCnt]));
-                tdbVmapAddVlenValue(params, "values", temp);
+                if (colDomain[j] == 0){
+                  uint8 [[1]] temp = __bytes_from_string(substring(strData, offset, offset + ms[strCnt]));
+                  tdbVmapAddVlenValue(params, "values", temp);
+                }else{
+                  pd_shared3p xor_uint8 [[1]] temp = __bytes_from_string(substring(strData, offset, offset + ms[strCnt]));
+                  tdbVmapAddVlenValue(params, "values", temp);
+                }
                 offset = offset + ms[strCnt];
                 strCnt++;
             }
@@ -1319,7 +1436,7 @@ relColumn<D, bool, bool> constBoolColumn(T arg0, uint m){
     D bool arg = (bool)arg0;
     relColumn<D, bool, bool> result;
     result.val = reshape(arg,m);
-    result.str = reshape(0,m,0);
+    result.str = reshape(false,m,0);
     result.fv = reshape(false,m);
     return result;
 }
@@ -1352,7 +1469,7 @@ relColumn<D, T, T> constColumn(T0 arg0){
     D T arg = (T)arg0;
     relColumn<D, T, T> result;
     result.val = reshape(arg,1);
-    result.str = reshape(0,1,0);
+    result.str = reshape((T)0,1,0);
     result.fv = reshape(false,1);
     return result;
 }
@@ -1371,8 +1488,8 @@ T0 constColumn(D T [[N]] arg){
 template <domain D, type T, type S>
 relColumn<D, T, S> freeVarColumn(uint m){
     relColumn<D, T, S> result;
-    result.val = reshape(0,m);
-    result.str = reshape(0,m,0);
+    result.val = reshape((T)0,m);
+    result.str = reshape((S)0,m,0);
     result.fv  = reshape(true,m);
     return result;
 }
@@ -1467,7 +1584,7 @@ subst<D, relColumn<D, T, S> > unify(relColumn<D, T, S> x, T y){
     uint m = size(x.val);
     relColumn<D, T, S> y_col;
     y_col.val = reshape(y,m);
-    y_col.str = reshape(0,m,0);
+    y_col.str = reshape((S)0,m,0);
     y_col.fv  = reshape(false,m);
     return unify(x, y_col);
 }
@@ -1504,10 +1621,10 @@ subst<D, relColumn<D, T, S> > unify(relColumn<D0, T0, S0> x, relColumn<D1, T1, S
     uint m = shape(x.str)[0];
     uint n = max(shape(x.str)[1], shape(y.str)[1]);
 
-    D0 S0 [[2]] xstr = reshape(0, shape(x.str)[0], max(shape(x.str)[1], n));
+    D0 S0 [[2]] xstr = reshape((S0)0, shape(x.str)[0], max(shape(x.str)[1], n));
     xstr = mySetSlice(x.str, xstr, 0, shape(x.str)[0], 0, shape(x.str)[1]);
 
-    D1 S1 [[2]] ystr = reshape(0, shape(y.str)[0], max(shape(y.str)[1], n));
+    D1 S1 [[2]] ystr = reshape((S1)0, shape(y.str)[0], max(shape(y.str)[1], n));
     ystr = mySetSlice(y.str, ystr, 0, shape(y.str)[0], 0, shape(y.str)[1]);
 
     uint [[1]] ms (m); ms = 1;
@@ -1837,7 +1954,7 @@ relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, relCo
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, x.val, y.val);
-    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
 
@@ -1849,7 +1966,7 @@ relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, relColumn<
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, x.val, y.val);
-    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
 
@@ -1861,7 +1978,7 @@ relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, relColumn<D, T, S> y){
     relColumn<D, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, x.val, y.val);
-    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
 
@@ -1874,7 +1991,7 @@ relColumn<pd_shared3p, T, S> aop(string s, public T x, relColumn<pd_shared3p, T,
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, xval, y.val);
-    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
     return z;
 }
 
@@ -1886,7 +2003,7 @@ relColumn<pd_shared3p, T, S> aop(string s, pd_shared3p T x, relColumn<public, T,
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, xval, y.val);
-    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
     return z;
 }
 
@@ -1898,7 +2015,7 @@ relColumn<D, T, S> aop(string s, D T x, relColumn<D, T, S> y){
     relColumn<D, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, xval, y.val);
-    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
     return z;
 }
 
@@ -1911,7 +2028,7 @@ relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, pd_shared3
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, x.val, yval);
-    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
 
@@ -1923,7 +2040,7 @@ relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, publi
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, x.val, yval);
-    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
 
@@ -1935,7 +2052,7 @@ relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, D T y){
     relColumn<D, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, x.val, yval);
-    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
 //---
@@ -1946,7 +2063,7 @@ relColumn<pd_shared3p, T, S> aop(string s, pd_shared3p T [[1]] x, relColumn<publ
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, x, y.val);
-    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
     return z;
 }
 
@@ -1957,7 +2074,7 @@ relColumn<pd_shared3p, T, S> aop(string s, public T [[1]] x, relColumn<pd_shared
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, x, y.val);
-    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
     return z;
 }
 
@@ -1968,7 +2085,7 @@ relColumn<D, T, S> aop(string s, D T [[1]] x, relColumn<D, T, S> y){
     relColumn<D, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, x, y.val);
-    z.str = reshape(0,shape(y.str)[0], shape(y.str)[1]);
+    z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
     return z;
 }
 
@@ -1980,7 +2097,7 @@ relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, pd_shared3
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, x.val, y);
-    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
 
@@ -1991,7 +2108,7 @@ relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, publi
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, x.val, y);
-    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
 
@@ -2002,18 +2119,18 @@ relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, D T [[1]] y){
     relColumn<D, T, S> z;
     z.fv  = false;
     z.val = apply_op(s, x.val, y);
-    z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
+    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
 
 //aggregations
 template<domain D0, domain D, type T, type S>
-D0 int32 [[1]] count_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
+relColumn<D0, int32, int32> count_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     uint n = size(b) / m;
     assert(m*n == size(b));
     D0 int32 [[1]] bu = (int32)b;
 
-    relColumn<D, T, S> y;
+    relColumn<D, int32, int32> y;
     y.fv  = false;
     y.val = sum(bu,n);
     y.str = reshape(0,n,0);
@@ -2022,7 +2139,7 @@ D0 int32 [[1]] count_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
 }
 
 template<domain D0, domain D, type T, type S>
-D0 int32 [[1]] sum_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
+relColumn<D0, T, S> sum_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     uint n = size(b) / m;
     assert(m*n == size(b));
     D0 int32 [[1]] bu = (int32)b;
@@ -2030,18 +2147,18 @@ D0 int32 [[1]] sum_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     relColumn<D, T, S> y;
     y.fv  = false;
     y.val = sum(x.val * bu, n);
-    y.str = reshape(0,n,0);
+    y.str = reshape((S)0,n,0);
 
     return y;
 }
 
 template<domain D0, domain D, type T, type S>
-D0 float32 [[1]] avg_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
+relColumn<D0, float32, float32> avg_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     uint n = size(b) / m;
     assert(m*n == size(b));
     D0 int32 [[1]] bu = (int32)b;
 
-    relColumn<D, T, S> y;
+    relColumn<D, float32, float32> y;
     y.fv  = false;
     y.val = (float32)sum(x.val * bu, n) / (float32)sum(bu,n);
     y.str = reshape(0,n,0);
@@ -2049,16 +2166,33 @@ D0 float32 [[1]] avg_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     return y;
 }
 
+int32 maxValue(int32 x){
+  return INT32_MAX;
+}
+int32 minValue(int32 x){
+  return INT32_MIN;
+}
+
+//TODO find better bounds for floats
+float32 maxValue(float32 x){
+  return (float32)(INT32_MAX);
+}
+float32 minValue(float32 x){
+  return (float32)(INT32_MIN);
+}
+
 template<domain D0, domain D, type T, type S>
-D0 int32 [[1]] min_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
+relColumn<D0, T, S> min_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     uint n = size(b) / m;
     assert(m*n == size(b));
-    D0 int32 [[1]] bu = (int32)b;
+    D0 T [[1]] bu = (T)b;
 
+    T dummy;
+    T ff = maxValue(dummy);
     relColumn<D, T, S> y;
     y.fv  = false;
-    y.val = min(bu * (x.val - INT32_MAX) + INT32_MAX, n);
-    y.str = reshape(0,n,0);
+    y.val = min(bu * (x.val - maxValue(dummy)) + maxValue(dummy), n);
+    y.str = reshape((S)0,n,0);
 
     return y;
 }
@@ -2069,16 +2203,17 @@ relColumn<D0, T, S> max_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     assert(m*n == size(b));
     D0 int32 [[1]] bu = (int32)b;
 
+    T dummy;
     relColumn<D, T, S> y;
     y.fv  = false;
-    y.val = max(bu * (x.val - INT32_MIN) + INT32_MIN, n);
-    y.str = reshape(0,n,0);
+    y.val = max(bu * (x.val - minValue(dummy)) + minValue(dummy), n);
+    y.str = reshape((S)0,n,0);
 
     return y;
 }
 
 template<domain D0, domain D, type T, type S>
-D0 int32 [[1]] times_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
+relColumn<D0, T, S> times_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     uint n = size(b) / m;
     assert(m*n == size(b));
     D0 int32 [[1]] bu = (int32)b;
@@ -2086,7 +2221,7 @@ D0 int32 [[1]] times_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     relColumn<D, T, S> y;
     y.fv  = false;
     y.val = product(bu * (x.val - 1) + 1, n);
-    y.str = reshape(0,n,0);
+    y.str = reshape((S)0,n,0);
 
     return y;
 }

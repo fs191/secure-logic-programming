@@ -35,12 +35,12 @@ deriveAllGroundRules n program = f program'
     pipeline :: DatalogProgram -> Int -> IO DatalogProgram
     pipeline dp _ = 
       do
-        pl <- dp & dpRules %~ removeDuplicateFacts
-                     & dpRules %~ removeFalseFacts
-                     & dpRules . traversed . ruleTail %~ simplifyAnds
-                     & dpRules %%~ filterM checkConsistency
-        let pl1 = pl & dpRules . traversed %~ refreshRule "X_"
-        return $ inlineOnce pl1
+        pl <- dp & id %~ inlineOnce
+                 & dpRules . traversed %~ refreshRule "X_"
+                 & dpRules %%~ filterM checkConsistency
+        return $ pl & dpRules . traversed . ruleTail %~ simplifyAnds
+                    & dpRules %~ removeFalseFacts
+                    & dpRules %~ removeDuplicateFacts
 
 -- | Tries to unify the first predicate in each rule body with an appropriate rule
 inlineOnce :: DatalogProgram -> DatalogProgram
