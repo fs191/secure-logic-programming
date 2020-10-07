@@ -470,6 +470,7 @@ identifier (Var _ n)       = Just n
 identifier (ConstStr _ n)  = Just n
 identifier (Pred _ n _)    = Just n
 identifier (Attribute _ n) = Just n
+identifier (ConstBool _ b) = Just $ show b
 identifier _ = Nothing
 
 -- | Creates a new attribute 
