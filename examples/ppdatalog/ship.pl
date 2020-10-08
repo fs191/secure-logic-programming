@@ -61,7 +61,7 @@ suitable_ship(Ship,WantedCargo) :-
    ship_cargoamount(Ship, ShipCargoAmount),
    %  "\+" is negation. let us only allow to apply negations "to ground terms which do not contain intensional predicates"
    %  "=:=" is a comparison of two ground arithmetic terms (translated to Eq construction)
-   \+ (ShipCargoAmount =:= 0),
+   ShipCargoAmount > 0,
    %let us asume that special cargo type "all" contains everything that may ever be needed
    %  "="   is the unification (translated to Un construction)
    %  ";"   denotes an OR operation  (translated to Or construction)
@@ -76,5 +76,5 @@ arrival(Ship,Port,CargoType,Time) :-
 %not sure if it is a good idea to use repeating name "@cargotype" in the table and for the inputs
 :-inputs([@portname:private string, @cargotype:private string]).
 :-outputs([MinTime]).
-?-min(arrival(Ship,PortName,CargoType,Time),Time,MinTime).
+?-min(arrival(Ship,@portname,@cargotype,Time),Time,MinTime).
 

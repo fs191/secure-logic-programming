@@ -179,8 +179,6 @@ findDBFact :: DatalogProgram -> String -> Maybe Rule
 findDBFact dp n = extensionalFacts dp 
                     ^? folded 
                      . filtered ((==n) . ruleName)
-  where
-    err = error $ "DB fact not found: " ++ show n ++ "\n" ++ show (pretty dp)
 
 dpGoal :: Lens' DatalogProgram Expr
 dpGoal = lens getter setter

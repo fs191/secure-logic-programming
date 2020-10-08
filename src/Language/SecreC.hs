@@ -950,6 +950,11 @@ formulaToSC ds q j =
             let dom = scDomainFromAnn ann in
             [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (SCNot (SCAnds $ zipWith (\z i -> SCEq (exprToSC z) (SCVarName (nameTableArg (nameTable j) i))) zs [0..]))]
 
+        Not ann e ->
+            let dom = scDomainFromAnn ann in
+            let sc = exprToSC e in
+            [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ SCNot sc]
+
         Or ann e1 e2 ->
             let dom = scDomainFromAnn ann in
             let sc1 = exprToSC e1 in
@@ -1028,6 +1033,7 @@ exprToSC e =
     Lt   _ e1 e2 -> funBoolOp [SCConstStr "<", exprToSC e1, exprToSC e2]
     Le   _ e1 e2 -> funBoolOp [SCConstStr "<=", exprToSC e1, exprToSC e2]
     Eq   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2]
+    Un   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2]
     Gt   _ e1 e2 -> funBoolOp [SCConstStr ">", exprToSC e1, exprToSC e2]
     Ge   _ e1 e2 -> funBoolOp [SCConstStr ">=", exprToSC e1, exprToSC e2]
     Mul  _ e1 e2 -> binArith "*" e1 e2

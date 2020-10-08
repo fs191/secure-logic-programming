@@ -300,23 +300,28 @@ predicate = Pred a
 
 -- | Creates a new less-than expression
 less :: Expr -> Expr -> Expr
-less = Lt empty
+less = Lt e
+  where e = empty & annType .~ PPBool
 
 -- | Creates a new less-than-or-equal expression
 lessEqual :: Expr -> Expr -> Expr
-lessEqual = Le empty
+lessEqual = Le e
+  where e = empty & annType .~ PPBool
 
 -- | Creates a new greater-than expression
 greater :: Expr -> Expr -> Expr
-greater = Gt empty
+greater = Gt e
+  where e = empty & annType .~ PPBool
 
 -- | Creates a new greater-than-or-equal expression
 greaterEqual :: Expr -> Expr -> Expr
-greaterEqual = Ge empty
+greaterEqual = Ge e
+  where e = empty & annType .~ PPBool
 
 -- | Creates a new equals expression
 equal :: Expr -> Expr -> Expr
-equal = Eq empty
+equal = Eq e
+  where e = empty & annType .~ PPBool
 
 -- | Creates a new unification expression
 eUn :: Expr -> Expr -> Expr
@@ -328,7 +333,9 @@ eNeg = Neg empty
 
 -- | Creates a new boolean not expression
 eNot :: Expr -> Expr
-eNot = Not empty
+eNot = Not e
+  where
+    e = empty & annType .~ PPBool
 
 -- | Creates a new square root expression
 eSqrt :: Expr -> Expr
@@ -389,7 +396,8 @@ eIs :: Expr -> Expr -> Expr
 eIs = Is empty
 
 eNeq :: Expr -> Expr -> Expr
-eNeq = Neq empty
+eNeq = Neq e
+  where e = empty & annType .~ PPBool
 
 eTrue :: Expr
 eTrue = constBool True
@@ -538,6 +546,7 @@ isPredicative (Le{})   = True
 isPredicative (Lt{})   = True
 isPredicative (Is{})   = True
 isPredicative (Un{})   = True
+isPredicative (Neq{})  = True
 isPredicative _        = False
 
 applyAnnotation :: Ann -> Expr -> Maybe Expr

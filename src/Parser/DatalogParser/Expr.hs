@@ -60,6 +60,7 @@ aExpr1 = binary ops aExpr1 aExpr2
       , Operator ">"   greater
       , Operator "<"   less
       , Operator "=:=" equal
+      , Operator "=/=" eNeq
       , Operator "="   eUn
       , Operator "is"  eIs
       ]
