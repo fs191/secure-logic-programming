@@ -44,10 +44,7 @@ main =
           let pp   = preProcess ap
           --let mag  = magicSets ap
           tf <- deriveAllGroundRules _ite pp
-          let post = 
-                if inferTypesOnly
-                  then tf
-                  else postProcess tf
+          let post = postProcess tf
           let ti = typeInference post
           let sc = secrecCode ti
 

@@ -44,8 +44,8 @@ programArgs =
     outFile <- strOption $ mconcat
       [ short 'o'
       , long "output"
-      , help "Specify output file path. Outputs into out.sc by default."
-      , value "out.sc"
+      , help "Specify output file path. Outputs into 'out' by default."
+      , value "out"
       , hidden
       ]
     inFile <- strArgument $ mconcat
