@@ -1425,7 +1425,7 @@ relColumn<D, bool, bool> constBoolColumn(D T arg0, uint m){
     D bool arg = (bool)arg0;
     relColumn<D, bool, bool> result;
     result.val = reshape(arg,m);
-    result.str = reshape(0,m,0);
+    result.str = reshape(false,m,0);
     result.fv = reshape(false,m);
     return result;
 }
@@ -1792,7 +1792,7 @@ D0 T0 aggr_times(D bool [[1]] b, relColumn<D0, T0, S0> x){
 
 //boolean operations
 template<domain D>
-D bool [[1]] apply_op(string s, uint32 [[1]] x, D xor_uint32 [[1]] y){
+D bool [[1]] apply_bop(string s, uint32 [[1]] x, D xor_uint32 [[1]] y){
     D bool [[1]] b;
     //this gives an error for (x == y) for some type derivation reasons
     if (s == "==") b = (y == x);
@@ -1801,7 +1801,23 @@ D bool [[1]] apply_op(string s, uint32 [[1]] x, D xor_uint32 [[1]] y){
 }
 
 template<domain D>
-D bool [[1]] apply_op(string s, D xor_uint32 [[1]] x, uint32 [[1]] y){
+D bool [[1]] apply_bop(string s, D xor_uint32 [[1]] x, uint32 [[1]] y){
+    D bool [[1]] b;
+    if (s == "==") b = (x == y);
+    else assert(false);
+    return b;
+}
+
+template<domain D>
+D bool [[1]] apply_bop(string s, bool [[1]] x, D bool [[1]] y){
+    D bool [[1]] b;
+    if (s == "==") b = (y == x);
+    else assert(false);
+    return b;
+}
+
+template<domain D>
+D bool [[1]] apply_bop(string s, D bool [[1]] x, bool [[1]] y){
     D bool [[1]] b;
     if (s == "==") b = (x == y);
     else assert(false);
@@ -1809,7 +1825,7 @@ D bool [[1]] apply_op(string s, D xor_uint32 [[1]] x, uint32 [[1]] y){
 }
 
 template<domain D, domain D0, domain D1, type T>
-D bool [[1]] apply_op(string s, D0 T [[1]] x, D1 T [[1]] y){
+D bool [[1]] apply_bop(string s, D0 T [[1]] x, D1 T [[1]] y){
     D bool [[1]] b;
     if      (s == "==") b = (x == y);
     else if (s == "<=") b = (x <= y);
@@ -1824,7 +1840,7 @@ template<domain D, domain D0, type T0, type S0, domain D1, type T1, type S1>
 D bool [[1]] bop(string s, relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y){
     assert(sum((uint)x.fv) == 0);
     assert(sum((uint)y.fv) == 0);
-    D bool [[1]] b = apply_op(s, x.val, y.val);
+    D bool [[1]] b = apply_bop(s, x.val, y.val);
     return b;
 }
 
@@ -1832,14 +1848,14 @@ template<domain D, type T1, type S1>
 D bool [[1]] bop(string s, T1 x, relColumn<D, T1, S1> y){
     assert(sum((uint)y.fv) == 0);
     D T1 [[1]] xval = reshape(x, size(y.val));
-    D bool [[1]] b = apply_op(s, xval, y.val);
+    D bool [[1]] b = apply_bop(s, xval, y.val);
     return b;
 }
 
 template<domain D, domain D0, type T0, domain D1, type T1, type S1>
 D bool [[1]] bop(string s, D0 T0 [[1]] x, relColumn<D1, T1, S1> y){
     assert(sum((uint)y.fv) == 0);
-    D bool [[1]] b = apply_op(s, x, y.val);
+    D bool [[1]] b = apply_bop(s, x, y.val);
     return b;
 }
 
@@ -1847,14 +1863,14 @@ template<domain D, type T1, type S1>
 D bool [[1]] bop(string s, relColumn<D, T1, S1> x, T1 y){
     assert(sum((uint)x.fv) == 0);
     D T1 [[1]] yval = reshape(y, size(x.val));
-    D bool [[1]] b = apply_op(s, x.val, yval);
+    D bool [[1]] b = apply_bop(s, x.val, yval);
     return b;
 }
 
 template<domain D, domain D0, type T0, domain D1, type T1, type S1>
 D bool [[1]] bop(string s, relColumn<D1, T1, S1> x, D0 T0 [[1]] y){
     assert(sum((uint)x.fv) == 0);
-    D bool [[1]] b = apply_op(s, x.val, y);
+    D bool [[1]] b = apply_bop(s, x.val, y);
     return b;
 }
 
@@ -1901,7 +1917,7 @@ pd_shared3p T [[1]] power(pd_shared3p T [[1]] x, public T0 [[1]] y){
 
 //arithmetic operations
 template<domain D, domain D0, domain D1, type T>
-D T [[1]] apply_op(string s, D0 T [[1]] x, D1 T [[1]] y){
+D T [[1]] apply_aop(string s, D0 T [[1]] x, D1 T [[1]] y){
     D T [[1]] z;
     if      (s == "+") z = x + y;
     else if (s == "-") z = x - y;
@@ -1953,7 +1969,7 @@ relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, relCo
 
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x.val, y.val);
+    z.val = apply_aop(s, x.val, y.val);
     z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
@@ -1965,7 +1981,7 @@ relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, relColumn<
 
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x.val, y.val);
+    z.val = apply_aop(s, x.val, y.val);
     z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
@@ -1977,7 +1993,7 @@ relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, relColumn<D, T, S> y){
 
     relColumn<D, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x.val, y.val);
+    z.val = apply_aop(s, x.val, y.val);
     z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
@@ -1990,7 +2006,7 @@ relColumn<pd_shared3p, T, S> aop(string s, public T x, relColumn<pd_shared3p, T,
 
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, xval, y.val);
+    z.val = apply_aop(s, xval, y.val);
     z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
     return z;
 }
@@ -2002,7 +2018,7 @@ relColumn<pd_shared3p, T, S> aop(string s, pd_shared3p T x, relColumn<public, T,
 
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, xval, y.val);
+    z.val = apply_aop(s, xval, y.val);
     z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
     return z;
 }
@@ -2014,7 +2030,7 @@ relColumn<D, T, S> aop(string s, D T x, relColumn<D, T, S> y){
 
     relColumn<D, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, xval, y.val);
+    z.val = apply_aop(s, xval, y.val);
     z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
     return z;
 }
@@ -2027,7 +2043,7 @@ relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, pd_shared3
 
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x.val, yval);
+    z.val = apply_aop(s, x.val, yval);
     z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
@@ -2039,7 +2055,7 @@ relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, publi
 
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x.val, yval);
+    z.val = apply_aop(s, x.val, yval);
     z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
@@ -2051,7 +2067,7 @@ relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, D T y){
 
     relColumn<D, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x.val, yval);
+    z.val = apply_aop(s, x.val, yval);
     z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
@@ -2062,7 +2078,7 @@ relColumn<pd_shared3p, T, S> aop(string s, pd_shared3p T [[1]] x, relColumn<publ
 
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x, y.val);
+    z.val = apply_aop(s, x, y.val);
     z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
     return z;
 }
@@ -2073,7 +2089,7 @@ relColumn<pd_shared3p, T, S> aop(string s, public T [[1]] x, relColumn<pd_shared
 
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x, y.val);
+    z.val = apply_aop(s, x, y.val);
     z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
     return z;
 }
@@ -2084,7 +2100,7 @@ relColumn<D, T, S> aop(string s, D T [[1]] x, relColumn<D, T, S> y){
 
     relColumn<D, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x, y.val);
+    z.val = apply_aop(s, x, y.val);
     z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
     return z;
 }
@@ -2096,7 +2112,7 @@ relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, pd_shared3
 
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x.val, y);
+    z.val = apply_aop(s, x.val, y);
     z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
@@ -2107,7 +2123,7 @@ relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, publi
 
     relColumn<pd_shared3p, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x.val, y);
+    z.val = apply_aop(s, x.val, y);
     z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
@@ -2118,7 +2134,7 @@ relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, D T [[1]] y){
 
     relColumn<D, T, S> z;
     z.fv  = false;
-    z.val = apply_op(s, x.val, y);
+    z.val = apply_aop(s, x.val, y);
     z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
