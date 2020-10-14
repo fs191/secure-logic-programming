@@ -29,6 +29,10 @@ process conf dp =
     let ite = _tcIterations conf
     tf <- deriveAllGroundRules ite pp
     let pk   = pkTransform tf
-    let post = postProcess pk
+    let post' = postProcess pk
+
+    -- currently, simplifyRule may break some annotation, so we need to derive it again
+    let post = adornProgram post'
+
     return $ typeInference post
 

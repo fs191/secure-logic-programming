@@ -11,7 +11,7 @@ import qualified Data.Map as M
 import Data.List
 import Data.Text.Prettyprint.Doc
 
---import Debug.Trace
+import Debug.Trace
 
 import Expr
 import Substitution
@@ -65,8 +65,8 @@ simplify :: [Expr] -> Head -> [Expr]
 simplify es (b, o) =
      --trace (show (b `union` predFreeVars es)) $
      --trace (show (o `union` predBoundedVars es)) $
-     --trace (show (pretty es)) $
      --trace "---" $
+     --trace (show (pretty es)) $
      let res = simplify' es (b `union` predFreeVars es, o `union` predBoundedVars es) in
      --trace (show (pretty res)) $
      --trace "===" $
@@ -143,7 +143,7 @@ substitute = substitute' 1
 
 substitute' :: Int -> [Expr] -> Head -> [Expr]
 substitute' i es h =
-  if substituted == es && i /= 7
+  if substituted == es && i /= 8
     then substitute' (i + 1) es h
     else substituted
   where
@@ -191,7 +191,7 @@ getSubst = getSubst' 1
 
 getSubst' :: Int -> [Expr] -> Head -> (Subst', [Expr])
 getSubst' i es (b, o)
-  | null substList && i /= 7 = getSubst' (i + 1) es (b, o)
+  | null substList && i /= 8 = getSubst' (i + 1) es (b, o)
   | otherwise = (subst, es \\ redundant)
   where
     substList =
@@ -200,9 +200,10 @@ getSubst' i es (b, o)
         2 -> [e | e@(Un _ _ y) <- es, unknowns y b == 0]
         3 -> [e | e@(Un _ _ y) <- es, null $ intersect (varNames y) b]
         4 -> [e | e@Un {} <- es]
-        5 -> [e | e@(Is _ (Var _ _) y) <- es, unknowns y b == 0]
-        6 -> [e | e@(Is _ (Var _ _) y) <- es, null $ intersect (varNames y) b]
-        7 -> [e | e@(Is _ (Var _ _) _) <- es]
+        5 -> [e | e@(Eq _ (Var _ x) y) <- es, not (elem x b), unknowns y b == 0]
+        6 -> [e | e@(Is _ (Var _ _) y) <- es, unknowns y b == 0]
+        7 -> [e | e@(Is _ (Var _ _) y) <- es, null $ intersect (varNames y) b]
+        8 -> [e | e@(Is _ (Var _ _) _) <- es]
     (substMap, redundant) = makeSubst substList (b ++ o) M.empty []
     subst = (if i < 5 then "un" else "is", substMap)
 
@@ -211,6 +212,8 @@ makeSubst :: [Expr] -> [String] -> M.Map Expr Expr -> [Expr] -> (M.Map Expr Expr
 makeSubst (e@(Un _ l r):es) head m rd = makeSubst es head m' (if isRedundant then rd ++ [e] else rd)
   where (m', isRedundant) = makeSubst' l r head m
 makeSubst (e@(Is _ l r):es) head m rd = makeSubst es head m' (if isRedundant then rd ++ [e] else rd)
+  where (m', isRedundant) = makeSubst' l r head m
+makeSubst (e@(Eq _ l r):es) head m rd = makeSubst es head m' (if isRedundant then rd ++ [e] else rd)
   where (m', isRedundant) = makeSubst' l r head m
 makeSubst (e:es) head m rd = makeSubst es head m rd
 makeSubst [] _ m rd = (m, rd)
@@ -253,6 +256,10 @@ simplifyExpr (Is a x y) m = (is eq, m')
     (eq, m') = simplifyExpr (equal x y) m
     is (Eq _ l r) = Is a l r
     is e = e
+
+{-
+TODO add support for non-int datatype for full integration
+
 simplifyExpr e@(Eq _ x y) m
   | (ex == ey && isJust ex) || x == y = (eTrue, m)
   | isNothing bounds = (eFalse, m)
@@ -263,6 +270,7 @@ simplifyExpr e@(Eq _ x y) m
     bounds = eqBounds xb yb
     m' = if isVar x then M.insert (_varName x) (fromJust bounds) m else m
     m'' = if isVar y then M.insert (_varName y) (fromJust bounds) m' else m'
+
 simplifyExpr e@(Neq _ x y) m
   | ex /= ey && isJust ex && isJust ey = (eTrue, m)
   | isNothing bounds = (eFalse, m)
@@ -273,10 +281,13 @@ simplifyExpr e@(Neq _ x y) m
     bounds = neqBounds xb yb
     m' = if isVar x then M.insert (_varName x) (fromJust bounds) m else m
     m'' = if isVar y then M.insert (_varName y) (fromJust bounds) m' else m'
+
 simplifyExpr (Lt a x y) m = lessThan True a x y m
 simplifyExpr (Le a x y) m = lessThan False a x y m
 simplifyExpr e@Gt {} m = (switch lt, m') where (lt, m') = simplifyExpr (switch e) m
 simplifyExpr e@Ge {} m = (switch le, m') where (le, m') = simplifyExpr (switch e) m
+-}
+
 simplifyExpr e m = (simplifyConst e, m)
 
 -- | Helper funtion that simplifies an inequality
@@ -360,6 +371,8 @@ getBounds (Div _ x y) m
   where
     (_, ex, _, _) = getBounds x m
     (_, ey, _, _) = getBounds y m
+
+getBounds _ _ = (Nothing, Nothing, Nothing, [])
 
 add :: Maybe Int -> Maybe Int -> Maybe Int
 add (Just x) (Just y) = Just $ x + y

@@ -543,6 +543,12 @@ D T[[2]] mySlice(D T[[2]] X, T1 _lb1, T2 _ub1) {
     return Y;
 }
 
+template<type T, type T1, type T2 >
+T[[1]] mySlice(T[[1]] X, T1 _lb, T2 _ub) {
+    uint lb = (uint)(_lb); uint ub = (uint)(_ub);
+    return X[lb:ub];
+}
+
 template<domain D, type T, type T1, type T2 >
 D T[[1]] mySlice(D T[[1]] X, T1 _lb, T2 _ub) {
 
@@ -1080,6 +1086,11 @@ D int32 [[1]] getIntColumn(string ds, string tableName, uint colIndex, uint m, u
 }
 */
 
+uint tableRowCount(string ds, string tableName, uint limit){
+    print("reportedRowCount:",min(limit, tdbGetRowCount(ds, tableName)));
+    return min(limit, tdbGetRowCount(ds, tableName));
+}
+
 template<domain D>
 D bool [[1]] extendColumn(D bool [[1]] x, uint m, uint mi, uint ni){
     uint [[1]] ms (mi); ms = 1;
@@ -1102,12 +1113,19 @@ relColumn<D, T, S> extendColumn(relColumn<D, T, S> x, uint m, uint mi, uint ni){
 
 template<domain D, type T, type T0>
 relColumn<D, T, T> getDBColumn(string ds, string tableName, T0 _colIndex, uint m, uint mi, uint ni){
+
     uint colIndex = (uint)_colIndex;
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
 
     D T [[1]] col = tdbReadColumn(ds, tableName, colIndex);
+    col = mySlice(col,0,min(size(col),mi));
+
+    print("reportedNumRows:",mi);
+    print("colSize:",        size(col));
+
     col = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
+    print("colSizeRep:", size(col));
 
     public relColumn<D, T, T> result;
     result.fv  = reshape(false, m);
@@ -1119,6 +1137,7 @@ relColumn<D, T, T> getDBColumn(string ds, string tableName, T0 _colIndex, uint m
 //TODO check out why it does not work with polymorphic T (like public string column)
 //template< type T>
 relColumn<pd_shared3p, xor_uint32, xor_uint8> getDBColumn(string ds, string tableName, int64 _colIndex, uint m, uint mi, uint ni){
+    print("start:",mi);
     uint colIndex = (uint)_colIndex;
     uint rv;
     uint [[1]] ms (mi); ms = 1;
@@ -1146,11 +1165,13 @@ relColumn<pd_shared3p, xor_uint32, xor_uint8> getDBColumn(string ds, string tabl
     result.fv  = reshape(false, m);
     result.val = col;
     result.str = col_str;
+    print("finish:",mi);
     return result;
 }
 
 template<type T>
 relColumn<public, uint32, uint8> getDBColumn(string ds, string tableName, T _colIndex, uint m, uint mi, uint ni){
+    print("start:",mi);
     uint colIndex = (uint)_colIndex;
     uint rv;
     uint [[1]] ms (mi); ms = 1;
@@ -1180,6 +1201,7 @@ relColumn<public, uint32, uint8> getDBColumn(string ds, string tableName, T _col
     result.fv  = reshape(false, m);
     result.val = col;
     result.str = col_str;
+    print("finish:",mi);
     return result;
 }
 
@@ -1275,7 +1297,7 @@ void writePublicToTable(string ds, string tableName, T [[1]] _colDataType, T [[1
     uint boolCnt = 0;
     uint floatCnt = 0;
 
-    uint m = size(ms);
+    //uint m = size(ms);
     uint n = size(colDataType);
     uint offset = 0;
     while (true){
@@ -1321,9 +1343,9 @@ void writePublicToTable(string ds, string tableName, T [[1]] _colDataType, T [[1
         }
         tdbInsertRow(ds,tableName, params);
         tdbVmapClear(params);
-        if (strCnt == m) break;
+        if (strCnt == size(ms) & floatCnt == size(floatData) & intCnt == size(intData) & boolCnt == size(boolData)) break;
     }
-
+    print("batch finished");
 }
 
 //creation of constant columns
@@ -1464,6 +1486,16 @@ relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(pd_shared3p xor_uint8 
 }
 
 //public->private
+template <domain D, type T>
+relColumn<D, T, T> constColumn(float32 arg0){
+    D T arg = (T)arg0;
+    relColumn<D, T, T> result;
+    result.val = reshape(arg,1);
+    result.str = reshape((T)0,1,0);
+    result.fv = reshape(false,1);
+    return result;
+}
+
 template <domain D, type T, type T0>
 relColumn<D, T, T> constColumn(T0 arg0){
     D T arg = (T)arg0;
@@ -1824,6 +1856,30 @@ D bool [[1]] apply_bop(string s, D bool [[1]] x, bool [[1]] y){
     return b;
 }
 
+template<domain D, domain D0, domain D1>
+D bool [[1]] apply_bop(string s, D0 int32 [[1]] x, D1 float32 [[1]] y){
+    D bool [[1]] b;
+    if      (s == "==") b = ((float32)x == y);
+    else if (s == "<=") b = ((float32)x <= y);
+    else if (s == "<")  b = ((float32)x <  y);
+    else if (s == ">=") b = ((float32)x >= y);
+    else if (s == ">")  b = ((float32)x >  y);
+    else assert(false);
+    return b;
+}
+
+template<domain D, domain D0, domain D1>
+D bool [[1]] apply_bop(string s, D0 float32 [[1]] x, D1 int32 [[1]] y){
+    D bool [[1]] b;
+    if      (s == "==") b = (x == (float32)y);
+    else if (s == "<=") b = (x <= (float32)y);
+    else if (s == "<")  b = (x <  (float32)y);
+    else if (s == ">=") b = (x >= (float32)y);
+    else if (s == ">")  b = (x >  (float32)y);
+    else assert(false);
+    return b;
+}
+
 template<domain D, domain D0, domain D1, type T>
 D bool [[1]] apply_bop(string s, D0 T [[1]] x, D1 T [[1]] y){
     D bool [[1]] b;
@@ -1886,6 +1942,12 @@ D int32 [[1]] div(D0 int32 [[1]] x, D1 int32 [[1]] y){
     D uint32 [[1]] uz = ux / uy;
     D int32 [[1]] z = (int32)uz + 1 - (int32)(exactDiv | !diffSign);
     return (int32)z * (1 - 2*(int32)diffSign);
+}
+
+template<domain D>
+D float32 [[1]] div(D float32 [[1]] x, float32 [[1]] y){
+   D float32 [[1]] dy = y;
+   return x / dy;
 }
 
 template<domain D, domain D0, domain D1>
