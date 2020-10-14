@@ -15,9 +15,6 @@ import Expr
 import Expr.Classes
 import Rule
 
-import Data.Text.Prettyprint.Doc
-import Debug.Trace
-
 type PKTrans = State PKState
 
 data PKState = PKState
@@ -35,7 +32,7 @@ pkState dp = PKState 0 M.empty dp
 
 -- Reduces database lookups
 pkTransform :: DatalogProgram -> DatalogProgram
-pkTransform dp = dp & dpRules . traversed %~ \r -> trace ("=== Transforming " <> ruleName r <> "\n") (r & ruleTail %~ foldWithAnds . f)
+pkTransform dp = dp & dpRules . traversed . ruleTail %~ foldWithAnds . f
   where f e = evalState (traverse transformDBFact $ andsToList e) (pkState dp)
 
 transformDBFact :: Expr -> PKTrans Expr
@@ -59,7 +56,7 @@ transformDBFact p@Pred{} =
             equalities x = catMaybes $ zipWith zipper x pArgs
             updateMap = modifying pksPKMap $ M.insert (predId, pkId) pArgs
         Just $ case vars of
-          Just x  -> trace ("Cache hit! " <> predId <> (show $ pretty vars)) $ return . foldWithAnds $ equalities x
-          Nothing -> traceM ("Caching " <> (show $ pretty (predId, pkId)) <> " ->\n" <> (show $ pretty p) <> "\n") *> updateMap *> return p
+          Just x  -> return . foldWithAnds $ equalities x
+          Nothing -> updateMap *> return p
 transformDBFact x = return x
 
