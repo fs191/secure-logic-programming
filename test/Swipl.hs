@@ -30,12 +30,8 @@ import DatalogProgram
 import Expr
 import Rule
 
-import Transform
-import PreProcessing
-import PostProcessing
-import TypeInference
-import Adornment
 import Language.SecreC
+import Translator
 
 data SwiplException
   = SwiplException String
@@ -150,8 +146,9 @@ compileSC file iterations = errExit False $ withTmpDir act
     act tmp = 
       do
         _prog <- liftIO $ parseDatalogFromFile file
-        trans <- liftIO $ deriveAllGroundRules iterations . preProcess $ adornProgram _prog
-        let sc = secrecCode . typeInference $ postProcess trans
+        let conf = TranslatorConfig iterations
+        trans <- liftIO $ process conf _prog
+        let sc = secrecCode trans
         cp "SecreC/lp_essentials.sc" tmp
         let _path = tmp <> "prog.sc"
         let src = T.pack . show $ pretty sc

@@ -17,6 +17,9 @@ module Rule
   , ruleSchema
   , boundVars
   , unboundVars
+  , primaryKey
+  , nonPKLens
+  , pkIndex
   ) where
 
 ---------------------------------------------------------
@@ -111,4 +114,30 @@ boundVars = filter (view $ annotation . annBound) . args
 
 unboundVars :: Rule -> [Expr]
 unboundVars = filter (view $ annotation . annBound . to not) . args
+
+-- Attempts to get the primary key of a DB rule if it exists
+primaryKey' :: Getter Rule (Maybe (Expr, Int))
+primaryKey' = to getter
+  where
+    getter r = 
+      case pks r of
+        []  -> Nothing
+        [x] -> Just x
+        _   -> error $ "Rule " <> show r <> " has multiple primary keys."
+    pks :: Rule -> [(Expr, Int)]
+    pks r = r ^..
+      ruleHead 
+      . predArgs 
+      . to (`zip` [0..])
+      . folded 
+      . filtered (^. _1 . annotation . isPK)
+
+primaryKey :: Getter Rule (Maybe Expr)
+primaryKey = to . preview $ primaryKey' . _Just . _1
+
+pkIndex :: Getter Rule (Maybe Int)
+pkIndex = to . preview $ primaryKey' . _Just . _2
+
+nonPKLens :: Traversal' Rule Expr
+nonPKLens = undefined
 

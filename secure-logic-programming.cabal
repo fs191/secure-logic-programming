@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a2af3a08c6a64e40df2ce1e78efde0828c869e317fd7911afe24407f18051843
+-- hash: b3b8f0c098bcd19e1470a7f03e9b4910df38084a47c4cc22480937487245284d
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -33,6 +33,7 @@ library
       DBClause
       ErrorMsg
       Expr
+      Expr.Classes
       Language.Datalog.Literal
       Language.Privalog.Types
       Language.Prolog.PrologSource
@@ -44,6 +45,7 @@ library
       Parser.DatalogParser
       Parser.DatalogParser.Expr
       Parser.DatalogParser.Lexer
+      PKTransform
       PostProcessing
       PreProcessing
       Rule
@@ -52,6 +54,7 @@ library
       Substitution
       Table
       Transform
+      Translator
       TypeInference
   other-modules:
       Paths_secure_logic_programming

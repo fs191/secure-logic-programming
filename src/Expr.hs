@@ -51,6 +51,7 @@ module Expr
   , _ConstStr
   , andsToList
   , orsToList
+  , foldWithAnds
   , predicateVarNames
   , predicateBoundedVarNames
   , predicateFreeVarNames
@@ -617,4 +618,8 @@ toDNF = toDNF' . toNNF
     dist ann e1@(Or _ e11 e12) e2 = Or ann (dist ann e11 e2) (dist ann e12 e2)
     dist ann e1 e2@(Or _ e21 e22) = Or ann (dist ann e1 e21) (dist ann e1 e22)
     dist ann e1 e2 = And ann e1 e2
+
+foldWithAnds :: [Expr] -> Expr
+foldWithAnds [] = constTrue
+foldWithAnds es = foldr1 eAnd es
 

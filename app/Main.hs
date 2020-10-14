@@ -14,12 +14,8 @@ import Control.Monad hiding (ap)
 import Data.Text.Prettyprint.Doc
 import GHC.Stack
 
-import Transform
-import PreProcessing
-import PostProcessing
-import TypeInference
-import Adornment
 import DatalogProgram
+import Translator
 
 main :: IO ()
 main = 
@@ -40,16 +36,13 @@ main =
                 Left ex -> throw $ CannotReadFile inFileName ex
                 Right x -> x
 
-          let ap   = adornProgram program
-          let pp   = preProcess ap
-          --let mag  = magicSets ap
-          tf <- deriveAllGroundRules _ite pp
-          let post = postProcess tf
-          let ti = typeInference post
-          let sc = secrecCode ti
+          let conf = TranslatorConfig _ite
+          tr <- process conf program
+
+          let sc = secrecCode tr
 
           let output = show $ if inferTypesOnly
-              then pretty ti
+              then pretty tr
               else pretty sc
 
           -- create a Sharemind script that can be used to upload the tables used in given program

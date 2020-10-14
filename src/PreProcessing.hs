@@ -7,11 +7,13 @@ import Control.Monad.State
 
 import Data.Generics.Uniplate.Data as U
 import Data.Maybe
+import qualified Data.Map.Strict as M
 
 import Annotation
 import DatalogProgram
 import Rule
 import Expr
+import Substitution
 
 preProcess :: DatalogProgram -> DatalogProgram
 preProcess dp = dp' & dpRules %~ concatMap ruleNonDetSplit
@@ -89,13 +91,13 @@ holeToVar (Hole e) =
   do
     n <- get
     modify (+1)
-    return . Var e $ "__HOLE_" <> show n
+    return . Var e $ "__HOLE__" <> show n
 holeToVar x = return x
 
 ruleNonDetSplit :: Rule -> [Rule]
-ruleNonDetSplit r =
-    let rHead   = r ^. ruleHead in
-    let oldTail = r ^. ruleTail in
-    let dnfTail = toDNF oldTail in
-    let newTails = orsToList dnfTail in
-    map (Rule rHead) newTails
+ruleNonDetSplit r = map (Rule rHead) newTails
+  where
+    rHead   = r ^. ruleHead
+    dnfTail = r ^. ruleTail . to toDNF
+    newTails = orsToList dnfTail
+
