@@ -2,8 +2,6 @@
 import struct
 import os
 import sys
-import numpy as np
-import struct
 
 from subprocess import call
 
