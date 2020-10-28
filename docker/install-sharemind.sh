@@ -19,8 +19,8 @@ make -j 8
 
 # Install sharemind API
 cd /root
-install build-sdk/prefix/bin/* /usr/local/bin
-install build-sdk/prefix/lib/* /usr/local/lib
-install build-sdk/prefix/include /usr/local/include
-install build-sdk/prefix/sharemind /usr/local/share
+cp -r build-sdk/prefix/bin/* /usr/bin
+cp -r build-sdk/prefix/lib/* /usr/lib
+cp -r build-sdk/prefix/include/* /usr/include
+cp -r build-sdk/prefix/share/* /usr/share
 rm -rf build-sdk
