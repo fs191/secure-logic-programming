@@ -72,4 +72,3 @@ tests:
     - HUnit
     - hspec
     - hspec-expectations
-    - criterion

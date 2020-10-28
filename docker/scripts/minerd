@@ -1,0 +1,9 @@
+#!/bin/bash
+
+trap "kill 0" EXIT
+
+miner1.sh &
+miner2.sh &
+miner3.sh &
+
+wait

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+trunc=${1%.sc}
+shift
+args=$@
+
+scc -I /root/sharemind/lib/sharemind/stdlib -I . ${trunc}.sc -o ${trunc}.sb &&
+scc -I /root/sharemind/lib/sharemind/stdlib -I . createdb_${trunc}.sc -o createdb_${trunc}.sb &&
+python run_emulator.py createdb_${trunc}.sb 0 &&
+python run_emulator.py ${trunc}.sb 0 ${args}
+

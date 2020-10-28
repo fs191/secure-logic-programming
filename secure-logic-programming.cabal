@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b3b8f0c098bcd19e1470a7f03e9b4910df38084a47c4cc22480937487245284d
+-- hash: 5b55ea8670de8d790fc9d81f988ba1327684f37e18020b772d17882e92766180
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -138,7 +138,6 @@ test-suite test
       HUnit
     , base >=4.7 && <5
     , containers
-    , criterion
     , hspec
     , hspec-expectations
     , lens
