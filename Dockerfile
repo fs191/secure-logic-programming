@@ -41,4 +41,5 @@ RUN sudo apt-get install swi-prolog -y
 FROM environment AS build
 ADD . lpsec
 WORKDIR lpsec
-RUN stack build --copy-bins --test
+RUN stack build
+CMD stack test
