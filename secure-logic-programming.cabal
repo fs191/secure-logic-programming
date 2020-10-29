@@ -65,6 +65,7 @@ library
       HUnit
     , base >=4.7 && <5
     , containers
+    , hashable
     , hspec
     , hspec-expectations
     , lens
@@ -97,6 +98,7 @@ executable lpsec
       HUnit
     , base >=4.7 && <5
     , containers
+    , hashable
     , hspec
     , hspec-expectations
     , lens
@@ -139,6 +141,7 @@ test-suite test
     , base >=4.7 && <5
     , containers
     , criterion
+    , hashable
     , hspec
     , hspec-expectations
     , lens

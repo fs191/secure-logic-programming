@@ -18,9 +18,13 @@ import Control.Monad
 
 import Rule
 import Expr
+import Simplify
 import Solve
 import Substitution
 import DatalogProgram
+import Annotation
+
+import Data.Hashable
 
 import Data.Text.Prettyprint.Doc
 import Debug.Trace
@@ -39,11 +43,12 @@ deriveAllGroundRules n program = f program'
     pipeline :: DatalogProgram -> IO DatalogProgram
     pipeline dp = 
       do
-        pl0 <- dp & id %~ inlineOnceGr
+        pl0 <- dp & id %~ inlineOnceBFS
                  & dpRules . traversed %~ refreshRule "X_"
                  & dpRules %%~ filterM checkConsistency
         pl  <- pl0 & dpRules . traversed %%~ simplifySat
         return $ pl & dpRules . traversed . ruleTail %~ simplifyAnds
+                    & dpRules %~ simplifyRules
                     & dpRules %~ removeFalseFacts
                     & dpRules %~ removeDuplicateFacts
 
@@ -51,10 +56,13 @@ loopPipeline :: Int -> (DatalogProgram -> IO DatalogProgram) -> DatalogProgram -
 loopPipeline n pipeline dp = do
     dp' <- pipeline dp
     let groundRulesBefore = filter (isGround dp ) (dp  ^. dpRules)
-    let groundRulesAfter  = filter (isGround dp') (dp' ^. dpRules)
 
-    -- TODO the following condition is correct only for the Gr strategy
-    if (length groundRulesBefore >= n) || (length groundRulesBefore == length groundRulesAfter) then do
+    -- TODO maybe, we can find a better stop condition and do not need to compute hashes on each step
+    -- for the Gr strategy, we could use e.g (length groundRulesBefore == length groundRulesAfter)
+    let hashBefore = hash (show dp)
+    let hashAfter  = hash (show dp')
+
+    if (length groundRulesBefore >= n) || (hashBefore == hashAfter) then do
         return dp
 
     else do
@@ -100,7 +108,7 @@ inlineOnceDFS dp =
   dp & dpRules .~ rs'
 
   where
-    rs' = potentialSrc <> inlined <> tail potentialTgt
+    rs' = potentialSrc <> inlined <> (if length potentialTgt > 0 then tail potentialTgt else [])
     rs  = dp ^. dpRules
     (potentialSrc, potentialTgt') = S.partition (isGround dp) rs
 
@@ -200,6 +208,26 @@ simplifySat r = do
                     newTails <- (Solve.extractSatSolution vars . andsToList) e
                     let newTail = if newTails == [] then constBool False else foldr1 eAnd newTails
                     return $ r & ruleTail .~ newTail
+
+simplifyRules :: [Rule] -> [Rule]
+simplifyRules rs = map simplifyRule rs
+
+simplifyRule :: Rule -> Rule
+simplifyRule r =
+
+    let rName = ruleName r in
+    let rBody = simplifyAnds' $ r ^. ruleTail in
+    let rArgs = args r in
+    let (boundedVars, freeVars) = S.partition (\z -> z ^. annotation ^. annBound) rArgs in
+    let boundedVarNames = concat $ map varNames boundedVars in
+    let freeVarNames = concat $ map varNames freeVars in
+    let newRuleBody = simplify rBody (boundedVarNames, freeVarNames) in
+
+    let newRuleTail = foldr1 eAnd . S.nub . filter (not . isAnd) $ newRuleBody in
+    --trace ("before: " ++ show (pretty r)) $
+    --trace ("after: " ++ show (pretty (rule rName rArgs newRuleTail))) $
+    --trace "=====" $
+    rule rName rArgs newRuleTail
 
 -- | Removes facts that always evaluate to False
 removeFalseFacts :: [Rule] -> [Rule]
