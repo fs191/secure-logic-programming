@@ -39,7 +39,10 @@ RUN sudo apt-get install swi-prolog -y
 
 # Build lpsec
 FROM environment AS build
-ADD . lpsec
-WORKDIR lpsec
-RUN stack build
+WORKDIR /opt/build
+COPY stack.yaml package.yaml stack.yaml.lock /opt/build/
+RUN stack build --system-ghc --dependencies-only
+WORKDIR /root/lpsec
+ADD . .
+RUN stack install
 CMD stack test
