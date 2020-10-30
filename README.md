@@ -34,7 +34,7 @@ The testing suite relies on SWI-Prolog and Sharemind emulator. To make it easier
 to set up the environment, we use Docker. To run the tests, install Docker and run
 
     docker build --tag lpsec:latest .
-    docker run -it
+    docker run -it lpsec:latest
 
 ## Example run:
 
