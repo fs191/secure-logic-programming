@@ -17,7 +17,6 @@ module Rule
   , boundVars
   , unboundVars
   , primaryKey
-  , nonPKLens
   , pkIndex
   ) where
 
@@ -138,7 +137,4 @@ primaryKey = to . preview $ primaryKey' . _Just . _1
 
 pkIndex :: Getter Rule (Maybe Int)
 pkIndex = to . preview $ primaryKey' . _Just . _2
-
-nonPKLens :: Traversal' Rule Expr
-nonPKLens = undefined
 

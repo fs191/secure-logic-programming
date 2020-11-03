@@ -56,7 +56,7 @@ inlineOnce j dp = dp & dpRules .~ rs'
       let ttl = tgt ^. ruleTail
       let fil (x,_) = isPredicate x && isIDBFact dp x
       let tlPreds = filter fil $ U.contexts ttl
-      let (p,mut) = head . fromMaybe undefined $ nonEmpty tlPreds
+      (p,mut) <- maybeToList $ head <$> nonEmpty tlPreds
       let res
             | null tlPreds = return tgt
             -- we can discard those rules for which there is no hope to become ground in the remaining number of steps
@@ -71,10 +71,6 @@ inlineOnce j dp = dp & dpRules .~ rs'
                   let subster x = applySubst x (tgt & ruleTail .~ mut stl)
                   maybeToList $ subster <$> subst
       res
-
-
-nullify :: Expr -> Expr
-nullify x = constBool False
 
 -- Removes duplicate terms from AND operations at the root expression
 simplifyAnds :: Expr -> Expr

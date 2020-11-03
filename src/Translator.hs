@@ -3,6 +3,7 @@
 module Translator 
   ( TranslatorConfig(..)
   , process
+  , tcIterations
   ) where
 
 import Relude

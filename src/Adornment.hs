@@ -5,6 +5,7 @@
 module Adornment 
   ( suffixPredicate
   , adornProgram
+  , aBound
   ) where
 
 import Relude
@@ -19,7 +20,7 @@ import Control.Lens
 
 import Data.Generics.Uniplate.Data as U
 import Data.Set as S
-import qualified Data.List as L
+import qualified Data.List as L hiding (nub)
 import qualified Data.Text as T
 
 data Adornable = Adornable 
@@ -133,7 +134,7 @@ adornRule a@(Adornable r _bp) =
         _newPairs = do
           let toPair p@(Pred _ n _) = Just (p, n)
               toPair _ = Nothing
-          (p, n) <- L.nub $ _boundTerms ^.. folded . to toPair . _Just
+          (p, n) <- ordNub $ _boundTerms ^.. folded . to toPair . _Just
           let _rs  = findRulesByName _rules n
               _bindings = repeat $ p ^. paramBindings
               _ads  = uncurry Adornable <$> zip _rs _bindings

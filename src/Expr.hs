@@ -60,8 +60,8 @@ module Expr
   , annotateWithBindings
   , identifier
   , hole
-  , unifyExprAnns, unifyExprAnnsWithError
-  , unifyExprTypes, unifyExprTypesWithError
+  , unifyExprAnns
+  , unifyExprTypes
   , unifyExprDomains
   , isArithmetic, isPredicative
   , applyAnnotation
@@ -229,7 +229,6 @@ instance PrologSource Expr where
                                   ]
   prolog (Aggr _ f p x y) = "findall(" <> prolog x <> "," <> prolog p <> ", Xs)," <+>
                             pretty (prologAggr $ show f) <> "_list(Xs," <> prolog y <> ")"
-  prolog x = error $ show x
 
 -- map datalog aggregations to prolog aggregations
 prologAggr :: Text -> Text
@@ -497,20 +496,12 @@ unifyExprAnns :: Expr -> Expr -> Maybe Expr
 unifyExprAnns x y = x & annotation %%~ (unifyAnns a)
   where a = y ^. annotation
 
-unifyExprAnnsWithError :: Expr -> Expr -> Expr
-unifyExprAnnsWithError x y = fromMaybe err $ unifyExprAnns x y
-  where err = undefined
-
 -- | Returns the result of unifying the types of the two expressions
 unifyExprTypes :: Expr -> Expr -> Maybe PPType
 unifyExprTypes x y = unifyTypes xd yd
   where
     xd = x ^. annotation . annType
     yd = y ^. annotation . annType
-
-unifyExprTypesWithError :: Expr -> Expr -> PPType
-unifyExprTypesWithError x y = fromMaybe err $ unifyExprTypes x y
-  where err = undefined
 
 -- | Returns the result of unifying the domains of the two expressions
 unifyExprDomains :: Expr -> Expr -> PPDomain
@@ -617,8 +608,8 @@ toDNF = toDNF' . toNNF
     toDNF' expr                  = expr
 
     dist :: Ann -> Expr -> Expr -> Expr
-    dist ann e1@(Or _ e11 e12) e2 = Or ann (dist ann e11 e2) (dist ann e12 e2)
-    dist ann e1 e2@(Or _ e21 e22) = Or ann (dist ann e1 e21) (dist ann e1 e22)
+    dist ann (Or _ e11 e12) e2 = Or ann (dist ann e11 e2) (dist ann e12 e2)
+    dist ann e1 (Or _ e21 e22) = Or ann (dist ann e1 e21) (dist ann e1 e22)
     dist ann e1 e2 = And ann e1 e2
 
 foldWithAnds :: [Expr] -> Expr

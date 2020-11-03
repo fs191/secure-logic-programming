@@ -21,7 +21,7 @@ import Relude
 import qualified Data.Map as M
 
 import Data.Generics.Uniplate.Data
-import Data.List (nub, stripPrefix)
+import Data.List (nub)
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text as T
 
@@ -66,7 +66,7 @@ compress (Th m) = runIdentity . runUnionFind $
     let pointMap :: M.Map Text (Point Text)
         pointMap = M.fromList $ vs `zip` points
         joins' = [(pointMap M.! x, pointMap M.! y) | (x,y) <- joins]
-    traverse (uncurry union) joins'
+    traverse_ (uncurry union) joins'
     reprMap <- traverse repr pointMap 
     -- Map from initial var names to representative var names
     descMap <- traverse descriptor reprMap
@@ -205,5 +205,8 @@ valEq _ _                             = False
 vars :: [(Expr, Expr)] -> [Expr]
 vars x = filter (is _Var) . uncurry (<>) $ unzip x
 
+keys :: Subst -> [Expr]
 keys (Th theta) = map var (M.keys theta)
+
+elems :: Subst -> [Expr]
 elems (Th theta) = M.elems theta
