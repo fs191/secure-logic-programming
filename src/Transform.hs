@@ -78,7 +78,7 @@ nullify x = constBool False
 
 -- Removes duplicate terms from AND operations at the root expression
 simplifyAnds :: Expr -> Expr
-simplifyAnds x = foldr eAnd h t
+simplifyAnds x = foldl' eAnd h t
   where
     (h:t) = L.nub . filter (not . isAnd) $ simplifyAnds' x
 
