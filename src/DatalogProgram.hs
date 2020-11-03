@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -28,9 +27,10 @@ module DatalogProgram
   , isIDBFact
   ) where
 
+import           Relude
+
 import           Control.Lens hiding (List)
 
-import           Data.Maybe
 import           Data.Data
 
 import           Rule
@@ -43,7 +43,7 @@ import           Language.Prolog.PrologSource
 data Directive
   = InputDirective ![Expr]
   | OutputDirective ![Expr]
-  | DBDirective String ![Expr]
+  | DBDirective Text ![Expr]
   deriving (Show, Eq, Data, Typeable)
 
 instance Pretty Directive where
@@ -149,11 +149,11 @@ outputDirective :: [Expr] -> Directive
 outputDirective = OutputDirective
 
 -- | Creates a new database directive
-dbDirective :: String -> [Expr] -> Directive
+dbDirective :: Text -> [Expr] -> Directive
 dbDirective = DBDirective
 
 -- | Finds all rules with name `n` from the program
-findRules :: DatalogProgram -> String -> [Rule]
+findRules :: DatalogProgram -> Text -> [Rule]
 findRules dp n = dp ^.. dpRules . folded . filtered f
   where f x = fromMaybe False $ x ^? ruleHead . predName . to (==n)
 
@@ -161,21 +161,21 @@ findRules dp n = dp ^.. dpRules . folded . filtered f
 -- names. Needed for running the program in swipl.
 variablize :: Expr -> Expr
 variablize (Var e n) = Var e $ "IN" <> n
-variablize x = error $ "Attempting to variablize " ++ show x
+variablize x = error $ "Attempting to variablize " <> show x
 
 -- | Changes the names of all attributes in the goal expression so that they
 -- are valid Prolog variables.
-variablizeInputs :: [String] -> Expr -> Expr
+variablizeInputs :: [Text] -> Expr -> Expr
 variablizeInputs ins (Pred e n xs) = Pred e n $ f <$> xs
   where 
     f v@(Attribute a n') 
       | elem n' ins = Attribute a $ "IN" <> n'
       | otherwise  = v
     f x = x
-variablizeInputs _ x = error $ "Attempting to variablize " ++ show x
+variablizeInputs _ x = error $ "Attempting to variablize " <> show x
 
 -- | Finds an extensional fact with the name `n` from the program
-findDBFact :: DatalogProgram -> String -> Maybe Rule
+findDBFact :: DatalogProgram -> Text -> Maybe Rule
 findDBFact dp n = extensionalFacts dp 
                     ^? folded 
                      . filtered ((==n) . ruleName)

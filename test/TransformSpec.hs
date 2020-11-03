@@ -1,6 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module TransformSpec where
+
+import Relude
 
 import Test.Hspec
 
@@ -41,20 +41,20 @@ spec =
 transform :: DatalogProgram -> IO DatalogProgram
 transform = deriveAllGroundRules 2
 
-canDeriveOn :: String -> Int -> Spec
-canDeriveOn file n = it desc $ action `shouldReturn` ()
+canDeriveOn :: Text -> Int -> Spec
+canDeriveOn file n = it (show desc) $ action `shouldReturn` ()
   where 
-    desc = "can derive ground rules on " ++ file ++ " with " ++ show n ++ " iterations"
+    desc = "can derive ground rules on " <> file <> " with " <> show n <> " iterations"
     action = do
         f <- parseDatalogFromFile file
         let d = deriveAllGroundRules n f
         return $ d `seq` ()
      
-transPreserveSem :: String -> Int -> Spec
+transPreserveSem :: Text -> Int -> Spec
 transPreserveSem f n = 
   preservesSemantics (deriveAllGroundRules n) f
 
-transPreserveSemDB :: String -> Int -> [Expr] -> Spec
+transPreserveSemDB :: Text -> Int -> [Expr] -> Spec
 transPreserveSemDB f n db = 
   preservesSemanticsDB (deriveAllGroundRules n) f db
 

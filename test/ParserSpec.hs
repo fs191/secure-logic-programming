@@ -1,9 +1,12 @@
 module ParserSpec where
 
+import Relude
+
 import Test.Hspec
 import Test.HUnit
 
 import Data.Either (isLeft)
+import qualified Data.Text as T
 
 import Text.Megaparsec.Error (errorBundlePretty)
 
@@ -35,16 +38,16 @@ spec = parallel . describe "Parser.parseDatalog" $ do
     canParse "examples/ppdatalog/precendence.pl"
     cannotParse "examples/prolog/negative/gibberish.pl"
 
-canParse :: String -> Spec
-canParse file = it ("can parse " ++ file) $ action `shouldReturn` ()
+canParse :: T.Text -> Spec
+canParse file = it (show $ "can parse " <> file) $ action `shouldReturn` ()
   where action = do
-            res <- parseDatalog file <$> readFile file
+            res <- parseDatalog file <$> readFileText (toString file)
             case res of
               Right _ -> return ()
-              Left  e -> error $ errorBundlePretty e
+              Left  e -> error . toText $ errorBundlePretty e
 
-cannotParse :: String -> Spec
-cannotParse file = it ("does not parse " ++ file) $ do
-  res <- parseDatalog file <$> readFile file
+cannotParse :: T.Text -> Spec
+cannotParse file = it (show $ "does not parse " <> file) $ do
+  res <- parseDatalog file <$> readFileText (toString file)
   assertBool "" $ isLeft res
 

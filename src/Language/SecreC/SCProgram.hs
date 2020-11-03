@@ -12,12 +12,11 @@ module Language.SecreC.SCProgram
   , varToExpr
   ) where
 
-import Data.Text (Text)
+import Relude
+
 import Data.Text.Prettyprint.Doc
 
 import Language.SecreC.SCExpr
-
-
 
 newtype SCProgram = SCProgram
   { _pStatements :: [TopStatement]

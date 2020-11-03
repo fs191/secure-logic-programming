@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Swipl 
   ( runDatalogFromFile
@@ -11,6 +10,8 @@ module Swipl
   , doesNotRun
   , compilesSuccessfully
   ) where
+
+import Relude
 
 import Shelly
 
@@ -25,6 +26,8 @@ import Control.Exception
 
 import Test.Hspec
 
+import qualified Text.Show
+
 import Parser.DatalogParser
 import DatalogProgram
 import Expr
@@ -34,22 +37,21 @@ import Language.SecreC
 import Translator
 
 data SwiplException
-  = SwiplException String
+  = SwiplException Text
   | SecreCException Text
   deriving (Exception, Eq)
 
 instance Show SwiplException where
-  show (SwiplException s) = "Failed to run swipl program:\n" ++ s
-  show (SecreCException s) = T.unpack $
-    "Failed to compile SecreC program:\n" <> s
+  show (SwiplException s) = "Failed to run swipl program:\n" <> toString s
+  show (SecreCException s) = "Failed to compile SecreC program:\n" <> toString s
 
-runDatalogFromFile :: FilePath -> IO (Either SwiplException [Text])
+runDatalogFromFile :: Text -> IO (Either SwiplException [Text])
 runDatalogFromFile p = shelly $ runDatalogFromFile' p
 
-runDatalogFromFile' :: FilePath -> Sh (Either SwiplException [Text])
+runDatalogFromFile' :: Text -> Sh (Either SwiplException [Text])
 runDatalogFromFile' p = silently $
   do
-    let _path = T.pack p
+    let _path = p
     let _action = run "swipl" 
           [ "-g"
           , "forall(goal(X,Y), writeln(Y))"
@@ -57,9 +59,9 @@ runDatalogFromFile' p = silently $
           , "halt"
           , _path
           ]
-    _source <- liftIO $ readFile p
-    let _num = ((("\n"++) . (++"\t") . show) <$> ([1..] :: [Int]))
-    let _numSource = concat $ (uncurry (++)) <$> _num `zip` lines _source
+    _source <- liftIO $ readFileText (toString p)
+    let _num = ((("\n"<>) . (<>"\t") . show) <$> ([1..] :: [Int]))
+    let _numSource = mconcat $ (uncurry (<>)) <$> _num `zip` lines _source
     res <- handleany_sh 
       (\e -> return . Left . SwiplException $ enumerateLines' _source <> "\n\n" <> show e) $
       Right <$> _action
@@ -73,21 +75,21 @@ runDatalogProgram dp = shelly $ withTmpDir action
     action tmp =
       do
         let _path = tmp <> "/dprog"
-        writefile _path . T.pack . show $ prolog dp
-        runDatalogFromFile' _path
+        writefile _path . show $ prolog dp
+        runDatalogFromFile' $ toText _path
 
 preservesSemantics 
   :: (DatalogProgram -> IO DatalogProgram) 
-  -> String 
+  -> Text 
   -> Spec
 preservesSemantics f p = preservesSemanticsDB f p []
 
 preservesSemanticsDB
   :: (DatalogProgram -> IO DatalogProgram) 
-  -> String 
+  -> Text 
   -> [Expr]
   -> Spec
-preservesSemanticsDB f p db = it desc $
+preservesSemanticsDB f p db = it (toString desc) $
   do
     _prog <- parseDatalogFromFile p
     _pre  <- runDatalogProgram $ insertDB db _prog
@@ -98,7 +100,7 @@ preservesSemanticsDB f p db = it desc $
       Right _ -> 
         if (S.fromList <$> _pre) == (S.fromList <$> _post)
           then return ()
-          else expectationFailure $ 
+          else expectationFailure . toString $ 
             "\nORIGINAL:\n" <> (enumerateLines' . show $ prolog _prog)     <> "\n\n" <>
             "MODIFIED:\n"   <> (enumerateLines' . show $ prolog _fprog) <> "\n\n" <>
             "expected:\n"   <> show _pre                 <> "\n\n" <>
@@ -106,11 +108,11 @@ preservesSemanticsDB f p db = it desc $
   where
     desc = "preserves semantics of " <> p
 
-runsSuccessfully :: String -> (DatalogProgram -> IO DatalogProgram) -> [Text] -> Spec
+runsSuccessfully :: Text -> (DatalogProgram -> IO DatalogProgram) -> [Text] -> Spec
 runsSuccessfully n p res = runsSuccessfullyDB n p res []
 
-runsSuccessfullyDB :: String -> (DatalogProgram -> IO DatalogProgram) -> [Text] -> [Expr] -> Spec
-runsSuccessfullyDB n p res db = it desc $
+runsSuccessfullyDB :: Text -> (DatalogProgram -> IO DatalogProgram) -> [Text] -> [Expr] -> Spec
+runsSuccessfullyDB n p res db = it (toString desc) $
   do
     _prog <- parseDatalogFromFile n
     _fprog <- p _prog
@@ -118,7 +120,7 @@ runsSuccessfullyDB n p res db = it desc $
     _res <- runDatalogProgram p'
     if (S.fromList <$> _res) == (Right $ S.fromList res)
       then return ()
-      else expectationFailure $ 
+      else expectationFailure . toString $ 
         "\nORIGINAL:\n" <> (enumerateLines' . show $ prolog _prog) <> "\n\n" <>
         "MODIFIED:\n" <> (enumerateLines' . show $ prolog p') <> "\n\n" <>
         "expected: " <> show res <> "\n" <>
@@ -126,8 +128,8 @@ runsSuccessfullyDB n p res db = it desc $
   where
     desc = "evaluating " <> n <> " outputs " <> show res
 
-doesNotRun :: String -> Spec
-doesNotRun p = it desc $
+doesNotRun :: Text -> Spec
+doesNotRun p = it (toString desc) $
   do
     _prog <- parseDatalogFromFile p
     runDatalogProgram _prog `shouldThrow` anyException
@@ -140,7 +142,7 @@ insertDB db x = x & dpRules %~ (<> _dbRules)
     _dbRules :: [Rule]
     _dbRules = [fact _n _as | Pred _ _n _as <- db]
 
-compileSC :: String -> Int -> Sh (Either SwiplException Text)
+compileSC :: Text -> Int -> Sh (Either SwiplException Text)
 compileSC file iterations = errExit False $ withTmpDir act
   where
     act tmp = 
@@ -151,14 +153,14 @@ compileSC file iterations = errExit False $ withTmpDir act
         let sc = secrecCode trans
         cp "SecreC/lp_essentials.sc" tmp
         let _path = tmp <> "prog.sc"
-        let src = T.pack . show $ pretty sc
+        let src = show $ pretty sc
         let srcNum = enumerateLines src
-        writefile _path src
+        writefile (toString _path) src
         cd tmp
         res <- run "scc" 
-                 [ T.pack _path
+                 [ toText _path
                  , "-I"
-                 , T.pack tmp
+                 , toText tmp
                  , "-I"
                  , "/usr/lib/sharemind/stdlib"
                  , "-o"
@@ -171,8 +173,8 @@ compileSC file iterations = errExit False $ withTmpDir act
           0 -> return $ Right res
           _ -> return . Left $ SecreCException ex
 
-compilesSuccessfully :: String -> Int -> Spec
-compilesSuccessfully file iterations = it desc $ do
+compilesSuccessfully :: Text -> Int -> Spec
+compilesSuccessfully file iterations = it (toString desc) $ do
   let act =
         do
           res <- shelly . silently $ compileSC file iterations
@@ -181,12 +183,12 @@ compilesSuccessfully file iterations = it desc $ do
             Right _ -> return ()
   act `shouldReturn` ()
   where
-    desc = "Translates " ++ file ++ " to SecreC successfully." 
+    desc = "Translates " <> file <> " to SecreC successfully." 
 
-enumerateLines' :: String -> String
-enumerateLines' = T.unpack . enumerateLines . T.pack
+enumerateLines' :: Text -> Text
+enumerateLines' = enumerateLines
 
 enumerateLines :: Text -> Text
 enumerateLines s = T.intercalate "\n" $ enumf <$> T.lines s `zip` [1..]
   where enumf :: (Text, Int) -> Text
-        enumf (l, i) = (T.pack $ show i) <> "\t| " <> l
+        enumf (l, i) = show i <> "\t| " <> l

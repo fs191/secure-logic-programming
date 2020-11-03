@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y \
       libhiredis-dev libmpfr-dev libssl-dev m4 make nettle-dev patch pkg-config \
       z3 python-numpy curl
 RUN apt-get install -y --no-install-recommends doxygen
-RUN LD_LIBRARY_PATH=/root/build-sdk/prefix/lib
+#RUN LD_LIBRARY_PATH=/root/build-sdk/prefix/lib
+ENV SHAREMIND_STDLIB_PATH /usr/lib/sharemind/stdlib
 RUN git clone https://github.com/sharemind-sdk/build-sdk.git
 WORKDIR build-sdk
 RUN git checkout 972aac87d772b67122ebb20bac0c315e5bf3ac83
@@ -22,13 +23,14 @@ RUN make -j 8
 
 # Install sharemind API
 WORKDIR /root
+ADD docker/scripts/* /usr/bin/
+ADD docker/config/* /root/.config/sharemind/
 RUN cp -r build-sdk/prefix/bin/* /usr/bin
 RUN cp -r build-sdk/prefix/lib/* /usr/lib
 RUN cp -r build-sdk/prefix/include/* /usr/include
 RUN cp -r build-sdk/prefix/share/* /usr/share
 RUN rm -rf build-sdk
-ADD docker/scripts/* /root/sharemind/bin/
-ADD docker/config/* /root/.config/sharemind/
+ADD SecreC/lp_essentials.sc /usr/lib/sharemind/stdlib
 
 # Install SWI-Prolog
 #ADD docker/install-swipl.sh install-swipl.sh

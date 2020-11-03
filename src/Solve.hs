@@ -1,8 +1,8 @@
 module Solve (checkSat) where
 
+import Relude
+
 import qualified SimpleSMT as SMT
-import Data.Foldable
-import Control.Monad.State
 import Data.List
 import Data.Maybe
 import Data.Generics.Uniplate.Data
@@ -22,7 +22,7 @@ checkSat es = do
 
 exprToSExpr :: Expr -> Maybe SMT.SExpr
 exprToSExpr (ConstInt _ x) = return $ SMT.Atom (show x)
-exprToSExpr (Var _ x)      = return $ SMT.Atom x
+exprToSExpr (Var _ x)      = return $ SMT.Atom (toString x)
 exprToSExpr (Not _ x)   = SMT.not <$> exprToSExpr x
 exprToSExpr (Neg _ x)   = SMT.neg <$> exprToSExpr x
 exprToSExpr (Inv _ x)   = Solve.inv <$> exprToSExpr x
@@ -57,13 +57,13 @@ neq x y = SMT.not $ SMT.eq x y
 inv :: SMT.SExpr -> SMT.SExpr
 inv = SMT.div (SMT.Atom "1")
 
-vars :: [Expr] -> [String]
+vars :: [Expr] -> [Text]
 vars (e:es) = union (nub [v | Var _ v <- universe e]) (vars es)
 vars [] = []
 
-declareVars :: SMT.Solver -> [String] -> IO SMT.Solver
+declareVars :: SMT.Solver -> [Text] -> IO SMT.Solver
 declareVars s (v:vs) = do
-  SMT.declare s v (SMT.Atom "Int")
+  SMT.declare s (toString v) (SMT.Atom "Int")
   declareVars s vs
 declareVars s [] = return s
 

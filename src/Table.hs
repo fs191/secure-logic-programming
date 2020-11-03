@@ -4,9 +4,11 @@ module Table
   ( getTableData
   ) where
 
+import Relude
+
 import Data.Map as M
-import Data.List (transpose, find)
-import Data.List.Split (endBy, splitOn)
+
+import Data.Text (splitOn)
 
 newtype Row k v = Row (Map k v)
   deriving (Functor)
@@ -30,7 +32,7 @@ header :: Table k v -> [k]
 header = _tHeader
 
 rows :: (Ord k) => Table k v -> [Row k v]
-rows t = Row . fromList . (zip $ header t) <$> _tRows t
+rows t = Row . M.fromList . (zip $ header t) <$> _tRows t
 
 rowsRaw :: Table k v -> [[v]]
 rowsRaw (Table _ vss) = vss
@@ -54,20 +56,16 @@ dbExt  = ".csv"
 
 -- read the database from the file as a matrix of strings
 -- read is as a single table row
-readDBString :: String -> String -> IO (Table String String)
+readDBString :: Text -> Text -> IO (Table Text Text)
 readDBString dbFileName separator = do
-    (firstLine:ls) <- fmap lines (readFile dbFileName)
-    let varNames = splitBySeparator separator firstLine
-    let t    = Prelude.map (splitBySeparator separator) ls
+    (firstLine:ls) <- fmap (lines . toText) (readFile $ toString dbFileName)
+    let varNames = splitOn separator firstLine
+    let t    = Relude.map (splitOn separator) ls
     return $ table varNames t
 
-splitBySeparator :: String -> String -> [String]
-splitBySeparator sep s =
-   if last s == last sep then endBy sep s else splitOn sep s
-
-getTableData :: String -> IO [[String]]
+getTableData :: Text -> IO [[Text]]
 getTableData p = do
-    tableData <- readDBString (dbPath ++ p ++ dbExt) dbSep
+    tableData <- readDBString (dbPath <> p <> dbExt) dbSep
     let tableHeader = header tableData
     let tableRows   = rowsRaw tableData
     return (tableHeader : tableRows)

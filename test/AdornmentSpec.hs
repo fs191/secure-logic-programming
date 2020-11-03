@@ -1,5 +1,7 @@
 module AdornmentSpec where
 
+import Relude
+
 import Data.Either
 
 import Test.Hspec
@@ -24,7 +26,7 @@ spec = describe "Adornment.adornProgram" $ do
   runsSuccessfullyDB "examples/ppdatalog/employee.pl" (return . adornProgram) employeeRes employeeDB
   runsSuccessfullyDB "examples/ppdatalog/auction.pl"  (return . adornProgram) marketRes marketDB
 
-adornPreserveSem :: String -> Spec
+adornPreserveSem :: Text -> Spec
 adornPreserveSem f = 
   preservesSemantics (return . adornProgram) f
 

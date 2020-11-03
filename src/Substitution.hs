@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Substitution
@@ -17,26 +16,28 @@ module Substitution
 ---- Substitution map and related operations
 ---------------------------------------------------------
 
+import Relude
+
 import qualified Data.Map as M
 
 import Data.Generics.Uniplate.Data
-import Data.Maybe
-import Data.List (nub, stripPrefix, isPrefixOf)
+import Data.List (nub, stripPrefix)
 import Data.Text.Prettyprint.Doc
+import qualified Data.Text as T
 
 import Control.Exception (assert)
 import Control.Lens hiding (universe, transform, transformM)
 import Control.Lens.Extras
-import Control.Monad.State
 import Control.Monad.Trans.UnionFind
-import Control.Applicative
+
+import qualified Text.Show
 
 import Expr
 import Annotation
 
 -- | Representation of substitution on variables. Only works on
 -- expressions that have an identifier. Currently does not preserve types.
-newtype Subst = Th (M.Map String Expr)
+newtype Subst = Th (M.Map Text Expr)
   deriving (Semigroup, Monoid, Eq)
 
 instance Show Subst where
@@ -47,7 +48,7 @@ instance Pretty Subst where
 
 -- | A very safe string that is prepended to variable names to keep track
 -- of which variables have already been substituted. Only used internally.
-safeStr :: String
+safeStr :: Text
 safeStr = "$!!?"
 
 -- | Compresses the substitution using union-find. 
@@ -62,14 +63,14 @@ compress (Th m) = runIdentity . runUnionFind $
     let joins = [(k, v) | (k, Var _ v) <- M.toList m]
         vs = nub $ (M.keys m) <> [v | Var _ v <- M.elems m]
     points <- traverse fresh vs
-    let pointMap :: M.Map String (Point String)
+    let pointMap :: M.Map Text (Point Text)
         pointMap = M.fromList $ vs `zip` points
         joins' = [(pointMap M.! x, pointMap M.! y) | (x,y) <- joins]
     traverse (uncurry union) joins'
     reprMap <- traverse repr pointMap 
     -- Map from initial var names to representative var names
     descMap <- traverse descriptor reprMap
-    let varByName :: String -> Maybe Expr
+    let varByName :: Text -> Maybe Expr
         varByName n = m ^? to M.elems 
                          . folded 
                          . filtered (\x -> fromMaybe False $ x ^? _Var . _2 . to (==n))
@@ -90,7 +91,7 @@ emptyTheta = Th $ M.empty
 v |-> y = Th (M.singleton x t)
   where x = fromMaybe err  $ identifier v
         t = fromMaybe err2 $ unifyExprAnns y v
-        err =  error $ show v ++ "does not have an identifier"
+        err =  error $ show v <> "does not have an identifier"
         err2 = error $ "Failed to unify " <> show v <> " and " <> show y
 
 -- | Get the substitution term for variable `x`
@@ -114,20 +115,20 @@ applyToExpr theta bexpr = removeSafePrefixes . transform f $ safePrefix _bexpr
         f x         = x
         _vars       = [b | (Var _ b) <- universe bexpr]
         -- Ensure that no variables begin with the safe string before application
-        _bexpr      = assert (all (not . isPrefixOf safeStr) _vars) bexpr
+        _bexpr      = assert (all (not . T.isPrefixOf safeStr) _vars) bexpr
 
 removeSafePrefixes :: Expr -> Expr
 removeSafePrefixes = transform f
   where
-    f (Var a x) = Var a $ fromMaybe x $ stripPrefix safeStr x
+    f (Var a x) = Var a $ fromMaybe x $ T.stripPrefix safeStr x
     f x = x
 
-mapKeys :: (String -> String) -> Subst -> Subst
+mapKeys :: (Text -> Text) -> Subst -> Subst
 mapKeys f (Th theta) = Th $ M.mapKeys f theta
 
 -- | Rename all the variables in `e` by 
 -- enumerating them and prepending the names with `prefix`
-refreshExpr :: String -> Expr -> Subst
+refreshExpr :: Text -> Expr -> Subst
 refreshExpr prefix e = mconcat $ evalState substs (0 :: Int)
   where 
     substs = traverse f $ nub [v | v@(Var _ _) <- universe e]
@@ -147,7 +148,7 @@ safePrefix = transform f
         f x = x
 
 -- | Immediately refreshes variable names in `e`
-refreshAndApply :: String -> Expr -> Expr
+refreshAndApply :: Text -> Expr -> Expr
 refreshAndApply prefix e = applyToExpr (refreshExpr prefix e) e
 
 -- | Attempt to unify the two expressions. Will return Nothing if the expressions cannot be unified

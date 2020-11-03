@@ -9,11 +9,13 @@ module Transform
 ----   to intermediate representation
 ---------------------------------------------------------
 
-import Data.Generics.Uniplate.Operations as U
-import qualified Data.List.Safe as S
-import Data.Maybe
+import Relude
 
-import Control.Lens as L
+import Data.Generics.Uniplate.Operations as U
+
+import qualified Data.List as L
+
+import Control.Lens
 import Control.Monad
 
 import Rule
@@ -40,7 +42,7 @@ deriveAllGroundRules n program = f program'
                  & dpRules %%~ filterM checkConsistency
         return $ pl & dpRules . traversed . ruleTail %~ simplifyAnds
                     & dpRules %~ removeFalseFacts
-                    & dpRules %~ removeDuplicateFacts
+                    & dpRules %~ L.nub
 
 -- | Tries to unify the first predicate in each rule body with an appropriate rule
 inlineOnce :: Int -> DatalogProgram -> DatalogProgram
@@ -54,7 +56,7 @@ inlineOnce j dp = dp & dpRules .~ rs'
       let ttl = tgt ^. ruleTail
       let fil (x,_) = isPredicate x && isIDBFact dp x
       let tlPreds = filter fil $ U.contexts ttl
-      (p,mut) <- S.head tlPreds
+      let (p,mut) = head . fromMaybe undefined $ nonEmpty tlPreds
       let res
             | null tlPreds = return tgt
             -- we can discard those rules for which there is no hope to become ground in the remaining number of steps
@@ -76,7 +78,9 @@ nullify x = constBool False
 
 -- Removes duplicate terms from AND operations at the root expression
 simplifyAnds :: Expr -> Expr
-simplifyAnds x = foldr1 eAnd . S.nub . filter (not . isAnd) $ simplifyAnds' x
+simplifyAnds x = foldr eAnd h t
+  where
+    (h:t) = L.nub . filter (not . isAnd) $ simplifyAnds' x
 
 simplifyAnds' :: Expr -> [Expr]
 simplifyAnds' (And _ x y) = simplifyAnds' x <> simplifyAnds' y
@@ -100,8 +104,4 @@ checkConsistency r = Solve.checkSat $ r ^. ruleTail . to andsToList
 -- | Removes facts that always evaluate to False
 removeFalseFacts :: [Rule] -> [Rule]
 removeFalseFacts = filter (\x -> x ^. ruleTail /= constBool False)
-
--- | Removes duplicates of facts that appear more than once
-removeDuplicateFacts :: [Rule] -> [Rule]
-removeDuplicateFacts = S.nub
 

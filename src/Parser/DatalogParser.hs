@@ -4,6 +4,8 @@ module Parser.DatalogParser
   , parseDatalog
   ) where
 
+import Relude
+
 import Text.Megaparsec
 
 import Data.Void (Void)
@@ -20,7 +22,7 @@ import qualified Rule as R
 import Annotation as A
 import ErrorMsg
 
-type Parser = Parsec Void String
+type Parser = Parsec Void Text
 
 data Clause
   = RC R.Rule
@@ -111,15 +113,15 @@ goal =
 -----------------------
 
 -- | Parses a privacy datalog program from a string
-parseDatalog :: String -> String -> Either (ParseErrorBundle String Void) DP.DatalogProgram
-parseDatalog = runParser datalogParser
+parseDatalog :: Text -> Text -> Either (ParseErrorBundle Text Void) DP.DatalogProgram
+parseDatalog path content = runParser datalogParser (toString path) content
 
 -- | Parses a privacy datalog program from a source file
-parseDatalogFromFile :: String -> IO DP.DatalogProgram
+parseDatalogFromFile :: Text -> IO DP.DatalogProgram
 parseDatalogFromFile filepath =
   do
-    file <- readFile filepath
-    let res = parse datalogParser filepath file
+    file <- readFileText (toString filepath)
+    let res = parse datalogParser (toString filepath) file
     case res of
       Left x  -> error . show $ MegaparsecError x
       Right x -> return x
@@ -130,5 +132,5 @@ parseDatalogFromFile filepath =
 
 joinExprs :: [Expr] -> Expr
 joinExprs [] = constTrue
-joinExprs b  = foldl1 eAnd b
+joinExprs (h:t)  = foldl' eAnd h t
 

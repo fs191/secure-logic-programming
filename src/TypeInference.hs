@@ -3,8 +3,9 @@ module TypeInference
   ( typeInference
   ) where
 
+import Relude
+
 import Control.Lens
-import Control.Monad
 
 import qualified Data.Map.Strict as M
 import qualified Data.List as L
@@ -19,13 +20,12 @@ import Language.Privalog.Types
 import ErrorMsg
 
 import Data.Text.Prettyprint.Doc
-import Debug.Trace
 
 -- | A substitution for typings. Substitutes types based on expression 
 -- identifier. It does not overwrite the typing, but rather tries to unify the 
 -- new typing with the old.
 data TypeSubstitution 
-  = TypeSubstitution (M.Map String Typing)
+  = TypeSubstitution (M.Map Text Typing)
   deriving (Show)
 
 instance Semigroup TypeSubstitution where
@@ -94,8 +94,8 @@ inferFromDB dp (Pred _ n xs) = mconcat newParams'
         y | v ^. annotation . annBound = Unknown
           | otherwise     = d
     err v = error $ 
-      (show $ v ^. annotation . srcPos) ++ " "
-      ++ show v ++ " does not have an indentifier"
+      (show $ v ^. annotation . srcPos) <> " "
+      <> show v <> " does not have an indentifier"
     newParams' = inferParams <$> (xs `zip` unified)
 inferFromDB _ _ = mempty
 
@@ -120,7 +120,7 @@ inferDBRet dp = dp & dpRules . traversed . ruleTail %~ U.transform f
       | otherwise = p & annotation . domain .~ Public
       where
         dbf = fromMaybe err $ findDBFact dp n
-        err = error $ "DB fact not found: " ++ show n ++ "\n" ++ show (pretty dp)
+        err = error $ "DB fact not found: " <> show n <> "\n" <> show (pretty dp)
         (Pred _ _ ys) = dbf ^. ruleHead
         -- See if a bound variable is compared to a private DB column
         privateComp (x, y) = 
@@ -176,7 +176,7 @@ inferBinRet e x y
   | yb        = e & annotation . annType %~ fromMaybe err2 . unifyTypes ut
                   & annotation . domain  .~ Public
   -- User has written incorrect code if both sides of the expression are unbound
-  | otherwise = error $ "Uninitialized subexpressions: " ++ show e
+  | otherwise = error $ "Uninitialized subexpressions: " <> show e
   where
     xd = x ^. annotation . domain
     xb = x ^. annotation . annBound
@@ -195,7 +195,7 @@ inferBinArgs e x y
   | xb && yb = mempty
   | yb       = fromMaybe mempty $ (|-> yt) <$> identifier x
   | xb       = fromMaybe mempty $ (|-> xt) <$> identifier y
-  | otherwise = error $ "Uninitialized subexpressions: " ++ show e
+  | otherwise = error $ "Uninitialized subexpressions: " <> show e
   where
     xt = x ^. annotation . typing
     xb = x ^. annotation . annBound
@@ -218,13 +218,13 @@ inferFromGoal dp = dp & dpRules . traverse %~ subst
         -- Unify goal and rule arguments
         let unified = (uncurry unifyExprTypings) <$> (rxs `zip` gxs)
             f (x, y) = (,) <$> (maybeToList $ identifier x) <*> [y]
-            paramNames :: [(String, Typing)]
+            paramNames :: [(Text, Typing)]
             paramNames = concat $ traverse f $ rxs `zip` unified
             s = mconcat $ (uncurry (|->)) <$> paramNames
         return $ applyTypeSubst s r
 
 -- | Creates a new type substitution from an expression identifier and a typing
-(|->) :: String -> Typing -> TypeSubstitution
+(|->) :: Text -> Typing -> TypeSubstitution
 (|->) x y = TypeSubstitution $ M.singleton x y
 
 -- | Infers types in the program goal by looking at the argument types of
@@ -242,7 +242,7 @@ inferGoal dp = dp & dpGoal  %~ U.transform f
                   . _Pred 
                   . _3
     foldUnify :: [Expr] -> Typing
-    foldUnify (x:xt) = foldl (unifyWithError unifyTypings) (x ^. annotation . typing) xt
+    foldUnify (x:xt) = foldl' (unifyWithError unifyTypings) (x ^. annotation . typing) xt
     f = applyTypeSubstToExpr .
           mconcat $ [x |-> (foldUnify y) | (Just x, y) <- goalRules]
 
@@ -264,7 +264,7 @@ inferRuleRet r = r & ruleHead . annotation . typing .~ unified'
   where
     (x:xt) = andsToList (r ^. ruleTail)
     x' = r ^. ruleHead . annotation . typing
-    unified = foldl (unifyWithError safelyUnifyTypings) (x ^. annotation . typing) xt
+    unified = foldl' (unifyWithError safelyUnifyTypings) (x ^. annotation . typing) xt
     unified' = fromMaybe err $ unifyTypings x' unified
     err = error $ "Failed to unify head typing " 
                <> show x' <> " with body typing " <> show unified'
@@ -274,7 +274,7 @@ inferGoalRet :: DatalogProgram -> DatalogProgram
 inferGoalRet dp = dp & dpGoal . annotation . domain .~ d
   where
     doms = dp ^.. dpRules . folded . ruleHead . annotation . domain
-    d = foldl safelyUnifyDomains Public doms
+    d = foldl' safelyUnifyDomains Public doms
 
 -- | Applies a type substitution to an expression
 applyTypeSubstToExpr :: TypeSubstitution -> Expr -> Expr

@@ -20,6 +20,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- relude
 - listsafe
 - containers
 - text
@@ -42,9 +43,13 @@ dependencies:
 - HUnit
 - shelly
 
+ghc-options:
+  - -Wall 
+  - -XNoImplicitPrelude
+  - -XOverloadedStrings
+
 library:
   source-dirs: src
-  ghc-options: -Wall
 
 executables:
   lpsec:
@@ -54,7 +59,6 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    - -Wall
     dependencies:
     - secure-logic-programming
 
@@ -66,7 +70,6 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    - -Wall
     dependencies:
     - secure-logic-programming
     - HUnit

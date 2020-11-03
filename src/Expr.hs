@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -- | This module contains the Datalog expression tree representation and
@@ -13,6 +12,7 @@ module Expr
   , isLeaf
   , isVar
   , _Pred
+  , varName
   , predName
   , predArgs
   , constStr
@@ -55,7 +55,6 @@ module Expr
   , predicateVarNames
   , predicateBoundedVarNames
   , predicateFreeVarNames
-  , predicateVarNames
   , predicateVars
   , predicateArity
   , annotateWithBindings
@@ -74,12 +73,13 @@ module Expr
 ---- Arithmetic and Boolean expressions
 ---------------------------------------------------------
 
+import Relude hiding (Sum, empty)
+
 import Control.Lens hiding (transform, children, List)
 
 import Data.Data
 import Data.Generics.Uniplate.Data as U
-import Data.List as L
-import Data.Maybe
+import Data.List as L hiding (head)
 import Data.Set as S hiding (empty)
 import Data.Text.Prettyprint.Doc
 
@@ -87,6 +87,8 @@ import Language.Privalog.Types
 import Language.Prolog.PrologSource
 
 import Annotation
+
+import qualified Text.Show
 
 data Aggregation
   = Min
@@ -106,16 +108,16 @@ instance Show Aggregation where
   show Prod    = "prod"
 
 instance Pretty Aggregation where
-  pretty = pretty . show
+  pretty = show
 
 -- | A datatype for representing datalog expression trees.
 data Expr
   = ConstInt   {_annotation :: !Ann, _intVal :: !Int}
   | ConstFloat {_annotation :: !Ann, _floatVal :: !Float}
-  | ConstStr   {_annotation :: !Ann, _strVal :: !String}
+  | ConstStr   {_annotation :: !Ann, _strVal :: !Text}
   | ConstBool  {_annotation :: !Ann, _boolVal :: !Bool}
-  | Attribute  {_annotation :: !Ann, _attrName :: !String}
-  | Var  {_annotation :: !Ann, _varName :: !String}
+  | Attribute  {_annotation :: !Ann, _attrName :: !Text}
+  | Var  {_annotation :: !Ann, _varName :: !Text}
   | Not  {_annotation :: !Ann, _arg :: !Expr}
   | Neg  {_annotation :: !Ann, _arg :: !Expr}
   | Inv  {_annotation :: !Ann, _arg :: !Expr}
@@ -137,7 +139,7 @@ data Expr
   | Pow  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | And  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Or   {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
-  | Pred {_annotation :: !Ann, _predName :: !String, _predArgs :: ![Expr]}
+  | Pred {_annotation :: !Ann, _predName :: !Text, _predArgs :: ![Expr]}
   | List {_annotation :: !Ann, _vals :: ![Expr]}
   | Hole {_annotation :: !Ann}
   | Aggr {_annotation :: !Ann, _aggr :: !Aggregation, _aggrPred :: !Expr, _sourceExpr :: !Expr, _targetExpr :: !Expr}
@@ -176,7 +178,7 @@ instance Pretty Expr where
   pretty (Pow e x y)      = pretty x <> "^" <> pretty y <+> pretty e
   pretty (Aggr e f p x y) = pretty f <> "(" <> pretty p <> ", " <> pretty x <> "," <> pretty y <> ")" <+> pretty e
   pretty (Sqrt e x)       = "sqrt(" <> pretty x <> ")" <+> pretty e
-  pretty x                = error $ "pretty not defined for " ++ show x
+  pretty x                = error . toText $ "pretty not defined for " ++ show x
 
 instance PrologSource Expr where
   prolog (Var _ x)           = pretty x
@@ -230,7 +232,7 @@ instance PrologSource Expr where
   prolog x = error $ show x
 
 -- map datalog aggregations to prolog aggregations
-prologAggr :: String -> String
+prologAggr :: Text -> Text
 prologAggr "sum"   = "sum_list"
 prologAggr "min"   = "min_list"
 prologAggr "max"   = "max_list"
@@ -248,7 +250,7 @@ isVar (Var _ _) = True
 isVar _         = False
 
 -- | Creates a new constant string
-constStr :: String -> Expr
+constStr :: Text -> Expr
 constStr = ConstStr a
   where
     a = empty & annBound .~ True
@@ -285,14 +287,14 @@ constBool = ConstBool (empty & annBound .~ True
                              & domain   .~ Public)
 
 -- | Creates a new variable
-var :: String -> Expr
+var :: Text -> Expr
 var n = Var a n 
   where a = empty & annType  .~ PPAuto
                   & domain   .~ Unknown
                   & annBound .~ False
 
 -- | Creates a new predicate from name and arguments
-predicate :: String -> [Expr] -> Expr
+predicate :: Text -> [Expr] -> Expr
 predicate = Pred a
   where
     a = empty & annBound .~ True
@@ -413,7 +415,7 @@ isConstExpr e = L.null [x | x@(Var _ _) <- U.universe e]
 varExprs :: Expr -> [Expr]
 varExprs e = nub [v | v@(Var _ _) <- U.universe e]
 
-varNames :: Expr -> [String]
+varNames :: Expr -> [Text]
 varNames e = nub [v | (Var _ v) <- U.universe e]
 
 -- | Turns all `And`s to a list, 
@@ -434,17 +436,17 @@ predicateVars (Pred _ _ vs) = vs
 predicateVars _ = error "Expecting a predicate"
 
 -- | Gets the names of all variables in the predicate arguments
-predicateVarNames :: Expr -> [String]
+predicateVarNames :: Expr -> [Text]
 predicateVarNames (Pred _ _ vs) = [n | (Var _ n) <- vs]
 predicateVarNames _ = error "Expecting a predicate"
 
 -- | Gets the names of all bounded variables in the predicate arguments
-predicateBoundedVarNames :: Expr -> [String]
+predicateBoundedVarNames :: Expr -> [Text]
 predicateBoundedVarNames (Pred _ _ vs) = [n | (Var ann n) <- vs, ann ^. annBound]
 predicateBoundedVarNames _ = error "Expecting a predicate"
 
 -- | Gets the names of all free variables in the predicate arguments
-predicateFreeVarNames :: Expr -> [String]
+predicateFreeVarNames :: Expr -> [Text]
 predicateFreeVarNames (Pred _ _ vs) = [n | (Var ann n) <- vs, not (ann ^. annBound)]
 predicateFreeVarNames _ = error "Expecting a predicate"
 
@@ -455,13 +457,13 @@ predicateArity _ = error "Expecting a predicate"
 
 -- | Takes a set of bound variable names and then finds all the variables in
 -- in the expression tree whose name is in the set and marks them bound.
-annotateWithBindings :: Set String -> Expr -> Expr
+annotateWithBindings :: Set Text -> Expr -> Expr
 annotateWithBindings s = L.foldl1 eAnd
                        . annotateWithBindings' s 
                        . andsToList
 
 -- | Helper function for `annotateWithBindings`
-annotateWithBindings' :: Set String -> [Expr] -> [Expr]
+annotateWithBindings' :: Set Text -> [Expr] -> [Expr]
 annotateWithBindings' _ [] = []
 annotateWithBindings' s (e:et) = e' : annotateWithBindings' s' et
   where
@@ -470,11 +472,11 @@ annotateWithBindings' s (e:et) = e' : annotateWithBindings' s' et
       | otherwise      = v
     f x = x
     e' = U.transform f e
-    s' = fromList [n | (Var _ n) <- U.universe e] <> s
+    s' = S.fromList [n | (Var _ n) <- U.universe e] <> s
 
 -- | Gets the identifier, or name of the expression if possible. Only works
 -- for leaves of the expression tree
-identifier :: Expr -> Maybe String
+identifier :: Expr -> Maybe Text
 identifier (Var _ n)       = Just n
 identifier (ConstStr _ n)  = Just n
 identifier (Pred _ n _)    = Just n
@@ -484,7 +486,7 @@ identifier _ = Nothing
 
 -- | Creates a new attribute 
 -- It is essentially a constant, whose value comes from an external database
-attribute :: String -> Expr
+attribute :: Text -> Expr
 attribute = Attribute empty
 
 hole :: Expr
@@ -503,8 +505,8 @@ unifyExprAnnsWithError x y = fromMaybe err $ unifyExprAnns x y
 unifyExprTypes :: Expr -> Expr -> Maybe PPType
 unifyExprTypes x y = unifyTypes xd yd
   where
-    xd = head $ x ^.. annotation . annType
-    yd = head $ y ^.. annotation . annType
+    xd = x ^. annotation . annType
+    yd = y ^. annotation . annType
 
 unifyExprTypesWithError :: Expr -> Expr -> PPType
 unifyExprTypesWithError x y = fromMaybe err $ unifyExprTypes x y
@@ -514,8 +516,8 @@ unifyExprTypesWithError x y = fromMaybe err $ unifyExprTypes x y
 unifyExprDomains :: Expr -> Expr -> PPDomain
 unifyExprDomains x y = unifyDomains xd yd
   where
-    xd = head $ x ^.. annotation . domain
-    yd = head $ y ^.. annotation . domain
+    xd = x ^. annotation . domain
+    yd = y ^. annotation . domain
 
 -- Unifies the given typing with the current typing of the expression
 -- and then sets the result of unification as the new typing of that expression.

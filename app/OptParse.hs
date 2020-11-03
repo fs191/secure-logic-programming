@@ -4,6 +4,8 @@ module OptParse
   ( getProgramOptions
   ) where
 
+import Relude
+
 import Options.Applicative
 
 import ProgramOptions

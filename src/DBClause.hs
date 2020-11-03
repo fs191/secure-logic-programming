@@ -1,26 +1,26 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module DBClause 
   ( DBClause
   , dbClause
   , name, vars
   ) where
 
+import Relude
+
 import Data.Text.Prettyprint.Doc
 
 import Expr
 
-data DBClause = DBClause String [Expr]
+data DBClause = DBClause Text [Expr]
   deriving (Show)
 
 instance Pretty DBClause where
   pretty (DBClause n vs) = "!" <> pretty n <> vars'
     where vars' = tupled $ pretty <$> vs
 
-dbClause :: String -> [Expr] -> DBClause
+dbClause :: Text -> [Expr] -> DBClause
 dbClause = DBClause
 
-name :: DBClause -> String
+name :: DBClause -> Text
 name (DBClause n _) = n
 
 vars :: DBClause -> [Expr]

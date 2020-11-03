@@ -7,9 +7,12 @@ module Language.SecreC.Types
   , unifyDomains
   ) where
 
-import Data.Text.Prettyprint.Doc
+import Relude hiding (show)
 
+import Data.Text.Prettyprint.Doc
 import Data.Data
+
+import Text.Show
 
 data PPType
   = PPBool
@@ -48,7 +51,7 @@ unifyTypes x y
   | x == PPAuto = y
   | y == PPAuto || x == y
                 = x
-  | otherwise   = error $ "Cannot unify types " ++ show x ++ " and " ++ show y
+  | otherwise   = error . toText $ "Cannot unify types " ++ show x ++ " and " ++ show y
 
 unifyDomains :: PPDomain -> PPDomain -> PPDomain
 unifyDomains Public Public = Public

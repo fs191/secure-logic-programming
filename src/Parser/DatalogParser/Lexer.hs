@@ -10,27 +10,24 @@ module Parser.DatalogParser.Lexer
   , typing
   ) where
 
+import Relude hiding (many)
+
 import Text.Megaparsec as P
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as C
 
-import Data.Maybe
-import Data.Foldable
-import Data.Void (Void)
 
 import Control.Lens
-import Control.Monad (void)
 
 import Language.Privalog.Types
 import qualified Annotation as A
-import Expr (Aggregation)
 
-type Parser = Parsec Void String
+type Parser = Parsec Void Text
 
 lexeme :: Parser a -> Parser a
 lexeme = C.lexeme sc
 
-symbol :: String -> Parser String
+symbol :: Text -> Parser Text
 symbol = C.symbol sc
 
 sc :: Parser ()
@@ -39,8 +36,8 @@ sc = C.space
   (C.skipLineComment "%")
   empty
 
-variable :: Parser String
-variable = lexeme variable' <?> "variable"
+variable :: Parser Text
+variable = toText <$> lexeme variable' <?> "variable"
   where
     variable' =
       do
@@ -53,7 +50,7 @@ variable = lexeme variable' <?> "variable"
         t <- many $ alphaNumChar <|> identifierSymbols
         return $ h:t
 
-identifier :: Parser String
+identifier :: Parser Text
 identifier = asum
   [ lexeme $ (try sQuote) *> identifier' <* sQuote
   , lexeme $ (try dQuote) *> identifier' <* dQuote
@@ -61,32 +58,32 @@ identifier = asum
   ] >>= check
   <?> "identifier"
   where 
-    check :: String -> Parser String
+    check :: Text -> Parser Text
     check x = 
       if x `elem` keywords
-        then fail $ "reserved keyword " ++ x ++ " cannot be an identifier."
+        then fail . toString $ "reserved keyword " <> x <> " cannot be an identifier."
         else return x
     keywords = ["sqrt", "is"]
 
-attributeIdentifier :: Parser String
+attributeIdentifier :: Parser Text
 attributeIdentifier =
   do
     try . void $ char '@'
     lexeme identifier 
   <?> "attribute"
 
-sQuote :: Parser String
+sQuote :: Parser Text
 sQuote = symbol "'"
 
-dQuote :: Parser String
+dQuote :: Parser Text
 dQuote = symbol "\""
 
-identifier' :: Parser String
+identifier' :: Parser Text
 identifier' = 
   do
-    h <- lowerChar
-    t <- many $ alphaNumChar <|> identifierSymbols
-    return $ h:t
+    h <- toText . (:[]) <$> lowerChar
+    t <- toText <$> (many $ alphaNumChar <|> identifierSymbols)
+    return $ h <> t
 
 identifierSymbols :: Parser Char
 identifierSymbols = oneOf ['_']

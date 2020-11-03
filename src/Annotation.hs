@@ -7,7 +7,7 @@ module Annotation
   ( Ann(..)
   , Typing(..)
   , SPos(..)
-  , empty, emptyTyping
+  , Annotation.empty, emptyTyping
   , annType, domain
   , annBound
   , tDom, tType
@@ -19,16 +19,17 @@ module Annotation
   , srcPos
   ) where
 
+import Relude hiding (show)
+
 import Control.Lens
 
 import Data.Data
-import Data.Foldable
-import Data.Maybe
 import Data.Text.Prettyprint.Doc
 
 import Language.Privalog.Types
 
 import Text.Megaparsec.Pos
+import Text.Show
 
 -- | A data type used for unifying type and domain simultaneously
 data Typing = Typing 

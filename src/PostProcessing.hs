@@ -3,11 +3,12 @@
 -- similar to the final SecreC code.
 module PostProcessing (postProcess) where
 
+import Relude
+
 import Control.Lens hiding (universe)
 
 import Data.Generics.Uniplate.Data
-import Data.List
-import Data.Maybe
+import Data.List hiding (elem)
 
 import Annotation
 import DatalogProgram

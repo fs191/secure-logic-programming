@@ -3,11 +3,11 @@
 
 module PKTransform (pkTransform) where
 
+import Relude
+
 import Control.Lens
-import Control.Monad.State.Strict
 
 import qualified Data.Map.Strict as M
-import Data.Maybe
 
 import Annotation
 import DatalogProgram
@@ -19,7 +19,7 @@ type PKTrans = State PKState
 
 data PKState = PKState
   { _pksVarIdx  :: !Int
-  , _pksPKMap   :: !(M.Map (String, String) [Expr])
+  , _pksPKMap   :: !(M.Map (Text, Text) [Expr])
   , _pksProgram :: !DatalogProgram
   }
 makeLenses ''PKState
@@ -46,7 +46,7 @@ transformDBFact p@Pred{} =
       do
         dbFact <- findDBFact dp predId
         pkIdx <- dbFact ^. pkIndex
-        pkId <- identifier $ pArgs !! pkIdx
+        pkId <- identifier . fromMaybe undefined $ pArgs !!? pkIdx
         let vars = M.lookup (predId, pkId) pkMap
             zipper x y =
               do

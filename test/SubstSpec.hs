@@ -1,4 +1,8 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module SubstSpec where
+
+import Relude
 
 import Data.Maybe
 import Data.Text.Prettyprint.Doc

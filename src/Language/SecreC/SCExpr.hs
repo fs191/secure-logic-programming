@@ -8,8 +8,11 @@ module Language.SecreC.SCExpr
   , angled
   ) where
 
-import Data.Text (Text)
+import Relude hiding (show)
+
 import Data.Text.Prettyprint.Doc
+
+import Text.Show
 
 data SCTemplate
   = SCTemplateDecl ([SCDomain], [SCType])
@@ -144,5 +147,5 @@ angled prettyContent = encloseSep (langle <> space) (rangle <> space) comma pret
 
 dynDomainToType :: SCDomain -> SCType
 dynDomainToType (SCDynamic i) = SCDynamicT i
-dynDomainToType x = error $ "Expected dynamic domain, got " ++ show x
+dynDomainToType x = error . toText $ "Expected dynamic domain, got " ++ show x
 

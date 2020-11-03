@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveAnyClass #-}
 
 module ErrorMsg 
@@ -7,15 +6,16 @@ module ErrorMsg
   , throw
   ) where
 
+import Relude hiding (show)
+
 import Control.Exception
 import Control.Lens
 
-import Data.Data
-import Data.Void
 import Data.Text.Prettyprint.Doc
 
 import Text.Megaparsec.Error
 import Text.Megaparsec.Pos
+import Text.Show
 
 import Language.Privalog.Types
 
@@ -31,14 +31,14 @@ data Severity
   | Warning
 
 data CompilerException
-  = MegaparsecError (ParseErrorBundle String Void)
+  = MegaparsecError (ParseErrorBundle Text Void)
   | NoGoal
   | TooManyGoals [Expr]
   | TypeMismatch PPType PPType
   | ExpectedGroundTerm Expr
   | ExpectedConstant Expr
   | NonVariableArgument Expr
-  | CannotReadFile String IOException
+  | CannotReadFile Text IOException
   | UnificationFailed Expr Expr
   | TypeApplicationFailed PPType Expr
   deriving (Typeable)

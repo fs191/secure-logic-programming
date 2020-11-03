@@ -7,6 +7,8 @@ module Adornment
   , adornProgram
   ) where
 
+import Relude
+
 import Annotation
 import DatalogProgram
 import Expr
@@ -14,12 +16,11 @@ import Rule
 import DBClause
 
 import Control.Lens
-import Control.Monad.State
 
 import Data.Generics.Uniplate.Data as U
 import Data.Set as S
-import Data.List as L
-import Data.Maybe
+import qualified Data.List as L
+import qualified Data.Text as T
 
 data Adornable = Adornable 
   { _aRule  :: Rule 
@@ -30,7 +31,7 @@ data Adornable = Adornable
 data AdornState = AdornState
   { _gsVisited   :: [Adornable]
   , _gsQueue     :: [Adornable]
-  , _gsBound     :: Set String
+  , _gsBound     :: Set Text
   , _gsRules     :: [Rule]
   , _gsDBClauses :: [DBClause]
   }
@@ -40,7 +41,7 @@ type AdornM =
 makeLenses ''Adornable
 makeLenses ''AdornState
 
-goalStr :: String
+goalStr :: Text
 goalStr = "$goal"
 
 runAdornM :: AdornM a -> a
@@ -65,8 +66,8 @@ adornProgram p = runAdornM $
                     | (Adornable r bp) <- _adornables]
 
     let isGoal :: Rule -> Bool
-        isGoal x = fromMaybe False $ x ^? ruleHead . _Pred . _2 . to(isPrefixOf goalStr)
-        _goal = head $ L.filter isGoal _rules
+        isGoal x = fromMaybe False $ x ^? ruleHead . _Pred . _2 . to(T.isPrefixOf goalStr)
+        _goal = head . fromMaybe undefined . nonEmpty $ L.filter isGoal _rules
     return $ p & dpRules .~ L.filter (not . isGoal) _rules
                & dpGoal  .~ (_goal ^. ruleTail)
 
@@ -90,8 +91,8 @@ popQueue =
   do
     _queue <- use gsQueue
     when (L.null _queue) $ error "trying to pop an empty queue"
-    modify $ gsQueue %~ tail
-    return $ head _queue
+    modify $ gsQueue %~ tail . fromMaybe undefined . nonEmpty
+    return $ head . fromMaybe undefined $ nonEmpty _queue
 
 adornRule :: Adornable -> AdornM ()
 adornRule a@(Adornable r _bp) = 
@@ -102,7 +103,7 @@ adornRule a@(Adornable r _bp) =
     let _varNameFun (Var _ n) = Just n
         _varNameFun _         = Nothing
     let _boundNames = catMaybes $ _varNameFun <$> _boundArgs
-    modify $ gsBound .~ fromList _boundNames
+    modify $ gsBound .~ S.fromList _boundNames
     _bound <- use gsBound
 
     -- Reorder the terms in rule body
@@ -117,7 +118,7 @@ adornRule a@(Adornable r _bp) =
               then return x
               else return $ suffixExpr x
     _suffixed <- traverse _suffixNotEDB _boundTerms
-    let _folded = foldr1 eAnd _suffixed
+    let _folded = L.foldr1 eAnd _suffixed
 
     -- Add current rule to gsVisited
     _rules <- use gsRules
@@ -132,7 +133,7 @@ adornRule a@(Adornable r _bp) =
         _newPairs = do
           let toPair p@(Pred _ n _) = Just (p, n)
               toPair _ = Nothing
-          (p, n) <- nub $ _boundTerms ^.. folded . to toPair . _Just
+          (p, n) <- L.nub $ _boundTerms ^.. folded . to toPair . _Just
           let _rs  = findRulesByName _rules n
               _bindings = repeat $ p ^. paramBindings
               _ads  = uncurry Adornable <$> zip _rs _bindings
@@ -142,7 +143,7 @@ adornRule a@(Adornable r _bp) =
 
     return ()
 
-findRulesByName :: [Rule] -> String -> [Rule]
+findRulesByName :: [Rule] -> Text -> [Rule]
 findRulesByName rs n = L.filter (\x -> n == ruleName x) rs
 
 isQueueEmpty :: AdornM Bool
@@ -158,11 +159,11 @@ isVisited visited (Adornable r bp) = anyOf folded f visited
 suffixPredicate :: [Bool] -> Expr -> Expr
 suffixPredicate suf = _Pred . _2 %~ (<> "_" <> showBindings suf)
 
-predPattern :: Set String -> Expr -> [Bool]
+predPattern :: Set Text -> Expr -> [Bool]
 predPattern bound (Pred _ _ as) = f <$> as
   where
     f :: Expr -> Bool
-    f (Var _ n) | n `elem` bound = True
+    f (Var _ n) | n `member` bound = True
                 | otherwise      = False
     -- Holes are treated as fresh variables, hence unbound
     f (Hole _) = False
@@ -178,14 +179,14 @@ bindTerms [] = return []
 bindTerms l  =
   do
     _bound <- use gsBound
-    let _head = head l
+    let _head = head . fromMaybe undefined $ nonEmpty l
     -- Bind all the variables that are parameters of the best candidate
         _vars = [v | v@(Var _ _) <- U.universe _head]
         _newBound = [n | (Var _ n) <- _vars]
     let _pat = predPattern _bound _head
         _ad = U.transform (annotateWithBindings _bound) $ _head & paramBindings .~ _pat
     modify $ gsBound %~ S.union (S.fromList _newBound)
-    _t <- bindTerms $ tail l
+    _t <- bindTerms $ tail . fromMaybe undefined $ nonEmpty l
     return $ _ad:_t
 
 allBound :: Rule -> Adornable
@@ -213,8 +214,8 @@ isEDB = view $ ruleHead . to isPredEDB
 paramBindings :: Lens' Expr [Bool]
 paramBindings = partsOf $ _Pred . _3 . traversed . annotation . annBound
 
-showBindings :: [Bool] -> String
+showBindings :: [Bool] -> Text
 showBindings [] = ""
-showBindings (True:bt)  = 'b' : showBindings bt
-showBindings (False:bt) = 'f' : showBindings bt
+showBindings (True:bt)  = "b" <> showBindings bt
+showBindings (False:bt) = "f" <> showBindings bt
 

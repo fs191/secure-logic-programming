@@ -4,33 +4,32 @@ module Simplify where
 ---- Simplifications for arithmetic/boolean expressions
 ---------------------------------------------------------
 
+import Relude
+
 import Data.Generics.Uniplate.Data
 import Data.Generics.Uniplate.Operations as U
 import Data.Maybe
 import qualified Data.Map as M
-import Data.List
-import Data.Text.Prettyprint.Doc
-
-import Debug.Trace
+import Data.List (union, intersect, (\\), minimum, maximum)
 
 import Expr
 import Substitution
 
 type Bounds = (Maybe Int, Maybe Int, Maybe Int, [Int])
-type Env = M.Map String Bounds
-type Subst' = (String, M.Map Expr Expr)
-type Head = ([String], [String])
+type Env = M.Map Text Bounds
+type Subst' = (Text, M.Map Expr Expr)
+type Head = ([Text], [Text])
 
 -- | List of all bounded variable names in predicates
-predBoundedVars :: [Expr] -> [String]
+predBoundedVars :: [Expr] -> [Text]
 predBoundedVars (e@Pred {}:es) = predicateBoundedVarNames e ++ predBoundedVars es
-predBoundedVars (e:es) = predBoundedVars es
+predBoundedVars (_:es) = predBoundedVars es
 predBoundedVars [] = []
 
 -- | List of all free variable names in predicates
-predFreeVars :: [Expr] -> [String]
+predFreeVars :: [Expr] -> [Text]
 predFreeVars (e@Pred {}:es) = predicateFreeVarNames e ++ predFreeVars es
-predFreeVars (e:es) = predFreeVars es
+predFreeVars (_:es) = predFreeVars es
 predFreeVars [] = []
 
 -- a customized variant of "M.f" functions that lift variables to expressions
@@ -73,31 +72,31 @@ simplify es (b, o) =
      res
 
 simplify' :: [Expr] -> Head -> [Expr]
-simplify' es head
-  | last t == eFalse = [eFalse]
+simplify' es h
+  | last (fromMaybe undefined $ nonEmpty t) == eFalse = [eFalse]
   | otherwise =
     if es == substituted then
       case simplified of
         [] -> [eTrue]
-        s -> if last s == eFalse then [eFalse] else s
+        s -> if last (fromMaybe undefined $ nonEmpty s) == eFalse then [eFalse] else s
     else
-      simplify' substituted head
+      simplify' substituted h
     where
-      t = transformExprs es head
-      substituted = substitute t head
+      t = transformExprs es h
+      substituted = substitute t h
       simplified = findError es M.empty
 
 -- | Evaluates and applies unification where possible
 transformExprs :: [Expr] -> Head -> [Expr]
-transformExprs (e@(Un _ l r):es) head =
+transformExprs (e@(Un _ l r):es) h =
   case unify l r of
     Nothing -> [eFalse]
     Just th ->
-      if last t /= eFalse
-        then t ++ transformExprs es head
+      if last (fromMaybe undefined $ nonEmpty t) /= eFalse
+        then t ++ transformExprs es h
         else [eFalse]
       where
-        t = uns (zipWith eUn (keys th) (elems th)) head
+        t = uns (zipWith eUn (keys th) (elems th)) h
 transformExprs (e@(Is a l r):es) head@(b, o)
   | not (isLeaf l) = [eFalse]
   | isConstExpr l && isConstExpr r =
@@ -135,7 +134,7 @@ uns (u@(Un a l@(Var _ x) r@(Var _ y)):es) head@(b, o)
 uns (e:es) head = e : uns es head
 uns [] _ = []
 
-unknowns :: Expr -> [String] -> Int
+unknowns :: Expr -> [Text] -> Int
 unknowns e excl = length [x | (Var _ x) <- universe e, notElem x excl]
 
 substitute :: [Expr] -> Head -> [Expr]
@@ -171,7 +170,7 @@ substitute'' (e:es) subst head =
     : substitute'' es subst head
 substitute'' [] _ _ = []
 
-replace :: M.Map Expr Expr -> [String] -> Expr -> Expr
+replace :: M.Map Expr Expr -> [Text] -> Expr -> Expr
 replace m b = transform f
   where
     f v@(Var _ x) =
@@ -208,7 +207,7 @@ getSubst' i es (b, o)
     subst = (if i < 5 then "un" else "is", substMap)
 
 -- | Makes substitution map from list of expressions that can be used to substitute
-makeSubst :: [Expr] -> [String] -> M.Map Expr Expr -> [Expr] -> (M.Map Expr Expr, [Expr])
+makeSubst :: [Expr] -> [Text] -> M.Map Expr Expr -> [Expr] -> (M.Map Expr Expr, [Expr])
 makeSubst (e@(Un _ l r):es) head m rd = makeSubst es head m' (if isRedundant then rd ++ [e] else rd)
   where (m', isRedundant) = makeSubst' l r head m
 makeSubst (e@(Is _ l r):es) head m rd = makeSubst es head m' (if isRedundant then rd ++ [e] else rd)
@@ -218,14 +217,14 @@ makeSubst (e@(Eq _ l r):es) head m rd = makeSubst es head m' (if isRedundant the
 makeSubst (e:es) head m rd = makeSubst es head m rd
 makeSubst [] _ m rd = (m, rd)
 
-makeSubst' :: Expr -> Expr -> [String] -> M.Map Expr Expr -> (M.Map Expr Expr, Bool)
+makeSubst' :: Expr -> Expr -> [Text] -> M.Map Expr Expr -> (M.Map Expr Expr, Bool)
 makeSubst' l r head m = (m', isRedundant && not containsRmd)
   where
   isRedundant = null [x | Var _ x <- universe l, elem x head || m_member l m]
   containsRmd = not $ null [x | v@(Var _ x) <- universe r, m_member v m]
   m' = if m_member l m || containsRmd then m else m_insert l r m
 
-emptySubst :: String -> Subst'
+emptySubst :: Text -> Subst'
 emptySubst ann = (ann, M.empty)
 
 -- | Checks for conflict in a list of expressions

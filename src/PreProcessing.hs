@@ -2,8 +2,9 @@ module PreProcessing
   ( preProcess
   ) where
 
+import Relude
+
 import Control.Lens
-import Control.Monad.State
 
 import Data.Generics.Uniplate.Data as U
 import Data.Maybe
@@ -78,13 +79,13 @@ simplifyRuleHead r = r & ruleHead . predArgs .~ _newArgs
         let f = if x ^. annotation . annBound
                   then equal
                   else eUn
-        return $ f (Var (x ^. annotation) $ "$A" ++ show i) x
+        return $ f (Var (x ^. annotation) $ "$A" <> show i) x
     _genArgs x@(Var{}) = return x
     _genArgs x =
       do
         i <- get
         modify (+1)
-        return $ Var (x ^. annotation) $ "$A" ++ show i
+        return $ Var (x ^. annotation) $ "$A" <> show i
 
 holeToVar :: Expr -> State Int Expr
 holeToVar (Hole e) =

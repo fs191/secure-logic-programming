@@ -2,6 +2,8 @@ module MagicSets
   ( magicSets
   ) where
 
+import Relude
+
 import Control.Lens
 
 import Annotation

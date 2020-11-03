@@ -1,5 +1,7 @@
 module TypeInferenceSpec where
 
+import Relude
+
 import Test.Hspec
 
 import Control.Lens
@@ -18,14 +20,16 @@ import TestResults
 
 import Parser.DatalogParser
 
-newtype StringWrapper = StringWrapper String
+import qualified Text.Show
+
+newtype TextWrapper = TextWrapper Text
   deriving(Eq)
 
-instance Show StringWrapper where
-  show (StringWrapper x) = x <> "\n\n"
+instance Show TextWrapper where
+  show (TextWrapper x) = show x <> "\n\n"
 
-wrap :: DatalogProgram -> StringWrapper
-wrap = StringWrapper . show . pretty
+wrap :: DatalogProgram -> TextWrapper
+wrap = TextWrapper . show . pretty
 
 spec :: Spec
 spec = parallel $ 
@@ -41,12 +45,12 @@ spec = parallel $
       infersTypes "examples/ppdatalog/relatives_unfolded_3_fulltyped.pl"
       infersTypes "examples/ppdatalog/ship_short_unfolded_fulltyped.pl"
 
-inferPreserveSemDB :: String -> [Expr] -> Spec
+inferPreserveSemDB :: Text -> [Expr] -> Spec
 inferPreserveSemDB f db =
   preservesSemanticsDB (return . typeInference . adornProgram) f db
 
-infersTypes :: String -> Spec
-infersTypes n = it desc $
+infersTypes :: Text -> Spec
+infersTypes n = it (toString desc) $
   do
     f <- adornProgram <$> parseDatalogFromFile n
     let g = f & dpRules . traversed . ruleHead %~ clearTypings

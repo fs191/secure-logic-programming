@@ -8,6 +8,8 @@ module Language.Datalog.Literal
   , _Lit, _Var, _ConstStr
   ) where
 
+import Relude
+
 import Control.Lens
 
 import Data.Data

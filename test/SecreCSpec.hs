@@ -1,5 +1,7 @@
 module SecreCSpec where
 
+import Relude
+
 import Test.Hspec
 
 import Swipl

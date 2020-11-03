@@ -1,9 +1,5 @@
 :-type(par, [@child:private string, @parent:private string]).
 
-parents(X,Y) :-
-  par(Z,X),
-  par(Z,Y).
-
 %we do not handle repeating variables in pattern matching yet
 sg(X,Y) :- X = Y.
 

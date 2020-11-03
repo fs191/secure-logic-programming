@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Rule
@@ -25,6 +24,8 @@ module Rule
 ---------------------------------------------------------
 ---- Data structures for LP facts and rules
 ---------------------------------------------------------
+
+import           Relude
 
 import           Data.Data
 import           Data.Text.Prettyprint.Doc
@@ -64,11 +65,11 @@ instance PrologSource Rule where
 
 -- | Creates a new fact from name and arguments.
 -- A fact is a rule with a body that always evaluates to true.
-fact :: String -> [Expr] -> Rule
+fact :: Text -> [Expr] -> Rule
 fact n as = Rule (predicate n as) constTrue
 
 -- | Creates a new rule from a name, arguments and body.
-rule :: String -> [Expr] -> Expr -> Rule
+rule :: Text -> [Expr] -> Expr -> Rule
 rule n as = Rule (predicate n as)
 
 -- | Gets the arguments of the rule head
@@ -80,7 +81,7 @@ isFact :: Rule -> Bool
 isFact r = _ruleTail r == constTrue
 
 -- | Refresh all variable names in the rule
-refreshRule :: String -> Rule -> Rule
+refreshRule :: Text -> Rule -> Rule
 refreshRule prefix r = applySubst s r
   where
     s = refreshExpr prefix . eAnd (r ^. ruleHead) $ r ^. ruleTail
@@ -95,7 +96,7 @@ dbClauseToRule :: DBClause -> Rule
 dbClauseToRule dbc = Rule (predicate (name dbc) $ vars dbc) constTrue
 
 -- | Get the name of the rule
-ruleName :: Rule -> String
+ruleName :: Rule -> Text
 ruleName (Rule (Pred _ n _) _) = n
 ruleName _ = error "Got a rule with a non-predicate head"
 

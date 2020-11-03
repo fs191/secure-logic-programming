@@ -1,7 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
+import Relude
 
 import ProgramOptions
 import OptParse
@@ -12,6 +13,7 @@ import Language.SecreC
 import Control.Exception
 import Control.Monad hiding (ap)
 import Data.Text.Prettyprint.Doc
+import qualified Data.Text as T
 import GHC.Stack
 
 import DatalogProgram
@@ -30,7 +32,7 @@ main =
           let inferTypesOnly = _inferTypesOnly args
 
           -- parse the input datalog program
-          program' <- try $ parseDatalogFromFile inFileName 
+          program' <- try . parseDatalogFromFile $ inFileName 
             :: IO (Either IOException DatalogProgram)
           let program = case program' of
                 Left ex -> throw $ CannotReadFile inFileName ex
@@ -50,14 +52,14 @@ main =
           when (_dbCreateTables args) $ do
               createdb <- csvImportCode program
               let createdbStr = show . pretty $ createdb
-              let outFileDir  = reverse $ dropWhile (/= '/') (reverse outFilePath)
-              let outFileName = reverse $ takeWhile (/= '/') (reverse outFilePath)
+              let outFileDir  = T.reverse $ T.dropWhile (/= '/') (T.reverse outFilePath)
+              let outFileName = T.reverse $ T.takeWhile (/= '/') (T.reverse outFilePath)
 
-              let createdbPath = outFileDir ++ "createdb_" ++ outFileName
-              writeFile createdbPath createdbStr
+              let createdbPath = outFileDir <> "createdb_" <> outFileName
+              writeFile (show createdbPath) createdbStr
 
           -- Output the results
-          writeFile outFilePath output
+          writeFileText (show outFilePath) output
     res <- try act
     case res of
       Left (ex :: SomeException) -> 

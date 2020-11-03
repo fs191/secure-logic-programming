@@ -9,6 +9,8 @@ module Parser.DatalogParser.Expr
   , aggregation
   ) where
 
+import Relude
+
 import Text.Megaparsec
 
 import Control.Lens
@@ -24,8 +26,8 @@ import qualified Rule as R
 import qualified Annotation as A
 import ErrorMsg
 
-type Parser = Parsec Void String
-data Operator f = Operator String f
+type Parser = Parsec Void Text
+data Operator f = Operator Text f
 
 -------------------------
 -- Numeric expressions --
@@ -92,7 +94,7 @@ aExpr4 = binary ops aExpr4 aExpr5
 aExpr5 :: Parser Expr
 aExpr5 = unary ops aExpr <|> aTerm <|> par
   where
-    par = typable . lexeme $ parens aExpr
+    par = typable $ parens aExpr
     ops =
       [ Operator "sqrt" eSqrt
       , Operator "\\+"  eNot

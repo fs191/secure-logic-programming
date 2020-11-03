@@ -1,6 +1,7 @@
 module Expr.Classes where
 
-import Control.Monad.State
+import Relude
+
 import Control.Lens
 
 import Expr
@@ -11,7 +12,7 @@ class HasVarIdx a where
 instance HasVarIdx Int where
   idxLens = id
 
-freshVar :: (HasVarIdx s, MonadState s m) => String -> m Expr
+freshVar :: (HasVarIdx s, MonadState s m) => Text -> m Expr
 freshVar n =
   do
     i <- use idxLens

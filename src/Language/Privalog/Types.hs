@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Language.Privalog.Types 
   ( PPType(..), PPDomain(..)
@@ -7,9 +6,12 @@ module Language.Privalog.Types
   , unifyDomains
   ) where
 
-import Data.Text.Prettyprint.Doc
+import Relude
 
+import Data.Text.Prettyprint.Doc
 import Data.Data
+
+import Text.Show as S
 
 data PPType
   = PPBool
@@ -33,7 +35,7 @@ instance Show PPType where
   show PPAuto  = "auto"
 
 instance Pretty PPType where
-  pretty = pretty . show
+  pretty = pretty . S.show
 
 instance Show PPDomain where
   show Public  = "public"
@@ -41,7 +43,7 @@ instance Show PPDomain where
   show Unknown = "unknown"
 
 instance Pretty PPDomain where
-  pretty = pretty . show
+  pretty = pretty . S.show
 
 unifyTypes :: PPType -> PPType -> Maybe PPType
 unifyTypes x y | x == y  = Just x
