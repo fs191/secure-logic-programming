@@ -63,7 +63,7 @@ module Expr
   , unifyExprAnns
   , unifyExprTypes
   , unifyExprDomains
-  , isArithmetic, isPredicative
+  , isArithmetic, isComparison, isPredicative
   , applyAnnotation
   , toDNF
   , toCNF
@@ -529,19 +529,24 @@ isArithmetic (Sqrt{}) = True
 isArithmetic (Pow{}) = True
 isArithmetic _       = False
 
+isComparison :: Expr -> Bool
+isComparison (Gt{})   = True
+isComparison (Ge{})   = True
+isComparison (Eq{})   = True
+isComparison (Le{})   = True
+isComparison (Lt{})   = True
+isComparison (Is{})   = True
+isComparison (Un{})   = True
+isComparison (Neq{})  = True
+isComparison _        = False
+
 -- | Returns True if the expression is a predicate, built-in or otherwise
 isPredicative :: Expr -> Bool
 isPredicative (Pred{}) = True
 isPredicative (Aggr{}) = True
-isPredicative (Gt{})   = True
-isPredicative (Ge{})   = True
-isPredicative (Eq{})   = True
-isPredicative (Le{})   = True
-isPredicative (Lt{})   = True
-isPredicative (Is{})   = True
-isPredicative (Un{})   = True
-isPredicative (Neq{})  = True
-isPredicative _        = False
+isPredicative x
+  | isComparison x = True
+  | otherwise      = False
 
 applyAnnotation :: Ann -> Expr -> Maybe Expr
 applyAnnotation ann expr = 

@@ -62,70 +62,68 @@ m_lookup expr m =
 simplify :: [Expr] -> Head -> [Expr]
 simplify es (b, o) =
      let res = simplify' es (b `union` predFreeVars es, o `union` predBoundedVars es) in
-     res
+     case res of
+       Just x  -> x
+       Nothing -> [eFalse]
 
-simplify' :: [Expr] -> Head -> [Expr]
+simplify' :: [Expr] -> Head -> Maybe [Expr]
 simplify' es h
-  | last (fromMaybe undefined $ nonEmpty t) == eFalse = [eFalse]
+  | t == Nothing = Nothing
   | otherwise =
-    if es == substituted then
+    if Just es == substituted then
       case simplified of
-        [] -> [eTrue]
-        s -> if last (fromMaybe undefined $ nonEmpty s) == eFalse then [eFalse] else s
+        Just [] -> Just [eTrue]
+        Just s  -> Just s
+        Nothing -> Nothing
     else
-      simplify' substituted h
+      flip simplify' h =<< substituted
     where
       t = transformExprs es h
-      substituted = substitute t h
+      substituted = flip substitute h <$> t
       simplified = findError es M.empty
 
 -- | Evaluates and applies unification where possible
-transformExprs :: [Expr] -> Head -> [Expr]
+transformExprs :: [Expr] -> Head -> Maybe [Expr]
 transformExprs ((Un _ l r):es) h =
   case unify l r of
-    Nothing -> [eFalse]
+    Nothing -> Nothing
     Just th ->
-      if last (fromMaybe undefined $ nonEmpty t) /= eFalse
-        then t ++ transformExprs es h
-        else [eFalse]
+      if t /= Nothing
+        then t <> transformExprs es h
+      else Nothing
       where
         t = uns (zipWith eUn (keys th) (elems th)) h
 transformExprs (e@(Is a l r):es) h@(b, o)
-  | not (isLeaf l) = [eFalse]
+  | not (isLeaf l) = Nothing
   | isConstExpr l && isConstExpr r =
     if simplifyConst e == eTrue
       then transformExprs es h
-      else [eFalse]
-  | isConstExpr r = Un a l (simplifyConst r) : transformExprs es h
-  | unknowns r b == 0 = e : transformExprs es h'
-  | otherwise = e : transformExprs es h
+      else Nothing
+  | isConstExpr r = Just [Un a l (simplifyConst r)] <> transformExprs es h
+  | unknowns r b == 0 = Just [e] <> transformExprs es h'
+  | otherwise = Just [e] <> transformExprs es h
     where h' = if isConstExpr l then h else (_varName l : b, o)
-transformExprs e@(Lt {}:_) h = comparison e h
-transformExprs e@(Le {}:_) h = comparison e h
-transformExprs e@(Eq {}:_) h = comparison e h
-transformExprs e@(Neq {}:_) h = comparison e h
-transformExprs e@(Or {}:_) h = comparison e h
-transformExprs e@(Gt {}:_) h = comparison e h
-transformExprs e@(Ge {}:_) h = comparison e h
-transformExprs (e:es) h = e : transformExprs es h
-transformExprs [] _ = []
+transformExprs (e:es) h 
+  | isComparison e = comparison (e:|es) h
+  | otherwise      = Just [e] <> transformExprs es h
+transformExprs [] _ = Just []
 
-comparison :: [Expr] -> Head -> [Expr]
-comparison (e:es) h
+comparison :: NonEmpty Expr -> Head -> Maybe [Expr]
+comparison (e:|es) h
   | isConstExpr e =
     if simplifyConst e == eTrue
       then transformExprs es h
-      else [eFalse]
-  | otherwise = e : transformExprs es h
+      else Nothing
+  | otherwise = Just [e] <> transformExprs es h
 
-uns :: [Expr] -> Head -> [Expr]
+uns :: [Expr] -> Head -> Maybe [Expr]
 uns (u@(Un a l@(Var _ x) r@(Var _ y)):es) h@(b, o)
-  | elem y o && notElem x o = Un a r l : uns es h
-  | elem x b && notElem y b = Un a r l : uns es h
-  | elem x b && not (isLeaf r) = [eFalse]
-  | otherwise = u : uns es h
-uns (e:es) h = e : uns es h
-uns [] _ = []
+  | elem y o && notElem x o ||
+    elem x b && notElem y b = (Un a r l :) <$> uns es h
+  | elem x b && not (isLeaf r) = Nothing
+  | otherwise = (u:) <$> uns es h
+uns (e:es) h = (e:) <$> uns es h
+uns [] _ = Just []
 
 unknowns :: Expr -> [Text] -> Int
 unknowns e excl = length [x | (Var _ x) <- universe e, notElem x excl]
@@ -214,14 +212,14 @@ makeSubst' l r h m = (m', isRedundant && not containsRmd)
   m' = if m_member l m || containsRmd then m else m_insert l r m
 
 -- | Checks for conflict in a list of expressions
-findError :: [Expr] -> Env -> [Expr]
+findError :: [Expr] -> Env -> Maybe [Expr]
 findError (e:es) m
   | e' == eTrue = findError es m'
-  | e' == eFalse = [eFalse]
-  | otherwise = e' : findError es m'
+  | e' == eFalse = Nothing
+  | otherwise = Just [e'] <> findError es m'
   where
     (e', m') = simplifyExpr e m
-findError [] _ = []
+findError [] _ = Just []
 
 -- | Simplifies and checks for conflict in expression
 simplifyExpr :: Expr -> Env -> (Expr, Env)
