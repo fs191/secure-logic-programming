@@ -30,11 +30,11 @@ data Severity
   = Warning
   | Error
   | Internal
-  | Debug1
+  | Debug1 -- Least detailed
   | Debug2
   | Debug3
   | Debug4
-  | Debug5
+  | Debug5 -- Most detailed
   deriving (Enum, Eq, Ord)
 
 data CompilerException
