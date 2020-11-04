@@ -63,6 +63,7 @@ m_lookup expr m =
 -- | Note that bounded vars are united with free vars (and the other way around) on purpose
 simplify :: [Expr] -> Head -> [Expr]
 simplify es (b, o) =
+     --trace (show b) $
      --trace (show (b `union` predFreeVars es)) $
      --trace (show (o `union` predBoundedVars es)) $
      --trace "---" $
@@ -128,9 +129,21 @@ comparison (e:es) head
 
 uns :: [Expr] -> Head -> [Expr]
 uns (u@(Un a l@(Var _ x) r@(Var _ y)):es) head@(b, o)
+  | elem x b && elem y b    = Eq a l r : uns es head
+  | elem x o && elem y b    = Is a l r : uns es head
   | elem y o && notElem x o = Un a r l : uns es head
   | elem x b && notElem y b = Un a r l : uns es head
+  | otherwise = u : uns es head
+uns (u@(Un a l@(Var _ x) r):es) head@(b, o)
   | elem x b && not (isLeaf r) = [eFalse]
+  -- otherwise, since Var has been pattern matched above, r is a constant
+  | elem x b && isLeaf r = Eq a l r : uns es head
+  | elem x o && isLeaf r = Is a l r : uns es head
+  | otherwise = u : uns es head
+uns (u@(Un a l r):es) head@(b, o)
+  -- since Var has been pattern matched above, a leaf l is a constant
+  | isLeaf l && not (isLeaf r) = [eFalse]
+  | isLeaf l && isLeaf r       = Eq a l r : uns es head
   | otherwise = u : uns es head
 uns (e:es) head = e : uns es head
 uns [] _ = []
