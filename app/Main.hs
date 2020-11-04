@@ -4,7 +4,6 @@
 
 import Relude
 
-import ProgramOptions
 import OptParse
 import ErrorMsg
 import Parser.DatalogParser
@@ -15,7 +14,7 @@ import Data.Text.Prettyprint.Doc
 import qualified Data.Text as T
 
 import DatalogProgram
-import Translator
+import Translator hiding (_debug)
 
 main :: IO ()
 main = 
@@ -28,6 +27,7 @@ main =
           let outFilePath = _outFile args
           let _ite = _iterations args
           let inferTypesOnly = _inferTypesOnly args
+          let debug = _debug args
 
           -- parse the input datalog program
           program' <- try . parseDatalogFromFile $ inFileName 
@@ -36,7 +36,7 @@ main =
                 Left ex -> throw $ CannotReadFile inFileName ex
                 Right x -> x
 
-          let conf = TranslatorConfig _ite
+          let conf = TranslatorConfig _ite debug
           tr <- process conf program
           let tr' = either throw id tr
 

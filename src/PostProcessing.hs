@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 -- | Post-processing for privalog programs. Meant to be used after
 -- transformation. The result of post-processing is a program that is more
 -- similar to the final SecreC code.
@@ -6,20 +7,26 @@ module PostProcessing (postProcess) where
 import Relude
 
 import Control.Lens hiding (universe)
+import Control.Monad.Except
 
 import Data.Generics.Uniplate.Data
-import Data.List hiding (elem)
 
 import DatalogProgram
 import Expr
+import ErrorMsg
 import Rule
 
 -- | Removes all rules that are not called by the goal clause and also removes
 -- rules that contain calls to other rules that are not facts.
-postProcess :: DatalogProgram -> DatalogProgram
-postProcess = removeFalseDP
-            . filterGoalRules
-            . filterGroundRules
+postProcess 
+  :: (MonadError CompilerException m) 
+  => DatalogProgram 
+  -> m DatalogProgram
+postProcess prog = 
+  do
+    let prog' = removeFalseDP . filterGoalRules $ filterGroundRules prog
+    when (prog' ^. dpRules . to null) $ throwError DoesNotConverge
+    return prog'
 
 -- | Filters out rules that contain predicates that are not facts
 filterGroundRules :: DatalogProgram -> DatalogProgram

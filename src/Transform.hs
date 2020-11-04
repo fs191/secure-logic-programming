@@ -2,6 +2,7 @@
 
 module Transform
   ( deriveAllGroundRules
+  , InliningStrategy(..)
   ) where
 
 ---------------------------------------------------------
@@ -25,31 +26,41 @@ import DatalogProgram
 import Annotation
 import Simplify
 
+data InliningStrategy 
+  = BreadthFirst
+  | DepthFirst
+
 -- | Generates all possible ground rules for `n` iterations by inlining
 -- predicates with matching rules. Each predicate gets inlined once per
 -- iteration.
-deriveAllGroundRules :: Int -> DatalogProgram -> IO DatalogProgram
+deriveAllGroundRules 
+  :: (MonadFail m, MonadIO m) 
+  => Int 
+  -> DatalogProgram 
+  -> m DatalogProgram
 deriveAllGroundRules n program = f program'
   where
     -- Input program but db clauses are converted to rules
     program' = program
-    f :: DatalogProgram -> IO DatalogProgram 
-    f rs = loopPipeline n pipeline rs
+    f rs = loopPipeline n rs
 
-    pipeline :: DatalogProgram -> IO DatalogProgram
-    pipeline dp = 
-      do
-        pl0 <- dp & id %~ inlineOnceBFS
-                 & dpRules . traversed %~ refreshRule "X_"
-                 & dpRules %%~ filterM checkConsistency
-        pl  <- pl0 & dpRules . traversed %%~ simplifySat
-        return $ pl & dpRules . traversed . ruleTail %~ simplifyAnds
-                    & dpRules %~ simplifyRules
-                    & dpRules %~ removeFalseFacts
-                    & dpRules %~ L.nub
+pipeline 
+  :: (MonadFail m, MonadIO m)
+  => DatalogProgram 
+  -> m DatalogProgram
+pipeline dp = 
+  do
+    pl0 <- dp & id %~ inlineOnceBFS
+             & dpRules . traversed %~ refreshRule "X_"
+             & dpRules %%~ filterM checkConsistency
+    pl  <- pl0 & dpRules . traversed %%~ simplifySat
+    return $ pl & dpRules . traversed . ruleTail %~ simplifyAnds
+                & dpRules %~ simplifyRules
+                & dpRules %~ removeFalseFacts
+                & dpRules %~ L.nub
 
-loopPipeline :: Int -> (DatalogProgram -> IO DatalogProgram) -> DatalogProgram -> IO DatalogProgram
-loopPipeline n pipeline dp = do
+loopPipeline :: (MonadFail m, MonadIO m) => Int  -> DatalogProgram -> m DatalogProgram
+loopPipeline n dp = do
     dp' <- pipeline dp
     let groundRulesBefore = filter (isGround dp ) (dp  ^. dpRules)
 
@@ -59,17 +70,11 @@ loopPipeline n pipeline dp = do
         return dp
 
     else do
-        loopPipeline n pipeline dp'
+        loopPipeline n dp'
 
 -- | Tries to unify the first predicate in each rule body with an appropriate rule using Breadth-First-Search strategy
 inlineOnceBFS :: DatalogProgram -> DatalogProgram
-inlineOnceBFS dp = 
-  --trace "====" $
-  --trace (show (length (dp ^. dpRules))) $
-  --trace (show (length (filter (isGround dp) (dp ^. dpRules)))) $
-  dp & dpRules .~ rs'
-
-
+inlineOnceBFS dp = dp & dpRules .~ rs'
   where
     rs' = potentialSrc <> inlined
     rs  = dp ^. dpRules
@@ -114,11 +119,11 @@ isGround :: DatalogProgram -> Rule -> Bool
 isGround dp r = all (not . isIDBFact dp) . U.universe $ r ^. ruleTail
 
 -- rewrite the assignments and look for contradictions
-checkConsistency :: Rule -> IO Bool
+checkConsistency :: (MonadIO m) => Rule -> m Bool
 checkConsistency r = Solve.checkSat $ r ^. ruleTail . to andsToList
 
 -- try whether the expressions have a more compact solution
-simplifySat :: Rule -> IO Rule
+simplifySat :: (MonadFail m, MonadIO m) => Rule -> m Rule
 simplifySat r = 
   do
     let vars = args r

@@ -4,7 +4,6 @@ import Relude
 
 import qualified SimpleSMT as SMT
 import Data.List
-import qualified Data.Map as M
 import Data.Maybe
 import Data.Generics.Uniplate.Data
 
@@ -12,25 +11,24 @@ import Data.Generics.Uniplate.Data
 
 import Expr
 
-checkSat :: [Expr] -> IO Bool
+checkSat :: (MonadIO m) => [Expr] -> m Bool
 checkSat es = do
-
-  s <- SMT.newSolver "z3" ["-in"] Nothing
+  s <- liftIO $ SMT.newSolver "z3" ["-in"] Nothing
   void $ declareVars s (vars es)
   let sExprs = map fromJust $ filter (\x -> case x of Nothing -> False; _ -> True) $ exprToSExpr <$> es
-  void $ traverse (SMT.assert s) sExprs
-  result <- SMT.check s
-  void $ SMT.stop s
+  void $ traverse (liftIO . SMT.assert s) sExprs
+  result <- liftIO $ SMT.check s
+  void . liftIO $ SMT.stop s
 
   return $ case result of
                SMT.Unsat -> False
                _         -> True
 
-extractSatSolution :: [Expr] -> [Expr] -> IO [Expr]
+extractSatSolution :: (MonadIO m) => [Expr] -> [Expr] -> m [Expr]
 extractSatSolution _    [] = do return []
 extractSatSolution args es = do
 
-  s <- SMT.newSolver "z3" ["-in"] Nothing
+  s <- liftIO $ SMT.newSolver "z3" ["-in"] Nothing
   let vnames = vars es
   let vargs  = vars args
 
@@ -39,7 +37,7 @@ extractSatSolution args es = do
   -- if we could not handle at least one expression, then the SAT model is overapproximated
   -- in Prolog, we assume that all "suitable" expressions are ground and can be pushed into the end
   -- in Datalog, the order is not important anyway (although it affects the efficiency)
-  let (goodZ3, badZ3) = partition (\(e,x) -> case x of Nothing -> False; _ -> True) $ zip es (exprToSExpr <$> es)
+  let (goodZ3, badZ3) = partition (\(_,x) -> case x of Nothing -> False; _ -> True) $ zip es (exprToSExpr <$> es)
   let sExprs = map (fromJust . snd) goodZ3
   let rest   = map fst badZ3
 
@@ -49,28 +47,28 @@ extractSatSolution args es = do
   --putStrLn $ show vnames
   --putStrLn $ show vargs
 
-  void $ traverse (SMT.assert s) sExprs
-  result <- SMT.check s
+  void $ traverse (liftIO . SMT.assert s) sExprs
+  result <- liftIO $ SMT.check s
 
   res <- case result of
                SMT.Unsat   -> do return [constBool False]
                SMT.Unknown -> do return es
                SMT.Sat     -> do
                    let exprs = map (SMT.Atom . toString) vargs
-                   values <- mapM (SMT.getExpr s) exprs
+                   values <- mapM (liftIO . SMT.getExpr s) exprs
                    --putStrLn $ show values
 
                    -- try to negate the solution and see if there exist more solutions
                    let neg = if values == [] then [] else [foldr1 SMT.or $ map (\(x,val) -> Solve.neq x (SMT.value val)) (zip exprs values)]
-                   void $ traverse (SMT.assert s) neg
+                   void $ traverse (liftIO . SMT.assert s) neg
 
-                   result <- SMT.check s
+                   result' <- liftIO $ SMT.check s
 
-                   let result2 = case result of
+                   let result2 = case result' of
                                      SMT.Unsat -> rest ++ map (\(x,val) -> eIs (var x) (smtValueToExpr val)) (zip vargs values)
                                      _         -> es
                    return result2
-  void $ SMT.stop s
+  void . liftIO $ SMT.stop s
   return res
 
 smtValueToExpr :: SMT.Value -> Expr
@@ -121,9 +119,9 @@ vars :: [Expr] -> [Text]
 vars (e:es) = union (nub [v | Var _ v <- universe e]) (vars es)
 vars [] = []
 
-declareVars :: SMT.Solver -> [Text] -> IO SMT.Solver
+declareVars :: (MonadIO m) => SMT.Solver -> [Text] -> m SMT.Solver
 declareVars s (v:vs) = do
-  void $ SMT.declare s (toString v) (SMT.Atom "Int")
+  void . liftIO $ SMT.declare s (toString v) (SMT.Atom "Int")
   declareVars s vs
 declareVars s [] = return s
 

@@ -2,6 +2,7 @@
 
 module ErrorMsg 
   ( CompilerException(..)
+  , Severity(..)
   , severity
   , throw
   ) where
@@ -26,13 +27,20 @@ class HasSeverity a where
   severity :: a -> Severity
 
 data Severity
-  = Error
+  = Warning
+  | Error
   | Internal
-  | Warning
+  | Debug1
+  | Debug2
+  | Debug3
+  | Debug4
+  | Debug5
+  deriving (Enum, Eq, Ord)
 
 data CompilerException
   = MegaparsecError (ParseErrorBundle Text Void)
   | NoGoal
+  | DoesNotConverge
   | TooManyGoals [Expr]
   | TypeMismatch PPType PPType
   | ExpectedGroundTerm Expr
@@ -48,12 +56,20 @@ instance Exception CompilerException where
     where sev = pretty $ severity ex
 
 instance Pretty Severity where
+  pretty Warning  = "[WARNING ]"
   pretty Error    = "[ERROR   ]"
   pretty Internal = "[INTERNAL]"
-  pretty Warning  = "[WARNING ]"
+  pretty Debug5   = "[DEBUG 5 ]"
+  pretty Debug4   = "[DEBUG 4 ]"
+  pretty Debug3   = "[DEBUG 3 ]"
+  pretty Debug2   = "[DEBUG 2 ]"
+  pretty Debug1   = "[DEBUG 1 ]"
+
+instance Show Severity where
+  show = show . pretty
 
 instance Show CompilerException where
-  show x = show $ pretty x
+  show = show . pretty
 
 instance HasSeverity CompilerException where
   severity _ = Error
@@ -98,6 +114,7 @@ errorMsg (TypeApplicationFailed t x) = vsep
   , pretty x
   , prettyLoc x
   ]
+errorMsg DoesNotConverge = "The program does not converge. Try increasing the number of iterations using `-n`"
 
 
 -- Utilities

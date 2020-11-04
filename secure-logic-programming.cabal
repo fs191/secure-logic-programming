@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c02bd9ae5ef367459352f533b41b59a2c2638fa38d2171b15b3fb35ff52033dd
+-- hash: abccc4b4c7c3ec9d43fb403493d0f8c5591fb91b850f31670c3540d2ca1bb870
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -41,6 +41,7 @@ library
       Language.SecreC.SCExpr
       Language.SecreC.SCProgram
       Language.SecreC.Types
+      Logger
       MagicSets
       Parser.DatalogParser
       Parser.DatalogParser.Expr
@@ -90,7 +91,6 @@ executable lpsec
   main-is: Main.hs
   other-modules:
       OptParse
-      ProgramOptions
       Paths_secure_logic_programming
   hs-source-dirs:
       app
@@ -142,6 +142,7 @@ test-suite test
       HUnit
     , base >=4.7 && <5
     , containers
+    , hashable
     , hspec
     , hspec-expectations
     , lens

@@ -4,7 +4,9 @@ import Relude
 
 import Test.Hspec
 
+import Control.Exception
 import Control.Monad
+import Control.Monad.Except
 
 import Swipl
 import PostProcessing
@@ -20,6 +22,12 @@ spec =
     postProcPreserveSem "examples/ppdatalog/employee.pl" employeeDB
 
 postProcPreserveSem :: Text -> [Expr] -> Spec
-postProcPreserveSem f db = preservesSemanticsDB _fun f db
-  where _fun = return . postProcess <=< deriveAllGroundRules 3
-
+postProcPreserveSem f db = 
+  do
+    preservesSemanticsDB _fun f db
+  where 
+    _fun x = either throw id <$> act x
+    act x = runExceptT $
+      do
+        tr <- liftIO $ deriveAllGroundRules 3 x
+        postProcess tr
