@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -620,4 +621,3 @@ toDNF = toDNF' . toNNF
 foldWithAnds :: [Expr] -> Expr
 foldWithAnds [] = constTrue
 foldWithAnds es = foldr1 eAnd es
-

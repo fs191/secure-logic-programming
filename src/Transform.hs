@@ -16,13 +16,14 @@ import Data.Generics.Uniplate.Operations as U
 import qualified Data.List as L
 
 import Control.Lens
-import Control.Monad
 
 import Rule
 import Expr
 import Solve
 import Substitution
 import DatalogProgram
+import Annotation
+import Simplify
 
 -- | Generates all possible ground rules for `n` iterations by inlining
 -- predicates with matching rules. Each predicate gets inlined once per
@@ -33,20 +34,42 @@ deriveAllGroundRules n program = f program'
     -- Input program but db clauses are converted to rules
     program' = program
     f :: DatalogProgram -> IO DatalogProgram 
-    f rs = foldM pipeline rs [1..n]
-    pipeline :: DatalogProgram -> Int -> IO DatalogProgram
-    pipeline dp i = 
+    f rs = loopPipeline n pipeline rs
+
+    pipeline :: DatalogProgram -> IO DatalogProgram
+    pipeline dp = 
       do
-        pl <- dp & id %~ (inlineOnce (n-i+1))
+        pl0 <- dp & id %~ inlineOnceBFS
                  & dpRules . traversed %~ refreshRule "X_"
                  & dpRules %%~ filterM checkConsistency
+        pl  <- pl0 & dpRules . traversed %%~ simplifySat
         return $ pl & dpRules . traversed . ruleTail %~ simplifyAnds
+                    & dpRules %~ simplifyRules
                     & dpRules %~ removeFalseFacts
                     & dpRules %~ L.nub
 
--- | Tries to unify the first predicate in each rule body with an appropriate rule
-inlineOnce :: Int -> DatalogProgram -> DatalogProgram
-inlineOnce j dp = dp & dpRules .~ rs'
+loopPipeline :: Int -> (DatalogProgram -> IO DatalogProgram) -> DatalogProgram -> IO DatalogProgram
+loopPipeline n pipeline dp = do
+    dp' <- pipeline dp
+    let groundRulesBefore = filter (isGround dp ) (dp  ^. dpRules)
+
+    -- TODO maybe, we can find a better stop condition and do not need to compute hashes on each step
+    -- for the Gr strategy, we could use e.g (length groundRulesBefore == length groundRulesAfter)
+    if (length groundRulesBefore >= n) || (dp == dp) then do
+        return dp
+
+    else do
+        loopPipeline n pipeline dp'
+
+-- | Tries to unify the first predicate in each rule body with an appropriate rule using Breadth-First-Search strategy
+inlineOnceBFS :: DatalogProgram -> DatalogProgram
+inlineOnceBFS dp = 
+  --trace "====" $
+  --trace (show (length (dp ^. dpRules))) $
+  --trace (show (length (filter (isGround dp) (dp ^. dpRules)))) $
+  dp & dpRules .~ rs'
+
+
   where
     rs' = potentialSrc <> inlined
     rs  = dp ^. dpRules
@@ -59,9 +82,6 @@ inlineOnce j dp = dp & dpRules .~ rs'
       (p,mut) <- maybeToList $ head <$> nonEmpty tlPreds
       let res
             | null tlPreds = return tgt
-            -- we can discard those rules for which there is no hope to become ground in the remaining number of steps
-            -- 'nullify' performs better and its correct, but for valid automated tests we currently need to leave them
-            | length tlPreds > j = return tgt -- (tgt & ruleTail %~ nullify)
             | otherwise = 
                 do
                   src <- findRules dp $ p ^. predName
@@ -96,6 +116,35 @@ isGround dp r = all (not . isIDBFact dp) . U.universe $ r ^. ruleTail
 -- rewrite the assignments and look for contradictions
 checkConsistency :: Rule -> IO Bool
 checkConsistency r = Solve.checkSat $ r ^. ruleTail . to andsToList
+
+-- try whether the expressions have a more compact solution
+simplifySat :: Rule -> IO Rule
+simplifySat r = 
+  do
+    let vars = args r
+    let e = r ^. ruleTail
+    newTails@(h:t) <- (Solve.extractSatSolution vars . andsToList) e
+    let newTail = if null newTails then constBool False else foldr eAnd h t
+    return $ r & ruleTail .~ newTail
+
+simplifyRules :: [Rule] -> [Rule]
+simplifyRules rs = map simplifyRule rs
+
+simplifyRule :: Rule -> Rule
+simplifyRule r =
+    let rName = ruleName r in
+    let rBody = simplifyAnds' $ r ^. ruleTail in
+    let rArgs = args r in
+    let (boundedVars, freeVars) = L.partition (\z -> z ^. annotation ^. annBound) rArgs in
+    let boundedVarNames = concat $ map varNames boundedVars in
+    let freeVarNames = concat $ map varNames freeVars in
+    let newRuleBody = simplify rBody (boundedVarNames, freeVarNames) in
+    let (h:t) = ordNub . filter (not . isAnd) $ newRuleBody in
+    let newRuleTail' = foldr eAnd h t in
+    --trace ("before: " ++ show (pretty r)) $
+    --trace ("after: " ++ show (pretty (rule rName rArgs newRuleTail))) $
+    --trace "=====" $
+    rule rName rArgs newRuleTail'
 
 -- | Removes facts that always evaluate to False
 removeFalseFacts :: [Rule] -> [Rule]

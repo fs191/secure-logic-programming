@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -115,4 +116,3 @@ safelyUnifyTypings (Typing dx tx) (Typing dy ty)
 
 unifyAnnsWithError :: Ann -> Ann -> Ann
 unifyAnnsWithError x y = fromMaybe undefined $ unifyAnns x y
-

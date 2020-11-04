@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -44,7 +46,7 @@ data Directive
   = InputDirective ![Expr]
   | OutputDirective ![Expr]
   | DBDirective Text ![Expr]
-  deriving (Show, Eq, Data, Typeable)
+  deriving (Show, Eq, Data, Typeable, Generic)
 
 instance Pretty Directive where
   pretty (InputDirective as) = ":-inputs([" <> _ps <> "])"
