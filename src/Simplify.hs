@@ -135,7 +135,7 @@ substitute' :: Int -> [Expr] -> Head -> [Expr]
 substitute' i es h =
   if substituted == es && i /= 8
     then substitute' (i + 1) es h
-    else substituted
+  else substituted
   where
     (s, es') = getSubst' i es h
     substituted = substitute'' es' s h
@@ -189,7 +189,7 @@ getSubst' i es (b, o)
         5 -> [e | e@(Eq _ (Var _ x) y) <- es, not (elem x b), unknowns y b == 0]
         6 -> [e | e@(Is _ (Var _ _) y) <- es, unknowns y b == 0]
         7 -> [e | e@(Is _ (Var _ _) y) <- es, null $ intersect (varNames y) b]
-        8 -> [e | e@(Is _ (Var _ _) _) <- es]
+        _ -> [e | e@(Is _ (Var _ _) _) <- es]
     (substMap, redundant) = makeSubst substList (b ++ o) M.empty []
     subst = (if i < 5 then "un" else "is", substMap)
 

@@ -11,10 +11,8 @@ import Parser.DatalogParser
 import Language.SecreC
 
 import Control.Exception
-import Control.Monad hiding (ap)
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text as T
-import GHC.Stack
 
 import DatalogProgram
 import Translator
@@ -40,11 +38,12 @@ main =
 
           let conf = TranslatorConfig _ite
           tr <- process conf program
+          let tr' = either throw id tr
 
-          let sc = secrecCode tr
+          let sc = secrecCode tr'
 
           let output = show $ if inferTypesOnly
-              then pretty tr
+              then pretty tr'
               else pretty sc
 
           -- create a Sharemind script that can be used to upload the tables used in given program

@@ -12,7 +12,7 @@ import Expr
 checkSat :: [Expr] -> IO Bool
 checkSat es = do
   s <- SMT.newSolver "z3" ["-in"] Nothing
-  declareVars s (vars es)
+  void $ declareVars s (vars es)
   let sExprs = map fromJust $ filter (\x -> case x of Nothing -> False; _ -> True) $ exprToSExpr <$> es
   void $ traverse (SMT.assert s) sExprs
   result <- SMT.check s
@@ -63,7 +63,7 @@ vars [] = []
 
 declareVars :: SMT.Solver -> [Text] -> IO SMT.Solver
 declareVars s (v:vs) = do
-  SMT.declare s (toString v) (SMT.Atom "Int")
+  void $ SMT.declare s (toString v) (SMT.Atom "Int")
   declareVars s vs
 declareVars s [] = return s
 

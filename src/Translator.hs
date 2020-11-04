@@ -17,21 +17,25 @@ import TypeInference
 import Adornment
 import PKTransform
 import DatalogProgram
+import ErrorMsg
 
 data TranslatorConfig = TranslatorConfig
   { _tcIterations :: Int
   }
 makeLenses ''TranslatorConfig
 
-process :: TranslatorConfig -> DatalogProgram -> IO DatalogProgram
-process conf dp =
+process 
+  :: TranslatorConfig 
+  -> DatalogProgram 
+  -> IO (Either CompilerException DatalogProgram)
+process conf dp = runExceptT $
   do
-    let ap   = adornProgram dp
-    let pp   = preProcess ap
+    let ap    = adornProgram dp
+    pp <- preProcess ap
     --let mag  = magicSets ap
-    let ite = _tcIterations conf
-    tf <- deriveAllGroundRules ite pp
-    let pk   = pkTransform tf
+    let ite   = _tcIterations conf
+    tf <- liftIO $ deriveAllGroundRules ite pp
+    let pk    = pkTransform tf
     let post' = postProcess pk
 
     -- currently, simplifyRule may break some annotation, so we need to derive it again

@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module PreProcessing 
   ( preProcess
   ) where
@@ -5,61 +6,82 @@ module PreProcessing
 import Relude
 
 import Control.Lens
+import Control.Monad.Except
 
 import Data.Generics.Uniplate.Data as U
-import Data.Maybe
-import qualified Data.Map.Strict as M
 
+import ErrorMsg
 import Annotation
 import DatalogProgram
 import Rule
 import Expr
-import Substitution
 
-preProcess :: DatalogProgram -> DatalogProgram
-preProcess dp = dp' & dpRules %~ concatMap ruleNonDetSplit
-  where dp' = flip evalState 0 $
-          dp & dpRules . traversed %~ simplify
-             & dpRules . traversed %~ simplifyRuleHead
-             & id %%~ U.transformBiM holeToVar
+preProcess 
+  :: (MonadError CompilerException m) 
+  => DatalogProgram 
+  -> m DatalogProgram
+preProcess dp = 
+  do
+    dp1 <- dp & dpRules . traversed %%~ simplify
+    let dp' = flip evalState (0::Int) $
+             dp1 & dpRules . traversed %~ simplifyRuleHead
+                 & id %%~ U.transformBiM holeToVar
+    return $ dp' & dpRules %~ concatMap ruleNonDetSplit
 
 -- | Rewrites constant terms to simpler terms
-simplify :: Rule -> Rule
-simplify r = r & ruleTail %~ U.rewrite f
+simplify 
+  :: (MonadError CompilerException m) 
+  => Rule 
+  -> m Rule
+simplify r = r & ruleTail %%~ U.rewriteM f
   where
-    f (And _ (ConstBool _ True) x) = Just x
-    f (And _ x (ConstBool _ True)) = Just x
-    f (And _ (ConstBool _ False) _) = Just $ constBool False
-    f (And _ _ (ConstBool _ False)) = Just $ constBool False
-    f (Or _ (ConstBool _ True) _) = Just $ constBool True
-    f (Or _ _ (ConstBool _ True)) = Just $ constBool True
-    f (Or _ (ConstBool _ False) x) = Just x
-    f (Or _ x (ConstBool _ False)) = Just x
-    f (Add _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify (+) x y
-    f (Sub _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify (-) x y
-    f (Mul _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplify (*) x y
-    f (Lt _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (<) x y
-    f (Gt _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (>) x y
-    f (Le _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (<=) x y
-    f (Ge _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (>=) x y
-    f (Eq _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just $ binarySimplifyBool (==) x y
-    f (Eq _ x@(ConstStr _ _) y@(ConstStr _ _)) = Just $ constBool $ x == y
+    f (And _ (ConstBool _ True) x) = return $ Just x
+    f (And _ x (ConstBool _ True)) = return $ Just x
+    f (And _ (ConstBool _ False) _) = return . Just $ constBool False
+    f (And _ _ (ConstBool _ False)) = return . Just $ constBool False
+    f (Or _ (ConstBool _ True) _) = return . Just $ constBool True
+    f (Or _ _ (ConstBool _ True)) = return . Just $ constBool True
+    f (Or _ (ConstBool _ False) x) = return $ Just x
+    f (Or _ x (ConstBool _ False)) = return $ Just x
+    f (Add _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just <$> binarySimplify (+) x y
+    f (Sub _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just <$> binarySimplify (-) x y
+    f (Mul _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just <$> binarySimplify (*) x y
+    f (Lt _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just <$> binarySimplifyBool (<) x y
+    f (Gt _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just <$> binarySimplifyBool (>) x y
+    f (Le _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just <$> binarySimplifyBool (<=) x y
+    f (Ge _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just <$> binarySimplifyBool (>=) x y
+    f (Eq _ x@(ConstInt _ _) y@(ConstInt _ _)) = Just <$> binarySimplifyBool (==) x y
+    f (Eq _ x@(ConstStr _ _) y@(ConstStr _ _)) = return . Just $ constBool $ x == y
     f (Eq _ (Var _ x) (Var _ y))
-      | x == y    = Just $ constBool True
-      | otherwise = Nothing
-    f _ = Nothing
+      | x == y    = return . Just $ constBool True
+      | otherwise = return Nothing
+    f _ = return Nothing
 
-binarySimplify :: (Int -> Int -> Int) -> Expr -> Expr -> Expr
-binarySimplify f (ConstInt a x) (ConstInt b y) = ConstInt c $ f x y
+binarySimplify 
+  :: (MonadError CompilerException m) 
+  => (Int -> Int -> Int) 
+  -> Expr 
+  -> Expr 
+  -> m Expr
+binarySimplify f l@(ConstInt a x) r@(ConstInt b y) =
+  (\c' -> ConstInt c' $ f x y) <$> c 
   where
-    c = fromMaybe err $ unifyAnns a b
-    err = error $ "Failed to unify " <> show a <> " and " <> show b
+    c = maybe err return $ unifyAnns a b
+    err = throwError $ UnificationFailed l r
+binarySimplify _ _ _ = error "Expecting integers in binarySimplify"
 
-binarySimplifyBool :: (Int -> Int -> Bool) -> Expr -> Expr -> Expr
-binarySimplifyBool f (ConstInt a x) (ConstInt b y) = ConstBool c (f x y)
+binarySimplifyBool 
+  :: (MonadError CompilerException m) 
+  => (Int -> Int -> Bool) 
+  -> Expr 
+  -> Expr 
+  -> m Expr
+binarySimplifyBool f l@(ConstInt a x) r@(ConstInt b y) = 
+  (\c' -> ConstBool c' $ f x y) <$> c 
   where
-    c = fromMaybe err $ unifyAnns a b
-    err = error $ "Failed to unify " <> show a <> " and " <> show b
+    c = maybe err return $ unifyAnns a b
+    err = throwError $ UnificationFailed l r
+binarySimplifyBool _ _ _ = error "Expecting integers in binarySimplifyBool"
 
 -- | Ensures that the rule head only consists of variables
 simplifyRuleHead :: Rule -> Rule

@@ -150,7 +150,8 @@ compileSC file iterations = errExit False $ withTmpDir act
         _prog <- liftIO $ parseDatalogFromFile file
         let conf = TranslatorConfig iterations
         trans <- liftIO $ process conf _prog
-        let sc = secrecCode trans
+        let trans' = either throw id trans
+        let sc = secrecCode trans'
         cp "SecreC/lp_essentials.sc" tmp
         let _path = tmp <> "prog.sc"
         let src = show $ pretty sc

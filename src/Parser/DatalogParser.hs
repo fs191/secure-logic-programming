@@ -8,9 +8,6 @@ import Relude
 
 import Text.Megaparsec
 
-import Data.Void (Void)
-
-import Control.Monad (void)
 import Control.Lens
 
 import Parser.DatalogParser.Lexer
