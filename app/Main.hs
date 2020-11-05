@@ -4,7 +4,6 @@
 
 import Relude
 
-import ProgramOptions
 import OptParse
 import ErrorMsg
 import Parser.DatalogParser
@@ -14,8 +13,7 @@ import Control.Exception
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text as T
 
-import DatalogProgram
-import Translator
+import Translator hiding (_debug)
 
 main :: IO ()
 main = 
@@ -28,16 +26,16 @@ main =
           let outFilePath = _outFile args
           let _ite = _iterations args
           let inferTypesOnly = _inferTypesOnly args
+          let debug = _debug args
 
           -- parse the input datalog program
           program' <- try . parseDatalogFromFile $ inFileName 
-            :: IO (Either IOException DatalogProgram)
           let program = case program' of
                 Left ex -> throw $ CannotReadFile inFileName ex
                 Right x -> x
 
-          let conf = TranslatorConfig _ite
-          tr <- process conf program
+          let conf = TranslatorConfig _ite debug
+          tr <- runExceptT $ process conf program
           let tr' = either throw id tr
 
           let sc = secrecCode tr'
@@ -55,10 +53,10 @@ main =
               let outFileName = T.reverse $ T.takeWhile (/= '/') (T.reverse outFilePath)
 
               let createdbPath = outFileDir <> "createdb_" <> outFileName
-              writeFile (show createdbPath) createdbStr
+              writeFile (toString createdbPath) createdbStr
 
           -- Output the results
-          writeFileText (show outFilePath) output
+          writeFileText (toString outFilePath) output
     res <- try act
     case res of
       Left (ex :: SomeException) -> 

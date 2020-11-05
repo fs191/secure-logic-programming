@@ -1,14 +1,16 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Translator 
   ( TranslatorConfig(..)
   , process
-  , tcIterations
   ) where
 
 import Relude
 
-import Control.Lens
+import Control.Monad.Except
+
+import Data.Text.Prettyprint.Doc
 
 import Transform
 import PreProcessing
@@ -21,25 +23,46 @@ import ErrorMsg
 
 data TranslatorConfig = TranslatorConfig
   { _tcIterations :: Int
+  , _debug        :: Bool
   }
-makeLenses ''TranslatorConfig
 
 process 
-  :: TranslatorConfig 
+  :: (MonadIO m, MonadError CompilerException m)
+  => TranslatorConfig 
   -> DatalogProgram 
-  -> IO (Either CompilerException DatalogProgram)
-process conf dp = runExceptT $
+  -> m DatalogProgram
+process conf dp = 
   do
-    let ap    = adornProgram dp
-    pp <- preProcess ap
+    let debug = _debug conf
+    printDebug debug "Original" dp
+    let adp = adornProgram dp
+    printDebug debug "Adornment" adp
+    pp <- preProcess adp
+    printDebug debug "PreProcessing" pp
     --let mag  = magicSets ap
     let ite   = _tcIterations conf
     tf <- liftIO $ deriveAllGroundRules ite pp
+    printDebug debug "Transform" tf
     let pk    = pkTransform tf
-    let post' = postProcess pk
-
+    printDebug debug "PKTransform" pk
+    post' <- postProcess pk
+    printDebug debug "PostProcess" post'
     -- currently, simplifyRule may break some annotation, so we need to derive it again
-    let post = adornProgram post'
+    let ad = adornProgram post'
 
-    return $ typeInference post
+    return $ typeInference ad
+
+printDebug 
+  :: (Pretty a, MonadIO m) 
+  => Bool 
+  -> Text 
+  -> a 
+  -> m ()
+printDebug debug component prog = 
+    liftIO . when debug $ do
+      putTextLn $ "[" <> component <> "]"
+      putTextLn "=========="
+      putTextLn . show $ pretty prog
+      putTextLn "=========="
+      putTextLn ""
 

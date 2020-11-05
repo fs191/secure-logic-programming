@@ -47,7 +47,7 @@ canDeriveOn file n = it (show desc) $ action `shouldReturn` ()
     desc = "can derive ground rules on " <> file <> " with " <> show n <> " iterations"
     action = do
         f <- parseDatalogFromFile file
-        let d = deriveAllGroundRules n f
+        d <- deriveAllGroundRules n f
         return $ d `seq` ()
      
 transPreserveSem :: Text -> Int -> Spec

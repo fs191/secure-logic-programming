@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 -- | Post-processing for privalog programs. Meant to be used after
 -- transformation. The result of post-processing is a program that is more
 -- similar to the final SecreC code.
@@ -6,23 +7,26 @@ module PostProcessing (postProcess) where
 import Relude
 
 import Control.Lens hiding (universe)
+import Control.Monad.Except
 
 import Data.Generics.Uniplate.Data
-import Data.List hiding (elem)
 
-import Annotation
 import DatalogProgram
 import Expr
+import ErrorMsg
 import Rule
-import Simplify
 
 -- | Removes all rules that are not called by the goal clause and also removes
 -- rules that contain calls to other rules that are not facts.
-postProcess :: DatalogProgram -> DatalogProgram
-postProcess = removeFalseDP
-            . simplifyDP
-            . filterGoalRules
-            . filterGroundRules
+postProcess 
+  :: (MonadError CompilerException m) 
+  => DatalogProgram 
+  -> m DatalogProgram
+postProcess prog = 
+  do
+    let prog' = removeFalseDP . filterGoalRules $ filterGroundRules prog
+    when (prog' ^. dpRules . to null) $ throwError DoesNotConverge
+    return prog'
 
 -- | Filters out rules that contain predicates that are not facts
 filterGroundRules :: DatalogProgram -> DatalogProgram
@@ -41,38 +45,6 @@ filterGoalRules dp = dp & dpRules .~ _rs
 
 removeFalseDP :: DatalogProgram -> DatalogProgram
 removeFalseDP dp = dp & dpRules %~ removeFalseFacts
-
-simplifyDP :: DatalogProgram -> DatalogProgram
-simplifyDP dp = dp & dpRules %~ simplifyRules
-
-simplifyRules :: [Rule] -> [Rule]
-simplifyRules rs = map simplifyRule rs
-
-simplifyRule :: Rule -> Rule
-simplifyRule r =
-
-
-    let rName = ruleName r in
-    let rBody = simplifyAnds' $ r ^. ruleTail in
-    let rArgs = args r in
-    let (boundedVars, freeVars) = partition (\z -> z ^. annotation ^. annBound) rArgs in
-    let boundedVarNames = concat $ map varNames boundedVars in
-    let freeVarNames = concat $ map varNames freeVars in
-    let newRuleBody = simplify rBody (boundedVarNames, freeVarNames) in
-
-    let newRuleTail = foldr1 eAnd . nub . filter (not . isAnd) $ newRuleBody in
-    --trace ("before: " ++ show (pretty r)) $
-    --trace ("after: " ++ show (pretty (rule rName rArgs newRuleTail))) $
-    --trace "=====" $
-    rule rName rArgs newRuleTail
-
-simplifyAnds' :: Expr -> [Expr]
-simplifyAnds' (And _ x y) = simplifyAnds' x <> simplifyAnds' y
-simplifyAnds' x = [x]
-
-isAnd :: Expr -> Bool
-isAnd And{} = True
-isAnd _     = False
 
 -- | Removes facts that always evaluate to False
 removeFalseFacts :: [Rule] -> [Rule]

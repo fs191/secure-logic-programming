@@ -39,7 +39,7 @@ spec = parallel . describe "Parser.parseDatalog" $ do
     cannotParse "examples/prolog/negative/gibberish.pl"
 
 canParse :: T.Text -> Spec
-canParse file = it (show $ "can parse " <> file) $ action `shouldReturn` ()
+canParse file = it (toString $ "can parse " <> file) $ action `shouldReturn` ()
   where action = do
             res <- parseDatalog file <$> readFileText (toString file)
             case res of
@@ -47,7 +47,7 @@ canParse file = it (show $ "can parse " <> file) $ action `shouldReturn` ()
               Left  e -> error . toText $ errorBundlePretty e
 
 cannotParse :: T.Text -> Spec
-cannotParse file = it (show $ "does not parse " <> file) $ do
+cannotParse file = it (toString $ "does not parse " <> file) $ do
   res <- parseDatalog file <$> readFileText (toString file)
   assertBool "" $ isLeft res
 
