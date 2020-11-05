@@ -3,6 +3,7 @@
 
 module Substitution
   ( Subst
+  , substFromMap
   , refreshExpr
   , applyToExpr
   , refreshAndApply
@@ -11,6 +12,7 @@ module Substitution
   , compress
   , (|->)
   , keys, elems
+  , getValue
   ) where
 
 ---------------------------------------------------------
@@ -49,6 +51,9 @@ instance Pretty Subst where
 -- of which variables have already been substituted. Only used internally.
 safeStr :: String
 safeStr = "$!!?"
+
+substFromMap :: M.Map String Expr -> Subst
+substFromMap = Th
 
 -- | Compresses the substitution using union-find. 
 --
@@ -206,3 +211,4 @@ vars x = filter (is _Var) . uncurry (<>) $ unzip x
 
 keys (Th theta) = map var (M.keys theta)
 elems (Th theta) = M.elems theta
+getValue (Th theta) = (theta M.!)

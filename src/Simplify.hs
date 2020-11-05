@@ -9,6 +9,7 @@ import Data.Generics.Uniplate.Operations as U
 import Data.Maybe
 import qualified Data.Map as M
 import Data.List
+import Data.Hashable
 import Data.Text.Prettyprint.Doc
 
 import Debug.Trace
@@ -60,15 +61,24 @@ m_lookup expr m =
     _       -> M.lookup expr m
 
 -- | Simplifies list of expressions
--- | Note that bounded vars are united with free vars (and the other way around) on purpose
 simplify :: [Expr] -> Head -> [Expr]
-simplify es (b, o) =
+simplify es (b', o') =
+     -- Note that bounded vars are united with free vars (and the other way around) on purpose
+     let b = b' `union` predFreeVars es in
+     let o = o' `union` predBoundedVars es in
+     --trace (show b') $
      --trace (show b) $
-     --trace (show (b `union` predFreeVars es)) $
-     --trace (show (o `union` predBoundedVars es)) $
+     --trace (show o) $
      --trace "---" $
      --trace (show (pretty es)) $
-     let res = simplify' es (b `union` predFreeVars es, o `union` predBoundedVars es) in
+
+     -- simplify
+     let es' = simplify' es (b, o) in
+
+     -- replace all comparisons with "eq" assignments with "is"
+     -- while using it for string data would be wrong in prolog/datalog, it is just an intermediate representation here
+     let res = finalize_uns es' (b, o) in
+
      --trace (show (pretty res)) $
      --trace "===" $
      res
@@ -127,26 +137,37 @@ comparison (e:es) head
       else [eFalse]
   | otherwise = e : transformExprs es head
 
+
 uns :: [Expr] -> Head -> [Expr]
 uns (u@(Un a l@(Var _ x) r@(Var _ y)):es) head@(b, o)
-  | elem x b && elem y b    = Eq a l r : uns es head
-  | elem x o && elem y b    = Is a l r : uns es head
   | elem y o && notElem x o = Un a r l : uns es head
   | elem x b && notElem y b = Un a r l : uns es head
-  | otherwise = u : uns es head
-uns (u@(Un a l@(Var _ x) r):es) head@(b, o)
   | elem x b && not (isLeaf r) = [eFalse]
-  -- otherwise, since Var has been pattern matched above, r is a constant
-  | elem x b && isLeaf r = Eq a l r : uns es head
-  | elem x o && isLeaf r = Is a l r : uns es head
-  | otherwise = u : uns es head
-uns (u@(Un a l r):es) head@(b, o)
-  -- since Var has been pattern matched above, a leaf l is a constant
-  | isLeaf l && not (isLeaf r) = [eFalse]
-  | isLeaf l && isLeaf r       = Eq a l r : uns es head
   | otherwise = u : uns es head
 uns (e:es) head = e : uns es head
 uns [] _ = []
+
+
+finalize_uns :: [Expr] -> Head -> [Expr]
+finalize_uns (u@(Un a l@(Var _ x) r@(Var _ y)):es) head@(b, o)
+  | elem x b && elem y b    = Eq a l r : finalize_uns es head
+  | elem x o && elem y b    = Is a l r : finalize_uns es head
+  | elem y o && notElem x o = Is a r l : finalize_uns es head
+  | elem x b && notElem y b = Is a r l : finalize_uns es head
+  | otherwise = u : finalize_uns es head
+finalize_uns (u@(Un a l@(Var _ x) r):es) head@(b, o)
+  | elem x b && not (isLeaf r) = [eFalse]
+  -- otherwise, since Var has been pattern matched above, r is a constant
+  | elem x b && isLeaf r = Eq a l r : finalize_uns es head
+  | elem x o && isLeaf r = Is a l r : finalize_uns es head
+  | otherwise = u : finalize_uns es head
+finalize_uns (u@(Un a l r):es) head@(b, o)
+  -- since Var has been pattern matched above, a leaf l is a constant
+  | isLeaf l && not (isLeaf r) = [eFalse]
+  | isLeaf l && isLeaf r       = Eq a l r : finalize_uns es head
+  | otherwise = u : finalize_uns es head
+finalize_uns (e:es) head = e : finalize_uns es head
+finalize_uns [] _ = []
 
 unknowns :: Expr -> [String] -> Int
 unknowns e excl = length [x | (Var _ x) <- universe e, notElem x excl]

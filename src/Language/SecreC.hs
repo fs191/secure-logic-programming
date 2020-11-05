@@ -739,26 +739,27 @@ ruleBodyToSC ann argTableType ds input p xs ys q =
   ] ++
   [SCEmpty, Comment "evaluate all underlying predicates"] ++ getTables ++
   [SCEmpty, Comment "assign input variables"] ++ asgnInputArgs ++
+  [SCEmpty, Comment "initialize filter"] ++ initFilter ++
   [SCEmpty, Comment "evaluate the clause body"] ++ evalBody ++
 
   [ SCEmpty, Comment "output the updated predicate arguments"
-  , VarInit (variable (scDomainFromAnn ann) (SCArray 1 SCBool) result_b) (SCAnd (SCVarName (nameTableBB inputTable)) (SCAnds (map (\i -> SCVarName (nameB i)) [1..length qs])))
 
   --, VarDecl (variable SCPublic (SCStruct (nameTableStruct p) (SCTemplateUse $ Just ([SCDynamic Nothing], map dynamicColumn [0..n-1]))) result)
   , VarDecl (variable SCPublic (SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([scDomainFromAnn ann], map (\(y,i) -> scColTypeI i (y ^. annotation)) ys))) result)
   --
 
-  , VarAsgn (nameTableBB result) (SCVarName result_b)
+  , VarAsgn (nameTableBB result) (SCVarName nameBB)
   ] ++ asgnOutputArgs ++
   [Return (SCVarName result)]
 
   where
     inputTable = "table0"
     result   = "result"
-    result_b = "b"
 
     asgnInputArgs  = map (\((Var xtype x),i) -> VarInit (variable SCPublic (scColType xtype) (pack x)) (SCVarName $ nameTableArg inputTable i)) xs
     asgnOutputArgs = map (\(z,i) -> VarAsgn (nameTableArg result i) (exprToSC z)) ys
+
+    initFilter = [VarInit (variable (scDomainFromAnn ann) (SCArray 1 SCBool) nameBB) (SCVarName (nameTableBB inputTable))]
 
     qs = andsToList q
     ts = map (\(qj,j) -> (qj ^. predName, j)) $ filter (\(qj,j) -> case qj of {Pred _ _ _ -> True; _ -> False}) $ zip qs [1..]
@@ -921,10 +922,11 @@ formulaToSC :: Text -> Expr -> Int -> [Statement]
 formulaToSC ds q j =
   [SCEmpty, Comment ("q" ++ show j)] ++ formulaToSC_case q
   where
+    addB = VarAsgn nameBB . SCAnd (SCVarName nameBB)
     formulaToSC_case q' = case q' of
 
         ConstBool ann b -> let dom = scDomainFromAnn ann in
-                           [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (funReshape [SCConstBool b, SCVarName nameMM])]
+                           [addB (funReshape [SCConstBool b, SCVarName nameMM])]
 
         Pred ann p zs    -> let dom = scDomainFromAnn ann in
 
@@ -943,47 +945,53 @@ formulaToSC ds q j =
                             let comps = map ((\(VarInit _ bexpr) -> bexpr) . last . fst) comps' in
                             let asgns = concat $ map (init . fst) asgns' in
 
-                            let bb = VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ if length comps > 0 then SCAnds comps else funTrueCol [SCVarName nameMM] in
+                            let bb = addB $ if length comps > 0 then SCAnds comps else funTrueCol [SCVarName nameMM] in
                             asgns ++ [bb]
 
         Not ann (Pred _ p zs) ->
             let dom = scDomainFromAnn ann in
-            [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (SCNot (SCAnds $ zipWith (\z i -> SCEq (exprToSC z) (SCVarName (nameTableArg (nameTable j) i))) zs [0..]))]
+            [addB $ SCNot (SCAnds $ zipWith (\z i -> SCEq (exprToSC z) (SCVarName (nameTableArg (nameTable j) i))) zs [0..])]
 
         Not ann e ->
             let dom = scDomainFromAnn ann in
             let sc = exprToSC e in
-            [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ SCNot sc]
+            [addB $ SCNot sc]
 
         Or ann e1 e2 ->
             let dom = scDomainFromAnn ann in
             let sc1 = exprToSC e1 in
             let sc2 = exprToSC e2 in
-            [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ SCOr sc1 sc2]
+            [addB $ SCOr sc1 sc2]
 
         And ann e1 e2 ->
             let dom = scDomainFromAnn ann in
             let sc1 = exprToSC e1 in
             let sc2 = exprToSC e2 in
-            [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ SCAnd sc1 sc2]
+            [addB $ SCAnd sc1 sc2]
 
-        Lt  ann _ _ -> let dom = scDomainFromAnn ann in [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (exprToSC q')]
-        Le  ann _ _ -> let dom = scDomainFromAnn ann in [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (exprToSC q')]
-        Gt  ann _ _ -> let dom = scDomainFromAnn ann in [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (exprToSC q')]
-        Ge  ann _ _ -> let dom = scDomainFromAnn ann in [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (exprToSC q')]
+        Lt  ann _ _ -> let dom = scDomainFromAnn ann in [addB (exprToSC q')]
+        Le  ann _ _ -> let dom = scDomainFromAnn ann in [addB (exprToSC q')]
+        Gt  ann _ _ -> let dom = scDomainFromAnn ann in [addB (exprToSC q')]
+        Ge  ann _ _ -> let dom = scDomainFromAnn ann in [addB (exprToSC q')]
 
         -- TODO: so far, we use Eq also in place of unification, so put back the first variant after updating the preprocessing
         -- Eq can only be a comparison
         -- Eq  ann _ _ -> let dom = scDomainFromAnn ann in (dv, [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (exprToSC q')])
         Eq ann e1 e2 -> formulaToSC_case (Is ann e1 e2)
 
+        -- TODO the annotation annx should be defined by type derivation
+        Is _ (Var ann x) (Choose _ bs xs) ->
+            [ VarAsgn nameBB $ foldr1 (\x y -> funCat [x,y]) $ map (SCAnd (SCVarName nameBB) . exprToSC) bs
+            , VarInit (variable SCPublic (scColType ann) (pack x)) $ foldr1 (\x y -> funCat [x,y]) $ map exprToSC xs
+            ]
+
         -- Is may be a comparison as well as initialization
         -- TODO we should become more strict about e1 being an expression
         Is ann e1 e2 -> ex
                         where
                           dom   = scDomainFromAnn ann
-                          bcomp = VarInit (variable dom      (SCArray 1 SCBool) (nameB j)) $ exprToSC (Eq        ann e1 e2)
-                          btrue = VarInit (variable SCPublic (SCArray 1 SCBool) (nameB j)) $ funTrueCol [SCVarName nameMM]
+                          bcomp = addB $ exprToSC (Eq        ann e1 e2)
+                          btrue = addB $ funTrueCol [SCVarName nameMM]
 
                           -- if x is a fresh variable, init x
                           ex = case e1 of
@@ -1007,7 +1015,6 @@ formulaToSC ds q j =
         Aggr _ _ _ _ _ -> aggrToSC ds q' j
 
         _ -> error $ "Unexpected boolean expression: " ++ show q'
-
 
 -- convert an expression to SecreC (transformation S^F)
 exprToSC :: Expr -> SCExpr
@@ -1041,7 +1048,6 @@ exprToSC e =
     Pow  _ e1 e2 -> binArith "pow" e1 e2
     And  _ e1 e2 -> funBoolOp [SCConstStr "and", exprToSC e1, exprToSC e2]
     Or   _ e1 e2 -> funBoolOp [SCConstStr "or", exprToSC e1, exprToSC e2]
-
     Pred _ _ _ -> error $ "High order predicates are not supported"
     _          -> error $ "Unexpected expression: " ++ show (pretty e)
   where

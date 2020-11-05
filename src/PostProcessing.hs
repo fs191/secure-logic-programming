@@ -8,6 +8,7 @@ import Control.Lens hiding (universe)
 
 import Data.Generics.Uniplate.Data
 import Data.List
+import qualified Data.Map as M
 import Data.Maybe
 import Data.Hashable
 import qualified Data.Set as S
@@ -17,7 +18,9 @@ import DatalogProgram
 import Expr
 import Rule
 import Simplify
+import Substitution
 
+import Data.Text.Prettyprint.Doc
 import Debug.Trace
 
 -- | Removes all rules that are not called by the goal clause and also removes
@@ -50,8 +53,12 @@ removeFalseDP dp = dp & dpRules %~ removeFalseFacts
 simplifyDP :: DatalogProgram -> DatalogProgram
 simplifyDP dp = dp & dpRules %~ simplifyRules
 
+-- | Merges similar rules into one by introducing disjunctions
 mergeRulesDP :: DatalogProgram -> DatalogProgram
-mergeRulesDP dp = dp & dpRules %~ mergeRules dp
+mergeRulesDP dp = dp & dpRules %~ map (prepareRule dp)
+                     & dpRules %~ map (refreshRule "X_")
+                     & dpRules %~ simplifyRules
+                     & dpRules %~ mergeMatchingRules
 
 refreshRulesDP :: DatalogProgram -> DatalogProgram
 refreshRulesDP dp = dp & dpRules . traversed %~ refreshRule "X_"
@@ -69,11 +76,7 @@ simplifyRule r =
     let boundedVarNames = concat $ map varNames boundedVars in
     let freeVarNames = concat $ map varNames freeVars in
     let newRuleBody = simplify rBody (boundedVarNames, freeVarNames) in
-
     let newRuleTail = foldr1 eAnd . nub . filter (not . isAnd) $ newRuleBody in
-    --trace ("before: " ++ show (pretty r)) $
-    --trace ("after: " ++ show (pretty (rule rName rArgs newRuleTail))) $
-    --trace "=====" $
     rule rName rArgs newRuleTail
 
 simplifyAnds' :: Expr -> [Expr]
@@ -88,32 +91,45 @@ isPredicate :: Expr -> Bool
 isPredicate Pred{} = True
 isPredicate _      = False
 
-isComparison :: Expr -> Bool
-isComparison Eq{}  = True
-isComparison Neq{} = True
-isComparison Le{} = True
-isComparison Lt{} = True
-isComparison Ge{} = True
-isComparison Gt{} = True
-isComparison _    = False
+isGroundPredicate :: Expr -> Bool
+isGroundPredicate Eq{}  = True
+isGroundPredicate Neq{} = True
+isGroundPredicate Le{} = True
+isGroundPredicate Lt{} = True
+isGroundPredicate Ge{} = True
+isGroundPredicate Gt{} = True
+-- by assumption, OR is applied only to ground predicates
+isGroundPredicate Or{} = True
+isGroundPredicate _    = False
 
 -- | Removes facts that always evaluate to False
 removeFalseFacts :: [Rule] -> [Rule]
 removeFalseFacts = filter (\x -> x ^. ruleTail /= constBool False)
 
--- | Merges similar rules into one by introducing disjunctions
-mergeRules :: DatalogProgram -> [Rule] -> [Rule]
-mergeRules dp rs =
-    let rs0 = map (prepareRule dp) rs in
-    let rs1 = map (refreshRule "X_") rs0 in
-    let rs2 = simplifyRules rs1 in
-    mergeMatchingRules rs2
 
 prepareRule :: DatalogProgram -> Rule -> Rule
-prepareRule dp r = r & ruleTail %~ (\ttl -> foldr1 eAnd $ zipWith (extendEDB dp) (simplifyAnds' ttl) [1..])
+prepareRule dp r = r & ruleTail %~ extendEDB_DP dp
+                     & ruleTail %~ reorderTail
+
+-- order the tail expressions as Predicates - Assignments - Comparisons
+reorderTail :: Expr -> Expr
+reorderTail ttl =
+       let (ps,as,cs) = splitTail ttl in
+       foldr1 eAnd $ ps ++ as ++ cs
+
+-- split the tail expressions to Predicates - Assignments - Comparisons
+splitTail :: Expr -> ([Expr], [Expr], [Expr])
+splitTail ttl =
+       let es      = simplifyAnds' ttl in
+       let (ps,rs) = partition isPredicate es in
+       let (cs,as) = partition isGroundPredicate rs in
+       (ps,as,cs)
 
 -- fills all EDB predicates with fresh variables
 -- while it makes rules longer, it is easier to optimize them in this form
+extendEDB_DP :: DatalogProgram -> Expr -> Expr
+extendEDB_DP dp ttl = foldr1 eAnd $ zipWith (extendEDB dp) (simplifyAnds' ttl) [1..]
+
 extendEDB :: DatalogProgram -> Expr -> Int -> Expr
 extendEDB dp e j =
     if isPredicate e then
@@ -132,7 +148,7 @@ mergeMatchingRules (r:rs) =
 
 mergeMatchingRulePairs :: [Rule] -> Rule -> [Rule]
 mergeMatchingRulePairs [] r = [r]
-mergeMatchingRulePairs (r1 : rs) r2 =
+mergeMatchingRulePairs (r2 : rs) r1 =
     let rs' = mergeTwoMatchingRules r1 r2 in
     tail rs' ++ mergeMatchingRulePairs rs (head rs')
 
@@ -141,44 +157,75 @@ mergeMatchingRulePairs (r1 : rs) r2 =
 mergeTwoMatchingRules :: Rule -> Rule -> [Rule]
 mergeTwoMatchingRules r1 r2 =
    -- 1. check that the rules have the same head
-   if r1 ^. ruleHead /= r2 ^. ruleHead then
+   if (hash . show) (r1 ^. ruleHead) /= (hash . show) (r2 ^. ruleHead) then
        [r1,r2]
    else
-       let es1       = simplifyAnds' (r1 ^. ruleTail) in
-       let (ps1,rs1) = partition isPredicate es1 in
-       let (cs1,as1) = partition isComparison rs1 in
+       let (ps1,as1,cs1) = splitTail (r1 ^. ruleTail) in
        let hps1 = map (hash . show) ps1 in
        let has1 = map (hash . show) as1 in
        let hcs1 = map (hash . show) cs1 in
 
-       let es2       = simplifyAnds' (r2 ^. ruleTail) in
-       let (ps2,rs2) = partition isPredicate es2 in
-       let (cs2,as2) = partition isComparison rs2 in
+       let (ps2,as2,cs2) = splitTail (r2 ^. ruleTail) in
        let hps2 = map (hash . show) ps2 in
        let has2 = map (hash . show) as2 in
        let hcs2 = map (hash . show) cs2 in
 
-       -- 1. check that the rules have the same EDB inputs
+       -- 2. check that the rules have the same EDB inputs
+       -- together, 1 and 2 ensure that the rules operate on the same input state
        if S.fromList hps1 /= S.fromList hps2 then
            [r1,r2]
 
-       -- 2. check that the rules have the same non-deterministic assignments
-       -- TODO try to generalize it
-       else if S.fromList has1 /= S.fromList has2 then
-           [r1,r2]
-
-       -- 3. extract comparisons that are identical in both rules
+       -- 3. extract comparisons and assignments that are identical in both rules
        else
-           let hs = S.intersection (S.fromList hcs1) (S.fromList hcs2) in
-           let cs_common = map fst . filter (\(_,hx) -> S.member hx hs)     $ zip cs1 hcs1 in
-           let cs_from1  = map fst . filter (\(_,hx) -> not (S.member hx hs)) $ zip cs1 hcs1 in
-           let cs_from2  = map fst . filter (\(_,hx) -> not (S.member hx hs)) $ zip cs2 hcs2 in
+           let ps = ps1 in
+
+           let hcs = S.intersection (S.fromList hcs1) (S.fromList hcs2) in
+           let cs_common = map fst . filter (\(_,hx) -> S.member hx hcs)     $ zip cs1 hcs1 in
+           let cs_from1  = map fst . filter (\(_,hx) -> not (S.member hx hcs)) $ zip cs1 hcs1 in
+           let cs_from2  = map fst . filter (\(_,hx) -> not (S.member hx hcs)) $ zip cs2 hcs2 in
+
+           let has = S.intersection (S.fromList has1) (S.fromList has2) in
+           let as_common = map fst . filter (\(_,hx) -> S.member hx has)     $ zip as1 has1 in
+           let as_from1  = map fst . filter (\(_,hx) -> not (S.member hx has)) $ zip as1 has1 in
+           let as_from2  = map fst . filter (\(_,hx) -> not (S.member hx has)) $ zip as2 has2 in
 
            -- if merging does not make sense, leave the rules as they are
-           if (length cs_common + length cs_from1 + length cs_from2) >= (length cs1 + length cs2) then
+           if (length cs_common + length cs_from1 + length cs_from2) > (length cs1 + length cs2) then
                [r1,r2]
-           else
+
+           -- if the assignments are the same, there is no non-determinism, and we can use ground OR
+           else if (length as_from1 == 0) && (length as_from1 == 0) then
+
                let rHead = r1 ^. ruleHead in
-               let rTail = foldr1 eAnd $ ps1 ++ as1 ++ cs_common ++ [eOr (foldr1 eAnd cs_from1) (foldr1 eAnd cs_from2)] in
+               let rTail = foldr1 eAnd $ ps ++ cs_common ++ [eOr (foldr1 eAnd cs_from1) (foldr1 eAnd cs_from2)] ++ as1 in
+               [Rule rHead rTail]
+
+           -- if the assignments are different, then we are dealing with non-determinism
+           else
+
+               -- label the variables in different assignments differently
+               let asgnVars = (nub . map (\(Is _ (Var _ x) _) -> x)) (as_from1 ++ as_from2) in
+               let subst1 = substFromMap $ M.fromList $ map (\x -> (x, var (x ++ "_1"))) asgnVars in
+               let subst2 = substFromMap $ M.fromList $ map (\x -> (x, var (x ++ "_2"))) asgnVars in
+
+               let cs1' = foldr1 eAnd $ map (applyToExpr subst1) cs_from1 in
+               let cs2' = foldr1 eAnd $ map (applyToExpr subst2) cs_from2 in
+
+               let as1' = map (applyToExpr subst1) as_from1 in
+               let as2' = map (applyToExpr subst2) as_from2 in
+
+               -- TODO for better efficiency, use a different function if cs1' and cs2' are mutually exclusive
+               -- this could be checked e.g. using smt-solver, but we would then need an IO here
+
+               -- TODO it can be better to put all vars into a single choose
+               -- we need to lonk them anyway when converting to prolog
+               let cats = map (\x -> eIs (var x) $ eChoose [cs1', cs2'] [getValue subst1 x, getValue subst2 x]) asgnVars in
+
+               let rHead = r1 ^. ruleHead in
+               let rTail = foldr1 eAnd $ ps ++ cs_common ++ as_common ++ as1' ++ as2' ++ cats in
+               --trace (show (pretty (r1 ^. ruleTail))) $
+               --trace (show (pretty (r2 ^. ruleTail))) $
+               --trace (show asgnVars) $
+               --trace (show (pretty rTail)) $
                [Rule rHead rTail]
 
