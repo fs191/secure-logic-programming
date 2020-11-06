@@ -13,10 +13,12 @@ module Language.SecreC
 import Control.Lens hiding(Empty)
 
 import Data.List
+import Data.List.Split
 import qualified Data.Set as S
 
 import Data.Text (Text, pack, unpack)
 import Data.Text.Prettyprint.Doc
+import Debug.Trace
 
 import Annotation
 import qualified DatalogProgram as DP
@@ -759,9 +761,12 @@ ruleBodyToSC ann argTableType ds input p xs ys q =
     asgnInputArgs  = map (\((Var xtype x),i) -> VarInit (variable SCPublic (scColType xtype) (pack x)) (SCVarName $ nameTableArg inputTable i)) xs
     asgnOutputArgs = map (\(z,i) -> VarAsgn (nameTableArg result i) (exprToSC z)) ys
 
-    initFilter = [VarInit (variable (scDomainFromAnn ann) (SCArray 1 SCBool) nameBB) (SCVarName (nameTableBB inputTable))]
+    -- TODO the domain should be (scDomainFromAnn ann), but we need to include the choose choice bit types for this to work
+    initFilter = [VarInit (variable SCShared3p (SCArray 1 SCBool) nameBB) (SCVarName (nameTableBB inputTable))]
 
-    qs = andsToList q
+    qs' = andsToList q
+    qs  = mergeChoose qs'
+
     ts = map (\(qj,j) -> (qj ^. predName, j)) $ filter (\(qj,j) -> case qj of {Pred _ _ _ -> True; _ -> False}) $ zip qs [1..]
     ks = 0 : (map snd ts)
 
@@ -770,7 +775,7 @@ ruleBodyToSC ann argTableType ds input p xs ys q =
                                    VarInit (variable SCPublic SCUInt (nameN k)) (SCDiv (SCVarName nameMM) (SCProd (map (\j -> SCVarName (nameM j)) js))) ) ks
     getTables    = map (\(tk,k) -> VarInit (variable SCPublic (SCStruct (nameOutTableStruct tk) (SCTemplateUse Nothing)) (nameTable k)) (SCFunCall (nameGetTableStruct tk) [SCVarName ds, SCVarName nameMM, SCVarName (nameM k), SCVarName (nameN k)])) ts
 
-    evalBody = concat $ zipWith (\qj j -> formulaToSC ds qj j) qs [1..]
+    evalBody = concat $ zipWith (\qj j -> formulaToSC ds False qj j) qs [1..]
 
 
 ---------------------------------------------------------------------
@@ -881,7 +886,7 @@ aggrToSC ds (Aggr _ f pr@(Pred ptype p zs) e1 e2) j =
                           let (_, dtype) = scVarType ann in
 
                           --extract aggregation result variable name
-                          -- TODO this can be generalized by adding a subcall of formulaToSC
+                          -- TODO this can be generalized by adding a subcall of 'formula to SC' transformation
                           let y = case e2 of
                                       Var _ y -> y
                                       _       -> error $ "comparing aggregation result to a complex expression is not supported yet"
@@ -918,29 +923,22 @@ prepareGoal ds dv goalPred j =
 
 --------------------------------------------------
 -- convert a formula to SecreC (transformation S^F)
-formulaToSC :: Text -> Expr -> Int -> [Statement]
-formulaToSC ds q j =
+formulaToSC :: Text -> Bool -> Expr -> Int -> [Statement]
+formulaToSC ds branch q j =
   [SCEmpty, Comment ("q" ++ show j)] ++ formulaToSC_case q
   where
+    ann = q ^. annotation
+    dom = scDomainFromAnn ann
     addB = VarAsgn nameBB . SCAnd (SCVarName nameBB)
     formulaToSC_case q' = case q' of
 
-        ConstBool ann b -> let dom = scDomainFromAnn ann in
-                           [addB (funReshape [SCConstBool b, SCVarName nameMM])]
+        ConstBool _ b -> [addB (funReshape [SCConstBool b, SCVarName nameMM])]
 
-        Pred ann p zs    -> let dom = scDomainFromAnn ann in
-
-                            --add database attributes to the set of declared variables
+        Pred _ p zs   -> --add database attributes to the set of declared variables
                             let predArgNames = S.fromList $ map (unpack . nameTableArg (nameTable j)) [0..length zs - 1] in
 
-                            -- TODO if we extract all comparisons into one expression, we can get a nicer indexation
-                            --let stmts = concat $ zipWith (\z i -> formulaToSC ds (Un ann z (Var (z ^. annotation) (unpack $ nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
-                            --let bb = VarInit (variable dom (SCArray 1 SCBool) (nameB j)) $ SCAnds comps in
-                            --stmts ++ [bb]
-
-
                             -- TODO it would be nice to have access to data types of extensional predicates here
-                            let stmts = zipWith (\z i -> formulaToSC ds (Un ann z (Var (z ^. annotation) (unpack $ nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
+                            let stmts = zipWith (\z i -> formulaToSC ds branch (Un ann z (Var (z ^. annotation) (unpack $ nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
                             let (comps', asgns') = partition snd $ zipWith (\s z -> (s, z ^. annotation ^. annBound)) stmts zs in
                             let comps = map ((\(VarInit _ bexpr) -> bexpr) . last . fst) comps' in
                             let asgns = concat $ map (init . fst) asgns' in
@@ -948,49 +946,45 @@ formulaToSC ds q j =
                             let bb = addB $ if length comps > 0 then SCAnds comps else funTrueCol [SCVarName nameMM] in
                             asgns ++ [bb]
 
-        Not ann (Pred _ p zs) ->
-            let dom = scDomainFromAnn ann in
+        Not _ (Pred _ p zs) ->
             [addB $ SCNot (SCAnds $ zipWith (\z i -> SCEq (exprToSC z) (SCVarName (nameTableArg (nameTable j) i))) zs [0..])]
 
-        Not ann e ->
-            let dom = scDomainFromAnn ann in
+        Not _ e ->
             let sc = exprToSC e in
             [addB $ SCNot sc]
 
-        Or ann e1 e2 ->
-            let dom = scDomainFromAnn ann in
+        Or _ e1 e2 ->
             let sc1 = exprToSC e1 in
             let sc2 = exprToSC e2 in
             [addB $ SCOr sc1 sc2]
 
-        And ann e1 e2 ->
-            let dom = scDomainFromAnn ann in
+        And _ e1 e2 ->
             let sc1 = exprToSC e1 in
             let sc2 = exprToSC e2 in
             [addB $ SCAnd sc1 sc2]
 
-        Lt  ann _ _ -> let dom = scDomainFromAnn ann in [addB (exprToSC q')]
-        Le  ann _ _ -> let dom = scDomainFromAnn ann in [addB (exprToSC q')]
-        Gt  ann _ _ -> let dom = scDomainFromAnn ann in [addB (exprToSC q')]
-        Ge  ann _ _ -> let dom = scDomainFromAnn ann in [addB (exprToSC q')]
+        Lt _ _ _ -> [addB (exprToSC q')]
+        Le _ _ _ -> [addB (exprToSC q')]
+        Gt _ _ _ -> [addB (exprToSC q')]
+        Ge _ _ _ -> [addB (exprToSC q')]
 
         -- TODO: so far, we use Eq also in place of unification, so put back the first variant after updating the preprocessing
         -- Eq can only be a comparison
         -- Eq  ann _ _ -> let dom = scDomainFromAnn ann in (dv, [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (exprToSC q')])
-        Eq ann e1 e2 -> formulaToSC_case (Is ann e1 e2)
+        Eq _ e1 e2 -> formulaToSC_case (Is ann e1 e2)
 
-        -- TODO the annotation annx should be defined by type derivation
-        Is _ (Var ann x) (Choose _ bs xs) ->
-            [ VarAsgn nameBB $ foldr1 (\x y -> funCat [x,y]) $ map (SCAnd (SCVarName nameBB) . exprToSC) bs
-            , VarInit (variable SCPublic (scColType ann) (pack x)) $ foldr1 (\x y -> funCat [x,y]) $ map exprToSC xs
-            ]
+        -- TODO this is a workaround for choose construction
+        Is _ (Expr.List _ xs) (Choose _ (Expr.List _ zs) (Expr.List _ bs)) ->
+            let n = length bs in
+            let zss = chunksOf n zs in
+            [ VarAsgn nameBB $ foldr1 (\x y -> funCat [x,y]) $ map (SCAnd (SCVarName nameBB) . bexprToSC) bs] ++
+            zipWith (\(Var annx x) zs -> VarInit (variable SCPublic (scColType annx) (pack x)) $ foldr1 (\x y -> funCat [x,y]) $ map exprToSC zs) xs zss
 
         -- Is may be a comparison as well as initialization
         -- TODO we should become more strict about e1 being an expression
-        Is ann e1 e2 -> ex
+        Is _ e1 e2 -> ex
                         where
-                          dom   = scDomainFromAnn ann
-                          bcomp = addB $ exprToSC (Eq        ann e1 e2)
+                          bcomp = addB $ exprToSC (Eq ann e1 e2)
                           btrue = addB $ funTrueCol [SCVarName nameMM]
 
                           -- if x is a fresh variable, init x
@@ -1010,7 +1004,7 @@ formulaToSC ds q j =
 
         -- unification may be a comparison as well as initialization
         -- most likely, there will be no Un constructions due to previous optimizations
-        Un ann e1 e2 -> formulaToSC_case (Is ann e1 e2)
+        Un _ e1 e2 -> formulaToSC_case (Is ann e1 e2)
 
         Aggr _ _ _ _ _ -> aggrToSC ds q' j
 
@@ -1059,6 +1053,25 @@ exprToSC e =
         = SCFunCall "cast_float32" [exprToSC z]
       | otherwise = exprToSC z
     typeof = view $ annotation . annType
+
+-- convert a pure boolean expression to SecreC (used only for the condition bits)
+bexprToSC :: Expr -> SCExpr
+bexprToSC e =
+  case e of 
+
+    ConstBool _ b -> funReshape [SCConstBool b, SCVarName nameMM]
+    Var   _ x -> SCVarName $ pack x
+    Not  _ e0 -> SCNot $ bexprToSC e0
+    Lt   _ e1 e2 -> funBoolOp [SCConstStr "<", exprToSC e1, exprToSC e2]
+    Le   _ e1 e2 -> funBoolOp [SCConstStr "<=", exprToSC e1, exprToSC e2]
+    Eq   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2]
+    Un   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2]
+    Gt   _ e1 e2 -> funBoolOp [SCConstStr ">", exprToSC e1, exprToSC e2]
+    Ge   _ e1 e2 -> funBoolOp [SCConstStr ">=", exprToSC e1, exprToSC e2]
+
+    And  _ e1 e2 -> SCAnd (bexprToSC e1) (bexprToSC e2)
+    Or   _ e1 e2 -> SCOr  (bexprToSC e1) (bexprToSC e2)
+    _          -> error $ "Unexpected pure boolean expression: " ++ show (pretty e)
 
 --------------------------------------------------
 -- create a script that writes data from .csv file to Sharemind database
@@ -1122,4 +1135,15 @@ tableGenerationCode ds dbc (tableHeader:tableRows) =
 
         vlengths = map length strData'
         strData  = concat $ strData'
+
+mergeChoose :: [Expr] -> [Expr]
+mergeChoose qs =
+    let (qs0',qs1) = partition (\q -> case q of {Is _ _ Choose{} -> True; _ -> False }) qs in
+    let qs0 = map (\(Is annx x ch) -> (Is annx (eList [x]) ch)) qs0' in
+    if length qs0 > 0 then
+        let q' = foldr1 (\(Is _ (Expr.List _ [x]) (Choose _ (Expr.List _ zs) _)) (Is ann (Expr.List _ xs) (Choose _ (Expr.List _ zss) bs)) -> Is ann (eList (x:xs)) (eChoose (eList (zs ++ zss)) bs) ) qs0 in
+        qs1 ++ [q']
+    else
+        qs
+
 

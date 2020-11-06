@@ -165,16 +165,33 @@ inferBuiltins r = r & ruleTail %~ U.transform ret
     rewr x = x
 
 inferBinRet :: Expr -> Expr -> Expr -> Expr
+
+-- TODO this is a workaround for 'choose' operator
+-- TODO we also need to infer the boolean domain
+inferBinRet e@Choose{} (Expr.List _ xs) (Expr.List _ ys) =
+    e & annotation . annType %~ fromMaybe err2 . unifyTypes t
+      & annotation . domain  .~ d
+    where
+      ts = map (\x -> x ^. annotation . annType) xs
+      ds = map (\x -> x ^. annotation . domain)  xs
+
+      t = foldr1 (\t1 t2 -> fromMaybe (err t1 t2) $ unifyTypes t1 t2) ts
+      d = foldr1 (\d1 d2 -> safelyUnifyDomains d1 d2) ds
+
+      err t1 t2  = error $ "Failed to unify expressions " <> show t1 <> " and " <> show t2
+      err2       = error $ "Failed to apply typing " <> show t <> " to " <> show e
+
 inferBinRet e x y
   -- If both are bound then it is a comparison and privacy depends on subterms
   | xb && yb  = e & annotation . annType %~ fromMaybe err2 . unifyTypes ut
                   & annotation . domain  .~ safelyUnifyDomains xd yd
   -- If only one variable is bound, then it is an assignment and will always
   -- return true
+  -- except when the assignee is a Choose construction
   | xb        = e & annotation . annType %~ fromMaybe err2 . unifyTypes ut
-                  & annotation . domain  .~ Public
+                  & annotation . domain  .~ d
   | yb        = e & annotation . annType %~ fromMaybe err2 . unifyTypes ut
-                  & annotation . domain  .~ Public
+                  & annotation . domain  .~ d
   -- User has written incorrect code if both sides of the expression are unbound
   | otherwise = error $ "Uninitialized subexpressions: " ++ show e
   where
@@ -184,6 +201,24 @@ inferBinRet e x y
     yd = y ^. annotation . domain
     yb = y ^. annotation . annBound
     yt = y ^. annotation . annType
+
+  -- TODO we need to handle Choose in a nicer way
+    yc = case y of {Choose{} -> True; _ -> False}
+    xc = case x of {Choose{} -> True; _ -> False}
+    d  = if xc then
+             case x of
+                 Choose _ _ (Expr.List _ bs) -> 
+                     let ds = map (\b -> b ^. annotation . domain) bs in
+                     foldr1 (\d1 d2 -> safelyUnifyDomains d1 d2) ds
+                 _ -> Public
+         else if yc then
+             case y of
+                 Choose _ _ (Expr.List _ bs) -> 
+                     let ds = map (\b -> b ^. annotation . domain) bs in
+                     foldr1 (\d1 d2 -> safelyUnifyDomains d1 d2) ds
+                 _ -> Public
+         else Public
+
     ut | isArithmetic e  = fromMaybe err $ unifyTypes xt yt
        | isPredicative e = PPBool
        | otherwise       = PPAuto

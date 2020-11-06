@@ -27,6 +27,7 @@ import Debug.Trace
 -- rules that contain calls to other rules that are not facts.
 postProcess :: DatalogProgram -> DatalogProgram
 postProcess = removeFalseDP
+            . foldChooseDP
             . simplifyDP
             . mergeRulesDP
             . filterGoalRules
@@ -59,6 +60,9 @@ mergeRulesDP dp = dp & dpRules %~ map (prepareRule dp)
                      & dpRules %~ map (refreshRule "X_")
                      & dpRules %~ simplifyRules
                      & dpRules %~ mergeMatchingRules
+
+foldChooseDP :: DatalogProgram -> DatalogProgram
+foldChooseDP dp = dp & dpRules . traversed . ruleTail %~ (\ttl -> foldr1 eAnd $ map foldChoose (simplifyAnds' ttl))
 
 refreshRulesDP :: DatalogProgram -> DatalogProgram
 refreshRulesDP dp = dp & dpRules . traversed %~ refreshRule "X_"
@@ -189,43 +193,64 @@ mergeTwoMatchingRules r1 r2 =
            let as_from1  = map fst . filter (\(_,hx) -> not (S.member hx has)) $ zip as1 has1 in
            let as_from2  = map fst . filter (\(_,hx) -> not (S.member hx has)) $ zip as2 has2 in
 
+           let asgnVars1 = (nub . map (\(Is _ (Var _ x) _) -> x)) as1 in
+           let asgnVars2 = (nub . map (\(Is _ (Var _ x) _) -> x)) as2 in
+           let asgnVars  = nub (asgnVars1 ++ asgnVars2) in
+
+           -- if the set of assigned variables is different in the rules, do not merge them
+           if S.fromList asgnVars1 /= S.fromList asgnVars2 then
+               [r1,r2]
+
            -- if merging does not make sense, leave the rules as they are
-           if (length cs_common + length cs_from1 + length cs_from2) > (length cs1 + length cs2) then
+           -- TODO we actually need a 'complexity estimate' here
+           else if (length cs_common + length cs_from1 + length cs_from2) > (length cs1 + length cs2) then
                [r1,r2]
 
            -- if the assignments are the same, there is no non-determinism, and we can use ground OR
-           else if (length as_from1 == 0) && (length as_from1 == 0) then
+           else if (length as_from1 == 0) && (length as_from2 == 0) then
 
                let rHead = r1 ^. ruleHead in
-               let rTail = foldr1 eAnd $ ps ++ cs_common ++ [eOr (foldr1 eAnd cs_from1) (foldr1 eAnd cs_from2)] ++ as1 in
+               let rTail = foldr1 eAnd $ ps ++ cs_common ++ [eOr (foldr eAnd eTrue cs_from1) (foldr eAnd eTrue cs_from2)] ++ as_common in
                [Rule rHead rTail]
 
            -- if the assignments are different, then we are dealing with non-determinism
            else
 
                -- label the variables in different assignments differently
-               let asgnVars = (nub . map (\(Is _ (Var _ x) _) -> x)) (as_from1 ++ as_from2) in
                let subst1 = substFromMap $ M.fromList $ map (\x -> (x, var (x ++ "_1"))) asgnVars in
                let subst2 = substFromMap $ M.fromList $ map (\x -> (x, var (x ++ "_2"))) asgnVars in
 
-               let cs1' = foldr1 eAnd $ map (applyToExpr subst1) cs_from1 in
-               let cs2' = foldr1 eAnd $ map (applyToExpr subst2) cs_from2 in
+               let cs1' = foldr eAnd eTrue $ map (applyToExpr subst1) cs_from1 in
+               let cs2' = foldr eAnd eTrue $ map (applyToExpr subst2) cs_from2 in
 
-               let as1' = map (applyToExpr subst1) as_from1 in
-               let as2' = map (applyToExpr subst2) as_from2 in
+               let as1' = map (applyToExpr subst1) as1 in
+               let as2' = map (applyToExpr subst2) as2 in
 
                -- TODO for better efficiency, use a different function if cs1' and cs2' are mutually exclusive
                -- this could be checked e.g. using smt-solver, but we would then need an IO here
 
                -- TODO it can be better to put all vars into a single choose
-               -- we need to lonk them anyway when converting to prolog
-               let cats = map (\x -> eIs (var x) $ eChoose [cs1', cs2'] [getValue subst1 x, getValue subst2 x]) asgnVars in
+               -- we need to link them anyway when converting to prolog
+               let cats = map (\x -> eIs (var x) $ eChoose (eList [getValue subst1 x, getValue subst2 x]) (eList [cs1', cs2'])) asgnVars in
 
                let rHead = r1 ^. ruleHead in
-               let rTail = foldr1 eAnd $ ps ++ cs_common ++ as_common ++ as1' ++ as2' ++ cats in
+               let rTail = foldr1 eAnd $ ps ++ cs_common ++ as1' ++ as2' ++ cats in
                --trace (show (pretty (r1 ^. ruleTail))) $
                --trace (show (pretty (r2 ^. ruleTail))) $
                --trace (show asgnVars) $
                --trace (show (pretty rTail)) $
-               [Rule rHead rTail]
+
+               -- apply 'simplify' to get rid of intermediate variables
+               [simplifyRule $ Rule rHead rTail]
+
+foldChoose :: Expr -> Expr
+foldChoose (Is ann x y) =
+    Is ann x (foldChoose y)
+foldChoose (Choose ann (Expr.List _ xs) (Expr.List _ bs)) =
+    let ys = map foldChoose xs in
+    let xs' = concat $ zipWith (\b y -> case y of {(Choose _ (Expr.List _ xs0) (Expr.List _ bs0)) -> xs0              ; _ -> [y]}) bs ys in
+    let bs' = concat $ zipWith (\b y -> case y of {(Choose _ (Expr.List _ xs0) (Expr.List _ bs0)) -> map (eAnd b) bs0 ; _ -> [b]}) bs ys in
+    (Choose ann (eList xs') (eList bs'))
+foldChoose e = e
+    --trace (show e) $ e
 

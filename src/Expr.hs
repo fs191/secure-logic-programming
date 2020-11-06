@@ -44,6 +44,7 @@ module Expr
   , varNames
   , annotation
   , leftHand, rightHand
+  , vals
   , aggr, aggrPred, sourceExpr, targetExpr
   , arg
   , annType, domain
@@ -142,7 +143,7 @@ data Expr
   | List {_annotation :: !Ann, _vals :: ![Expr]}
   | Hole {_annotation :: !Ann}
   | Aggr {_annotation :: !Ann, _aggr :: !Aggregation, _aggrPred :: !Expr, _sourceExpr :: !Expr, _targetExpr :: !Expr}
-  | Choose {_annotation :: !Ann, _choiceBits :: ![Expr], _choiceVals :: ![Expr]}
+  | Choose {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   deriving (Show, Eq, Ord, Data, Typeable)
 makeLenses ''Expr
 makePrisms ''Expr
@@ -178,7 +179,7 @@ instance Pretty Expr where
   pretty (Pow e x y)      = pretty x <> "^" <> pretty y <+> pretty e
   pretty (Aggr e f p x y) = pretty f <> "(" <> pretty p <> ", " <> pretty x <> "," <> pretty y <> ")" <+> pretty e
   -- TODO make this Prolog-edible
-  pretty (Choose e bs xs) = "choose(" <> (list $ pretty <$> (zip bs xs)) <> ")" <+> pretty e
+  pretty (Choose e b x)   = "choose(" <> pretty b <> " -- " <> pretty x <> ")" <+> pretty e
   pretty (Sqrt e x)       = "sqrt(" <> pretty x <> ")" <+> pretty e
   pretty x                = error $ "pretty not defined for " ++ show x
 
@@ -406,7 +407,7 @@ eNeq = Neq e
   where e = empty & annType .~ PPBool
 
 -- | Creates a new choice expression
-eChoose :: [Expr] -> [Expr] -> Expr
+eChoose :: Expr -> Expr -> Expr
 eChoose = Choose empty
 
 eTrue :: Expr
@@ -549,7 +550,6 @@ isArithmetic _       = False
 isPredicative :: Expr -> Bool
 isPredicative (Pred{}) = True
 isPredicative (Aggr{}) = True
-isPredicative (Choose{}) = True
 isPredicative (Gt{})   = True
 isPredicative (Ge{})   = True
 isPredicative (Eq{})   = True
