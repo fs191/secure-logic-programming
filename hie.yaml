@@ -1,0 +1,13 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "secure-logic-programming:lib"
+
+    - path: "./app/Main.hs"
+      component: "secure-logic-programming:exe:lpsec"
+
+    - path: "./app/Paths_secure_logic_programming.hs"
+      component: "secure-logic-programming:exe:lpsec"
+
+    - path: "./test"
+      component: "secure-logic-programming:test:test"

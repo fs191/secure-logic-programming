@@ -23,6 +23,7 @@ import Annotation
 import qualified DatalogProgram as DP
 import DBClause
 import Expr
+import ExprPretty
 import Rule
 import Table(getTableData)
 
@@ -1079,7 +1080,7 @@ exprToSC e =
     Or   _ e1 e2 -> funBoolOp [SCConstStr "or", exprToSC e1, exprToSC e2]
 
     Pred _ _ _ -> error $ "High order predicates are not supported"
-    _          -> error $ "Unexpected expression: " <> show (pretty e)
+    _          -> error $ "Unexpected expression: " <> show (prettyMinimal e)
   where
     binArith s x y = funArithOp [SCConstStr s, cast x y x, cast x y y]
     -- Cast arguments to float if either one is already float

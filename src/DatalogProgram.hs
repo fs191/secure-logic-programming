@@ -35,6 +35,7 @@ import           Data.Data
 
 import           Rule
 import           Expr
+import           ExprPretty
 import           Data.Text.Prettyprint.Doc
 import           DBClause
 import           Language.Prolog.PrologSource
@@ -48,11 +49,11 @@ data Directive
 
 instance Pretty Directive where
   pretty (InputDirective as) = ":-inputs([" <> _ps <> "])"
-    where _ps = cat . punctuate ", " $ pretty <$> as
+    where _ps = cat . punctuate ", " $ prettyFull <$> as
   pretty (OutputDirective as) = ":-outputs([" <> _ps <> "])"
-    where _ps = cat . punctuate ", " $ pretty <$> as
+    where _ps = cat . punctuate ", " $ prettyFull <$> as
   pretty (DBDirective n as) = ":-type(" <> pretty n <> ",[" <> _ps <> "])"
-    where _ps = cat . punctuate ", " $ pretty <$> as
+    where _ps = cat . punctuate ", " $ prettyFull <$> as
 
 -- | A datatype for representing privalog programs. Consists of rules, a goal
 -- and directives.
@@ -70,7 +71,7 @@ instance Pretty DatalogProgram where
   pretty p = vsep
     [ hcat $ (<>".\n\n") . pretty <$> _dpDirectives p
     , hcat $ (<>".\n\n") . pretty <$> _dpRules p
-    , "?-" <> pretty (p ^. dpGoal) <> "."
+    , "?-" <> prettyFull (p ^. dpGoal) <> "."
     ]
 
 instance PrologSource DatalogProgram where
@@ -195,7 +196,7 @@ dpGoal = lens getter setter
         a      -> err a
     err a =
       error $ "Invalid goal expression. Expected a predicate or an aggregation, got"
-        <> (show $ pretty a)
+        <> (show $ prettyMinimal a)
 
 isEDBFact :: DatalogProgram -> Expr -> Bool
 isEDBFact dp (Pred{_predName=n}) = isJust $ findDBFact dp n

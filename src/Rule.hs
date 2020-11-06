@@ -34,6 +34,7 @@ import           Control.Lens hiding (transform)
 import           Language.Prolog.PrologSource
 
 import           Expr
+import           ExprPretty
 import           Substitution
 import           DBClause
 import           Annotation
@@ -47,12 +48,12 @@ data Rule = Rule
 makeLenses ''Rule
 
 instance Pretty Rule where
-  pretty (Rule h (ConstBool _ True)) = pretty h
+  pretty (Rule h (ConstBool _ True)) = prettyFull h
   pretty r =
-    pretty (r ^. ruleHead) <+>
+    prettyFull (r ^. ruleHead) <+>
     ":-" <+>
     hardline <+>
-    indent 2 (pretty $ _ruleTail r)
+    indent 2 (prettyFull $ _ruleTail r)
 
 instance PrologSource Rule where
   prolog (Rule h (ConstBool _ True)) = prolog h <> "."

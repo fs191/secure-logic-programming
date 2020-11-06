@@ -91,7 +91,9 @@ preservesSemanticsDB
   -> Spec
 preservesSemanticsDB f p db = it (toString desc) $
   do
-    _prog <- parseDatalogFromFile p
+    _prog' <- parseDatalogFromFile p
+    let err = error "Cannot parse file"
+    let _prog = fromRight err _prog'
     _pre  <- runDatalogProgram $ insertDB db _prog
     _fprog <- f _prog
     _post <- runDatalogProgram $ insertDB db _fprog
@@ -114,7 +116,9 @@ runsSuccessfully n p res = runsSuccessfullyDB n p res []
 runsSuccessfullyDB :: Text -> (DatalogProgram -> IO DatalogProgram) -> [Text] -> [Expr] -> Spec
 runsSuccessfullyDB n p res db = it (toString desc) $
   do
-    _prog <- parseDatalogFromFile n
+    _prog' <- parseDatalogFromFile n
+    let err = error "Cannot parse file"
+    let _prog = fromRight err _prog'
     _fprog <- p _prog
     let p' = insertDB db _fprog
     _res <- runDatalogProgram p'
@@ -131,7 +135,9 @@ runsSuccessfullyDB n p res db = it (toString desc) $
 doesNotRun :: Text -> Spec
 doesNotRun p = it (toString desc) $
   do
-    _prog <- parseDatalogFromFile p
+    _prog' <- parseDatalogFromFile p
+    let err = error "Cannot parse file"
+    let _prog = fromRight err _prog'
     runDatalogProgram _prog `shouldThrow` anyException
   where
     desc = p <> " throws an exception"
@@ -147,7 +153,9 @@ compileSC file iterations = errExit False $ withTmpDir act
   where
     act tmp = 
       do
-        _prog <- liftIO $ parseDatalogFromFile file
+        _prog' <- liftIO $ parseDatalogFromFile file
+        let err = error "Cannot parse file"
+        let _prog = fromRight err _prog'
         let conf = TranslatorConfig iterations False
         trans <- runExceptT $ process conf _prog
         let trans' = either throw id trans

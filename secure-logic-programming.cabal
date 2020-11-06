@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2755ea429d88134ff9cf98ff6b7581913a1a066f08db5d48c22a9114ee550be6
+-- hash: 8a5fc2e52d84b6416fa365cae032823f7f95e3948c00d99dfed7cef3c6ac51b5
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -34,6 +34,7 @@ library
       ErrorMsg
       Expr
       Expr.Classes
+      ExprPretty
       Language.Datalog.Literal
       Language.Privalog.Types
       Language.Prolog.PrologSource
@@ -49,7 +50,9 @@ library
       PKTransform
       PostProcessing
       PreProcessing
+      ProgramOptions
       Rule
+      SemanticsChecker
       Simplify
       Solve
       Substitution
@@ -89,8 +92,6 @@ library
 executable lpsec
   main-is: Main.hs
   other-modules:
-      OptParse
-      ProgramOptions
       Paths_secure_logic_programming
   hs-source-dirs:
       app

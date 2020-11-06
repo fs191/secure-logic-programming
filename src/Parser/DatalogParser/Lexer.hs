@@ -16,13 +16,13 @@ import Text.Megaparsec as P
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as C
 
-
 import Control.Lens
 
 import Language.Privalog.Types
 import qualified Annotation as A
+import ErrorMsg
 
-type Parser = Parsec Void Text
+type Parser = Parsec CompilerException Text
 
 lexeme :: Parser a -> Parser a
 lexeme = C.lexeme sc

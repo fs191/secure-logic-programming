@@ -14,11 +14,6 @@ import Relude
 import Text.Megaparsec
 
 import Control.Lens
-import Control.Monad
-
-import Data.Void (Void)
-import Data.Foldable
-import Data.Maybe
 
 import Parser.DatalogParser.Lexer
 import Expr as E hiding (identifier)
@@ -26,7 +21,7 @@ import qualified Rule as R
 import qualified Annotation as A
 import ErrorMsg
 
-type Parser = Parsec Void Text
+type Parser = Parsec CompilerException Text
 data Operator f = Operator Text f
 
 -------------------------
@@ -202,8 +197,14 @@ rule =
 attributeParse :: Parser Expr
 attributeParse = withSrcPos $
   do
-    s <- attributeIdentifier
+    s <- attributeIdentifier <|> commonMistake
     typable . return $ E.attribute s
+  where
+    commonMistake = 
+      do
+        void . try $ identifier
+        fail "Expected an attribute, got a constant instead. \n\
+             \Add an '@' symbol in front of the atom."
 
 boolParse :: Parser Expr
 boolParse = choice
@@ -223,8 +224,9 @@ typable e =
     let f = case t of
           Just p  -> p
           Nothing -> A.empty
-    let err = error . show $ TypeApplicationFailed (f ^. annType) e'
-    return . fromMaybe err $ applyAnnotation f e'
+    pos <- getSourcePos
+    let err = customFailure $ compEx (TypeApplicationFailed (f ^. annType) e') pos
+    maybe err return $ applyAnnotation f e'
 
 withSrcPos :: Parser Expr -> Parser Expr
 withSrcPos parser =
@@ -232,4 +234,4 @@ withSrcPos parser =
     begin <- getSourcePos
     res <- parser
     end <- getSourcePos
-    return $ res & annotation . A.srcPos .~ Just (A.SPos begin end)
+    return $ res & annotation . A.srcPos .~ Just (begin, end)

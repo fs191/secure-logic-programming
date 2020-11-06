@@ -46,7 +46,8 @@ canDeriveOn file n = it (show desc) $ action `shouldReturn` ()
   where 
     desc = "can derive ground rules on " <> file <> " with " <> show n <> " iterations"
     action = do
-        f <- parseDatalogFromFile file
+        let err = error "Cannot parse file"
+        f <- fromRight err <$> parseDatalogFromFile file
         d <- deriveAllGroundRules n f
         return $ d `seq` ()
      

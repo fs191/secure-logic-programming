@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Parser.DatalogParser
-  ( parseDatalogFromFile
+  ( parseDatalogFromFile, parseDatalogFromFile_
   , parseDatalog
   ) where
 
@@ -8,6 +8,7 @@ import Relude
 
 import Text.Megaparsec
 
+import Control.Exception (throw)
 import Control.Lens
 
 import Parser.DatalogParser.Lexer
@@ -19,7 +20,7 @@ import qualified Rule as R
 import Annotation as A
 import ErrorMsg
 
-type Parser = Parsec Void Text
+type Parser = Parsec CompilerException Text
 
 data Clause
   = RC R.Rule
@@ -37,7 +38,10 @@ datalogParser =
     case qs of
       []  -> error $ show NoGoal
       [q] -> return $ DP.ppDatalogProgram rs q dirs
-      x   -> error . show $ TooManyGoals x
+      _   -> 
+        do
+          pos <- getSourcePos
+          customFailure $ compEx TooManyGoals pos
 
 clause :: Parser Clause
 clause =  label "clause" $
@@ -110,18 +114,28 @@ goal =
 -----------------------
 
 -- | Parses a privacy datalog program from a string
-parseDatalog :: Text -> Text -> Either (ParseErrorBundle Text Void) DP.DatalogProgram
-parseDatalog path content = runParser datalogParser (toString path) content
+parseDatalog :: Text -> Text -> Either Text DP.DatalogProgram
+parseDatalog path content = 
+    case res of
+      Left x  -> Left . toText $ errorBundlePretty x
+      Right x -> Right x
+  where
+    res = runParser datalogParser (toString path) content
 
 -- | Parses a privacy datalog program from a source file
-parseDatalogFromFile :: Text -> IO DP.DatalogProgram
+parseDatalogFromFile :: Text -> IO (Either CompilerException DP.DatalogProgram)
 parseDatalogFromFile filepath =
   do
     file <- readFileText (toString filepath)
     let res = parse datalogParser (toString filepath) file
     case res of
-      Left x  -> error . show $ MegaparsecError x
-      Right x -> return x
+      Left x  -> 
+          return . Left . compEx_ . ParserException . toText $ errorBundlePretty x
+      Right x -> return $ Right x
+
+-- | Unsafe version of `parseDatalogFromFile`
+parseDatalogFromFile_ :: Text -> IO DP.DatalogProgram
+parseDatalogFromFile_ f = either throw id <$> parseDatalogFromFile f
 
 -----------------------
 -- Utils

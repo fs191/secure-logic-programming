@@ -1,27 +1,31 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveAnyClass #-}
 
 module ErrorMsg 
   ( CompilerException(..)
+  , CompilerExceptionInfo(..)
   , Severity(..)
   , severity
-  , throw
+  , errorMsgWithSource
+  , compEx_, compEx, throwCompEx
   ) where
 
 import Relude hiding (show)
 
-import Control.Exception
 import Control.Lens
+import Control.Monad.Except
 
 import Data.Text.Prettyprint.Doc
 
-import Text.Megaparsec.Error
 import Text.Megaparsec.Pos
 import Text.Show
 
 import Language.Privalog.Types
 
 import Expr
+import ExprPretty
 import Annotation
+import Text.Megaparsec
 
 class HasSeverity a where
   severity :: a -> Severity
@@ -37,23 +41,31 @@ data Severity
   | Debug5 -- Most detailed
   deriving (Enum, Eq, Ord)
 
-data CompilerException
-  = MegaparsecError (ParseErrorBundle Text Void)
-  | NoGoal
+data CompilerException = 
+  CompilerException CompilerExceptionInfo (Maybe SourcePos)
+  deriving (Typeable, Eq, Ord)
+
+data CompilerExceptionInfo
+  = NoGoal
+  | ParserException Text
   | DoesNotConverge
-  | TooManyGoals [Expr]
+  | TypeInferenceFailed Expr
+  | TooManyGoals
   | TypeMismatch PPType PPType
   | ExpectedGroundTerm Expr
   | ExpectedConstant Expr
   | NonVariableArgument Expr
-  | CannotReadFile Text IOException
+  | CannotReadFile Text Text
   | UnificationFailed Expr Expr
   | TypeApplicationFailed PPType Expr
-  deriving (Typeable)
+  deriving (Typeable, Eq, Ord)
 
 instance Exception CompilerException where
-  displayException ex = show $ sev <+> pretty ex
+  displayException ex = show $ sev <+> (align $ pretty ex)
     where sev = pretty $ severity ex
+
+instance ShowErrorComponent CompilerException where
+  showErrorComponent = displayException
 
 instance Pretty Severity where
   pretty Warning  = "[WARNING ]"
@@ -71,27 +83,46 @@ instance Show Severity where
 instance Show CompilerException where
   show = show . pretty
 
-instance HasSeverity CompilerException where
+instance Show CompilerExceptionInfo where
+  show = show . errorMsg
+
+instance HasSeverity CompilerExceptionInfo where
   severity _ = Error
 
-instance Pretty CompilerException where
-  pretty x = (pretty $ severity x) <+> (align $ errorMsg x)
+instance HasSeverity CompilerException where
+  severity (CompilerException info _) = severity info
 
-errorMsg :: CompilerException -> Doc ann
-errorMsg (MegaparsecError err) = pretty $ errorBundlePretty err
+instance Pretty CompilerException where
+  pretty (CompilerException info _) = 
+    (pretty $ severity info) <+> (align $ errorMsg info)
+
+errorMsgWithSource :: Text -> CompilerException -> Doc ann
+errorMsgWithSource src (CompilerException info pos) = vsep [errorMsg info, srcDoc]
+  where
+    err = "<source location invalid>"
+    srcDoc = case pos of
+      Just p -> vsep
+        [ pretty $ sourceName p
+        , " |"
+        , " |" <+> pretty errorLine
+        , " |" <+> pretty errorIndicator
+        ]
+        where
+          errorLine = fromMaybe err $ lines src !!? (unPos $ sourceLine p)
+          errorIndicator = replicate (unPos $ sourceColumn p) ' ' <> "^"
+      Nothing -> emptyDoc
+
+errorMsg :: CompilerExceptionInfo -> Doc ann
 errorMsg NoGoal = "Program has no goal."
-errorMsg (TooManyGoals x) = hsep
-  [ "Program has more than one goal:"
-  , indent 4 . hsep $ prettyLoc <$> x
-  ]
+errorMsg TooManyGoals = "Program has more than one goal."
 errorMsg (TypeMismatch expected got) = 
   pretty expected `expectedGot` pretty got
 errorMsg (ExpectedConstant expr) = 
-  "a constant" `expectedGot` pretty expr
+  "a constant" `expectedGot` prettyMinimal expr
 errorMsg (ExpectedGroundTerm expr) = 
-  "a ground term" `expectedGot` pretty expr
+  "a ground term" `expectedGot` prettyMinimal expr
 errorMsg (NonVariableArgument expr) = 
-  "a variable argument" `expectedGot` pretty expr
+  "a variable argument" `expectedGot` prettyMinimal expr
 errorMsg (CannotReadFile f ex) = vsep
   [ "Cannot read from file" <+> pretty f <> ":"
   , pretty $ show ex <> "."
@@ -99,10 +130,10 @@ errorMsg (CannotReadFile f ex) = vsep
   ]
 errorMsg (UnificationFailed x y) = hsep
   [ "Failed to unify expressions"
-  , pretty x
+  , prettyMinimal x
   , prettyLoc x
   , "and"
-  , pretty y
+  , prettyMinimal y
   , prettyLoc y
   ]
 errorMsg (TypeApplicationFailed t x) = vsep 
@@ -111,11 +142,12 @@ errorMsg (TypeApplicationFailed t x) = vsep
     , pretty t
     , "to expression"
     ]
-  , pretty x
+  , prettyFull x
   , prettyLoc x
   ]
 errorMsg DoesNotConverge = "The program does not converge. Try increasing the number of iterations using `-n`"
-
+errorMsg (TypeInferenceFailed e) = "Could not infer type for\n\n" <> prettyMinimal e
+errorMsg (ParserException x) = "Could not parse program:\n" <> pretty x
 
 -- Utilities
 
@@ -129,9 +161,22 @@ prettyLoc expr = "at" <+> prettyPos
   where 
     prettyPos = case expr ^. annotation . srcPos of
                   Nothing     -> "an unknown position"
-                  Just (SPos x y) -> hsep
+                  Just (x, y) -> hsep
                     [ (pretty $ sourcePosPretty x)
                     , "-"
                     , (pretty $ sourcePosPretty y)
                     ]
+
+throwCompEx
+  :: (MonadError CompilerException m) 
+  => CompilerExceptionInfo 
+  -> SourcePos 
+  -> m ()
+throwCompEx info pos = throwError $ compEx info pos
+
+compEx :: CompilerExceptionInfo -> SourcePos -> CompilerException
+compEx info pos = CompilerException info $ Just pos
+
+compEx_ :: CompilerExceptionInfo -> CompilerException
+compEx_ x = CompilerException x Nothing
 

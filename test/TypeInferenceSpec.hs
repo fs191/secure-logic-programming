@@ -52,7 +52,7 @@ inferPreserveSemDB f db =
 infersTypes :: Text -> Spec
 infersTypes n = it (toString desc) $
   do
-    f <- adornProgram <$> parseDatalogFromFile n
+    f <- adornProgram <$> parseDatalogFromFile_ n
     let g = f & dpRules . traversed . ruleHead %~ clearTypings
               & dpRules . traversed . ruleTail %~ clearTypings
               & outputs %~ clearTypings

@@ -67,7 +67,7 @@ binarySimplify f l@(ConstInt a x) r@(ConstInt b y) =
   (\c' -> ConstInt c' $ f x y) <$> c 
   where
     c = maybe err return $ unifyAnns a b
-    err = throwError $ UnificationFailed l r
+    err = error "Failed to unify types"
 binarySimplify _ _ _ = error "Expecting integers in binarySimplify"
 
 binarySimplifyBool 
@@ -79,8 +79,7 @@ binarySimplifyBool
 binarySimplifyBool f l@(ConstInt a x) r@(ConstInt b y) = 
   (\c' -> ConstBool c' $ f x y) <$> c 
   where
-    c = maybe err return $ unifyAnns a b
-    err = throwError $ UnificationFailed l r
+    c = return $ unifyAnnsWithError a b
 binarySimplifyBool _ _ _ = error "Expecting integers in binarySimplifyBool"
 
 -- | Ensures that the rule head only consists of variables

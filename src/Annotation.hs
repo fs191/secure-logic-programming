@@ -6,7 +6,7 @@
 module Annotation 
   ( Ann(..)
   , Typing(..)
-  , SPos(..)
+  , SPos
   , Annotation.empty, emptyTyping
   , annType, domain
   , annBound
@@ -17,6 +17,7 @@ module Annotation
   , safelyUnifyDomains, safelyUnifyTypings
   , typing
   , srcPos
+  , isTyped
   ) where
 
 import Relude hiding (show)
@@ -39,11 +40,7 @@ data Typing = Typing
   deriving (Show)
 makeLenses ''Typing
 
-data SPos = SPos SourcePos SourcePos
-  deriving (Ord, Eq, Data, Typeable)
-
-instance Show SPos where
-  show (SPos a _) = sourcePosPretty a
+type SPos = (SourcePos, SourcePos)
 
 -- | Annotations data type for storing extra information about expressions
 data Ann = Ann
@@ -114,5 +111,7 @@ safelyUnifyTypings (Typing dx tx) (Typing dy ty)
   = Typing (safelyUnifyDomains dx dy) <$> unifyTypes tx ty
 
 unifyAnnsWithError :: Ann -> Ann -> Ann
-unifyAnnsWithError x y = fromMaybe undefined $ unifyAnns x y
+unifyAnnsWithError x y = fromMaybe (error "Unification failed") $ unifyAnns x y
 
+isTyped :: Typing -> Bool
+isTyped (Typing d t) = d /= Unknown && t /= PPAuto

@@ -9,13 +9,14 @@ import Relude
 import Data.Text.Prettyprint.Doc
 
 import Expr
+import ExprPretty
 
 data DBClause = DBClause Text [Expr]
   deriving (Show)
 
 instance Pretty DBClause where
   pretty (DBClause n vs) = "!" <> pretty n <> vars'
-    where vars' = tupled $ pretty <$> vs
+    where vars' = tupled $ prettyFull <$> vs
 
 dbClause :: Text -> [Expr] -> DBClause
 dbClause = DBClause

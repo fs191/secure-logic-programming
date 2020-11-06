@@ -115,9 +115,10 @@ inferDBRet :: DatalogProgram -> DatalogProgram
 inferDBRet dp = dp & dpRules . traversed . ruleTail %~ U.transform f
   where
     f p@(Pred _ n xs) 
-      | anyPC     = p & annotation . domain .~ Private
-      | anyUnk    = p
-      | otherwise = p & annotation . domain .~ Public
+      | isIDBFact dp p = p
+      | anyPC          = p & annotation . domain .~ Private
+      | anyUnk         = p
+      | otherwise      = p & annotation . domain .~ Public
       where
         dbf = fromMaybe err $ findDBFact dp n
         err = error $ "DB fact not found: " <> show n <> "\n" <> show (pretty dp)

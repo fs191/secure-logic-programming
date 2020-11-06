@@ -13,6 +13,7 @@ import Control.Monad.Except
 import Data.Text.Prettyprint.Doc
 
 import Transform
+import SemanticsChecker
 import PreProcessing
 import PostProcessing
 import TypeInference
@@ -35,6 +36,8 @@ process conf dp =
   do
     let debug = _debug conf
     printDebug debug "Original" dp
+    liftEither $ checkSemantics dp
+    putTextLn "Semantics check succeeded"
     let adp = adornProgram dp
     printDebug debug "Adornment" adp
     pp <- preProcess adp

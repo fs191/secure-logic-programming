@@ -33,6 +33,7 @@ import Control.Monad.Trans.UnionFind
 import qualified Text.Show
 
 import Expr
+import ExprPretty
 import Annotation
 
 -- | Representation of substitution on variables. Only works on
@@ -44,7 +45,7 @@ instance Show Subst where
   show (Th theta) = concat $ map (\(k,v) -> show k ++ " -> " ++ show v ++ "\n") (M.toList theta)
 
 instance Pretty Subst where
-  pretty (Th s) = tupled $ (\(a, b) -> pretty a <+> "->" <+> pretty b) <$> M.toList s
+  pretty (Th s) = tupled $ (\(a, b) -> pretty a <+> "->" <+> prettyFull b) <$> M.toList s
 
 -- | A very safe string that is prepended to variable names to keep track
 -- of which variables have already been substituted. Only used internally.
