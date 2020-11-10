@@ -104,13 +104,15 @@ errorMsgWithSource src (CompilerException info pos) = vsep [errorMsg info, srcDo
     srcDoc = case pos of
       Just p -> vsep
         [ pretty $ sourceName p
-        , " |"
-        , " |" <+> pretty errorLine
-        , " |" <+> pretty errorIndicator
+        , filler <+> "|"
+        , p'     <+> "|" <+> pretty errorLine
+        , filler <+> "|" <+> pretty errorIndicator
         ]
         where
-          errorLine = fromMaybe err $ lines src !!? (unPos $ sourceLine p)
+          errorLine = fromMaybe err $ lines src !!? ((unPos $ sourceLine p) - 1)
           errorIndicator = replicate (unPos $ sourceColumn p) ' ' <> "^"
+          p' = pretty . unPos $ sourceLine p
+          filler = stimes (length $ show p') " "
       Nothing -> emptyDoc
 
 errorMsg :: CompilerExceptionInfo -> Doc ann

@@ -7,13 +7,13 @@ import Relude
 import Parser.DatalogParser
 import Language.SecreC
 
-import Control.Exception
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text as T
 
 import Translator hiding (_debug)
 import Options.Applicative
 
+import ErrorMsg
 
 data ProgramOptions = ProgramOptions
   { _iterations     :: Int
@@ -89,27 +89,32 @@ getProgramOptions = execParser opts
 main :: IO ()
 main = 
   do
-    let act = do
-          args <- getProgramOptions
-          -- Text file containing input Datalog program
-          let inFileName = _inFile args
-          -- Text file containing output SecreC program
-          let outFilePath = _outFile args
-          let _ite = _iterations args
-          let inferTypesOnly = _inferTypesOnly args
-          let debug = _debug args
-          let skipSem = _skipSemCheck args
+    args <- getProgramOptions
+    -- Text file containing input Datalog program
+    let inFileName = _inFile args
+    -- Text file containing output SecreC program
+    let outFilePath = _outFile args
+    let _ite = _iterations args
+    let inferTypesOnly = _inferTypesOnly args
+    let debug = _debug args
+    let skipSem = _skipSemCheck args
 
-          -- parse the input datalog program
-          program' <- parseDatalogFromFile $ inFileName 
-          let program = case program' of
-                Left ex -> throw ex
-                Right x -> x
+    -- parse the input datalog program
+    source <- liftIO . readFileText $ toString inFileName
+    let program' = parseDatalog inFileName source
+    let program = case program' of
+          Left ex -> error ex
+          Right x -> x
 
-          let conf = TranslatorConfig _ite debug skipSem
-          tr <- runExceptT $ process conf program
-          let tr' = either throw id tr
-
+    let conf = TranslatorConfig _ite debug skipSem
+    tr <- runExceptT $ process conf program
+    case tr of
+      Left ex -> 
+        do
+          putStrLn . show $ errorMsgWithSource source ex 
+          fail "Compilation failed"
+      Right tr' -> 
+        do
           let sc = secrecCode tr'
 
           let output = show $ if inferTypesOnly
@@ -129,10 +134,4 @@ main =
 
           -- Output the results
           writeFileText (toString outFilePath) output
-    res <- try act
-    case res of
-      Left (ex :: SomeException) -> 
-        do
-          putStrLn $ show ex
-          putStrLn $ prettyCallStack callStack
-      Right _ -> return ()
+

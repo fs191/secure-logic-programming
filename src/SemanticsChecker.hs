@@ -34,7 +34,7 @@ checkDuplicates exprs = sequence_ $
       (Just x, Just y) -> if _attrName x == _attrName y
                             then return $ Left err
                             else return $ Right ()
-        where err = CompilerException (MultipleAttributeDeclarations $ _attrName x) (x ^. annotation . srcPos)
+        where err = CompilerException (MultipleAttributeDeclarations $ _attrName x) (y ^. annotation . srcPos)
       _                -> return $ Right ()
 
 checkTyping :: Expr -> Either CompilerException ()
