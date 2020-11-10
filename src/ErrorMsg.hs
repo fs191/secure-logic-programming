@@ -98,7 +98,7 @@ instance Pretty CompilerException where
     (pretty $ severity info) <+> (align $ errorMsg info)
 
 errorMsgWithSource :: Text -> CompilerException -> Doc ann
-errorMsgWithSource src (CompilerException info pos) = vsep [errorMsg info, srcDoc]
+errorMsgWithSource src ex@(CompilerException _ pos) = vsep [pretty ex, srcDoc]
   where
     err = "<source location invalid>"
     srcDoc = case pos of
