@@ -1,5 +1,5 @@
-:-type(sells, [@seller:private string, @item:private string, @price:private int]).
-:-type(buys, [@buyer :private string, @item:private string, @price:private int]).
+:-type(sells, [@seller:private string, @item_seller:private string, @price_seller:private int]).
+:-type(buys, [@buyer :private string, @item_buyer:private string, @price_buyer:private int]).
 
 findPotentialBargain(Buyer,Seller,Product,Price1,Price2) :-
     buys(Buyer,Product,Price1),

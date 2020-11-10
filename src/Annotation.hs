@@ -6,7 +6,6 @@
 module Annotation 
   ( Ann(..)
   , Typing(..)
-  , SPos
   , Annotation.empty, emptyTyping
   , annType, domain
   , annBound
@@ -40,8 +39,6 @@ data Typing = Typing
   deriving (Show)
 makeLenses ''Typing
 
-type SPos = (SourcePos, SourcePos)
-
 -- | Annotations data type for storing extra information about expressions
 data Ann = Ann
   { 
@@ -52,7 +49,7 @@ data Ann = Ann
   , _domain   :: PPDomain
     -- | Tells wether the expression is bound
   , _annBound :: Bool
-  , _srcPos   :: Maybe SPos
+  , _srcPos   :: Maybe SourcePos
   , _isPK     :: Bool
   }
   deriving (Ord, Eq, Data, Typeable)

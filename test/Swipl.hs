@@ -156,7 +156,7 @@ compileSC file iterations = errExit False $ withTmpDir act
         _prog' <- liftIO $ parseDatalogFromFile file
         let err = error "Cannot parse file"
         let _prog = fromRight err _prog'
-        let conf = TranslatorConfig iterations False
+        let conf = TranslatorConfig iterations False False
         trans <- runExceptT $ process conf _prog
         let trans' = either throw id trans
         let sc = secrecCode trans'

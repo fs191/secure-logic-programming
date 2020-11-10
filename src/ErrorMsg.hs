@@ -58,6 +58,7 @@ data CompilerExceptionInfo
   | CannotReadFile Text Text
   | UnificationFailed Expr Expr
   | TypeApplicationFailed PPType Expr
+  | MultipleAttributeDeclarations Text
   deriving (Typeable, Eq, Ord)
 
 instance Exception CompilerException where
@@ -148,6 +149,7 @@ errorMsg (TypeApplicationFailed t x) = vsep
 errorMsg DoesNotConverge = "The program does not converge. Try increasing the number of iterations using `-n`"
 errorMsg (TypeInferenceFailed e) = "Could not infer type for\n\n" <> prettyMinimal e
 errorMsg (ParserException x) = "Could not parse program:\n" <> pretty x
+errorMsg (MultipleAttributeDeclarations e) = "Attribute @" <> pretty e <> " is already defined elsewhere"
 
 -- Utilities
 
@@ -161,11 +163,7 @@ prettyLoc expr = "at" <+> prettyPos
   where 
     prettyPos = case expr ^. annotation . srcPos of
                   Nothing     -> "an unknown position"
-                  Just (x, y) -> hsep
-                    [ (pretty $ sourcePosPretty x)
-                    , "-"
-                    , (pretty $ sourcePosPretty y)
-                    ]
+                  Just x -> pretty $ sourcePosPretty x
 
 throwCompEx
   :: (MonadError CompilerException m) 

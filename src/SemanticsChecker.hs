@@ -4,14 +4,12 @@ module SemanticsChecker (checkSemantics) where
 import Relude
 
 import Control.Lens
-import qualified Data.Generics.Uniplate.Data as U
 
 import Annotation
-import Adornment
 import Expr
 import DatalogProgram
-import TypeInference
 import ErrorMsg
+import qualified DBClause
 
 -- | Checks the code for errors that can be blamed on the user.
 checkSemantics 
@@ -19,10 +17,25 @@ checkSemantics
   -> Either CompilerException ()
 checkSemantics dp = 
   do
-    let adorned = adornProgram dp
-    let typed = typeInference adorned
-    void . traverse checkTyping $ U.universeBi typed
+    --let adorned = adornProgram dp
+    --let typed = typeInference adorned
+    --void . traverse checkTyping $ U.universeBi typed
+    let attrs = dp ^. dpDBClauses . to DBClause.vars
+    -- Ensure that there are no duplicate attributes
+    checkDuplicates attrs
     return ()
+
+checkDuplicates :: [Expr] -> Either CompilerException ()
+checkDuplicates exprs = sequence_ $
+  do
+    i <- [0..length exprs - 1]
+    j <- [i+1..length exprs - 1]
+    case (exprs !!? i, exprs !!? j) of
+      (Just x, Just y) -> if _attrName x == _attrName y
+                            then return $ Left err
+                            else return $ Right ()
+        where err = CompilerException (MultipleAttributeDeclarations $ _attrName x) (x ^. annotation . srcPos)
+      _                -> return $ Right ()
 
 checkTyping :: Expr -> Either CompilerException ()
 checkTyping And{} = return ()
@@ -32,5 +45,5 @@ checkTyping e =
     then Right ()
     else Left $ CompilerException (TypeInferenceFailed e) pos
   where
-    pos = e ^? annotation . srcPos . _Just . _1
+    pos = e ^? annotation . srcPos . _Just
 
