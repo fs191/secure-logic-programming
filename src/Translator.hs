@@ -25,6 +25,7 @@ import ErrorMsg
 data TranslatorConfig = TranslatorConfig
   { _tcIterations :: Int
   , _debug        :: Bool
+  , _skipSem      :: Bool
   }
 
 process 
@@ -35,9 +36,11 @@ process
 process conf dp = 
   do
     let debug = _debug conf
+    let skipSem = _skipSem conf
     printDebug debug "Original" dp
-    liftEither $ checkSemantics dp
-    putTextLn "Semantics check succeeded"
+    printDebug (debug && not skipSem) "SemTyped" . typeInference $ adornProgram dp
+    when (not skipSem) . liftEither $ checkSemantics dp
+    liftIO . when debug $ putTextLn "Semantics check succeeded"
     let adp = adornProgram dp
     printDebug debug "Adornment" adp
     pp <- preProcess adp
@@ -52,8 +55,9 @@ process conf dp =
     printDebug debug "PostProcess" post'
     -- currently, simplifyRule may break some annotation, so we need to derive it again
     let ad = adornProgram post'
-
-    return $ typeInference ad
+    let ti = typeInference ad
+    printDebug debug "TypeInference" ti
+    return ti
 
 printDebug 
   :: (Pretty a, MonadIO m) 

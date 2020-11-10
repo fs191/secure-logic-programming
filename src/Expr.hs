@@ -240,11 +240,11 @@ constFloat = ConstFloat a
 
 -- | Creates a new true boolean
 constTrue :: Expr
-constTrue = ConstBool empty True
+constTrue = constBool True
 
 -- | Creates a new false boolean
 constFalse :: Expr
-constFalse = ConstBool empty False
+constFalse = constBool False
 
 -- | Creates a new constant boolean
 constBool :: Bool -> Expr

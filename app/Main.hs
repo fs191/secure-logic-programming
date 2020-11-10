@@ -4,7 +4,6 @@
 
 import Relude
 
-import ErrorMsg
 import Parser.DatalogParser
 import Language.SecreC
 
@@ -24,6 +23,7 @@ data ProgramOptions = ProgramOptions
   , _outFile        :: Text
   , _debug          :: Bool
   , _inFile         :: Text
+  , _skipSemCheck   :: Bool
   }
 
 programArgs :: Parser ProgramOptions
@@ -71,6 +71,11 @@ programArgs = ProgramOptions
   <*> (strArgument $ mconcat
         [ metavar "INPUT"
         ])
+  <*> (switch $ mconcat
+         [ long "skip-semantics-check"
+         , help "Skips the semantics check"
+         , hidden
+         ])
 
 getProgramOptions :: IO ProgramOptions
 getProgramOptions = execParser opts
@@ -93,6 +98,7 @@ main =
           let _ite = _iterations args
           let inferTypesOnly = _inferTypesOnly args
           let debug = _debug args
+          let skipSem = _skipSemCheck args
 
           -- parse the input datalog program
           program' <- parseDatalogFromFile $ inFileName 
@@ -100,7 +106,7 @@ main =
                 Left ex -> throw ex
                 Right x -> x
 
-          let conf = TranslatorConfig _ite debug
+          let conf = TranslatorConfig _ite debug skipSem
           tr <- runExceptT $ process conf program
           let tr' = either throw id tr
 

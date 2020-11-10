@@ -25,6 +25,8 @@ checkSemantics dp =
     return ()
 
 checkTyping :: Expr -> Either CompilerException ()
+checkTyping And{} = return ()
+checkTyping Or{} = return ()
 checkTyping e =
   if e ^. annotation . typing . to isTyped
     then Right ()
