@@ -1,5 +1,5 @@
 :-type(eds, [@employee:public string,@department:public string, @salary:private int]).
-:-type(dm, [@department:public string, @manager:public string]).
+:-type(dm, [@dm_department:public string, @manager:public string]).
 
 % combining domain(x) and domain(y) into domain(f(x,y)):
 % public & private -> private

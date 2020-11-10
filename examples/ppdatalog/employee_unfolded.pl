@@ -1,5 +1,5 @@
 :-type(eds, [@employee:public string,@department:public string, @salary:private int]).
-:-type(dm, [@department:public string, @manager:public string]).
+:-type(dm, [@dm_department:public string, @manager:public string]).
 
 viewESM(X0,X2,X4) :-
   eds(X0,X1,X2),

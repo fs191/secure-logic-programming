@@ -1,5 +1,5 @@
 % TODO this program is not parsed by PrivaLog yet
-:-type(ship, [@name:primary public string,
+:-type(ship, [@shipname:primary public string,
               %we do not have a float type yet
               @latitude:private float,
               @longitude:private float,
@@ -11,8 +11,8 @@
 % we will do this merge step e.g. after "postProcess" and before "typeInference"
 
 :-type(port, [@name:primary public string,
-              @latitude:public float,
-              @longitude:public float,
+              @port_latitude:public float,
+              @port_longitude:public float,
               @offloadcapacity:public int,
               %we do not have a boolean type yet
               @available:private bool]).
@@ -74,7 +74,7 @@ arrival(Ship,Port,CargoType,Time) :-
     reachability_time(Ship,Port,Time).
 
 %not sure if it is a good idea to use repeating name "@cargotype" in the table and for the inputs
-:-inputs([@portname:private string, @cargotype:private string]).
+:-inputs([@portname_in:private string, @cargotype_in:private string]).
 :-outputs([MinTime]).
-?-min(arrival(Ship,@portname,@cargotype,Time),Time,MinTime).
+?-min(arrival(Ship,@portname_in,@cargotype_in,Time),Time,MinTime).
 
