@@ -71,11 +71,14 @@ aExpr2 = binary ops aExpr2 aExpr3
       ]
 
 aExpr3 :: Parser Expr
-aExpr3 = binary ops aExpr3 aExpr4
+aExpr3 = binaryFuns funs aExpr <|> binary ops aExpr3 aExpr4
   where 
     ops =
       [ Operator "*" eMul
       , Operator "/" eFDiv
+      ]
+    funs =
+      [ Operator "mod" eMod
       ]
 
 aExpr4 :: Parser Expr
@@ -118,11 +121,26 @@ binary ops this next = (typable $
   do
     f <- try $ do
       lhs <- next
-      opr <- choice $ try . parseOperator <$> ops
+      opr <- choice $ parseOperator <$> ops
       return $ opr lhs
     rhs <- this
     return $ f rhs
   ) <|> next
+
+binaryFuns
+  :: [Operator (Expr -> Expr -> Expr)] 
+  -> Parser Expr 
+  -> Parser Expr 
+binaryFuns funs next = (typable $ 
+  do
+    f <- choice $ parseOperator <$> funs
+    void $ symbol "("
+    x <- next
+    void $ symbol ","
+    y <- next
+    void $ symbol ")"
+    return $ f x y
+  )
 
 parseOperator :: Operator f -> Parser f
 parseOperator (Operator sym f) = symbol sym *> return f

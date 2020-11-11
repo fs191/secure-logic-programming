@@ -33,6 +33,7 @@ module Expr
   , eSqrt, ePow
   , eAdd, eSub
   , eMul, eDiv, eFDiv
+  , eMod
   , eAnd, eOr
   , eList
   , eNeq

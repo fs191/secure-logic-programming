@@ -59,6 +59,7 @@ data CompilerExceptionInfo
   | UnificationFailed Expr Expr
   | TypeApplicationFailed PPType Expr
   | MultipleAttributeDeclarations Text
+  | UndefinedPredicate Expr
   deriving (Typeable, Eq, Ord)
 
 instance Exception CompilerException where
@@ -98,7 +99,7 @@ instance Pretty CompilerException where
     (pretty $ severity info) <+> (align $ errorMsg info)
 
 errorMsgWithSource :: Text -> CompilerException -> Doc ann
-errorMsgWithSource src ex@(CompilerException _ pos) = vsep [pretty ex, srcDoc]
+errorMsgWithSource src ex@(CompilerException _ pos) = align $ vsep [pretty ex, srcDoc]
   where
     err = "<source location invalid>"
     srcDoc = case pos of
@@ -152,6 +153,7 @@ errorMsg DoesNotConverge = "The program does not converge. Try increasing the nu
 errorMsg (TypeInferenceFailed e) = "Could not infer type for\n\n" <> prettyMinimal e
 errorMsg (ParserException x) = "Could not parse program:\n" <> pretty x
 errorMsg (MultipleAttributeDeclarations e) = "Attribute @" <> pretty e <> " is already defined elsewhere"
+errorMsg (UndefinedPredicate p) = "No rules found that would correspond to " <> hardline <> hardline <> prettyFull p <> hardline
 
 -- Utilities
 
