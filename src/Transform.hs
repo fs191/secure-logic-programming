@@ -43,9 +43,9 @@ deriveAllGroundRules n program = f program'
         pl0 <- dp & id %~ inlineOnceBFS
                  & dpRules . traversed %~ refreshRule "X_"
                  & dpRules %%~ filterM checkConsistency
-        pl  <- pl0 & dpRules . traversed %%~ simplifySat
-        return $ pl & dpRules . traversed . ruleTail %~ simplifyAnds
-                    & dpRules %~ simplifyRules
+        -- pl  <- pl0 & dpRules . traversed %%~ simplifySat
+        return $ pl0 & dpRules . traversed . ruleTail %~ simplifyAnds
+                    -- & dpRules %~ simplifyRules
                     & dpRules %~ removeFalseFacts
                     & dpRules %~ L.nub
 
@@ -62,8 +62,8 @@ loopPipeline n pipeline dp = do
 -- | Tries to unify the first predicate in each rule body with an appropriate rule using Breadth-First-Search strategy
 inlineOnceBFS :: DatalogProgram -> DatalogProgram
 inlineOnceBFS dp = 
-  trace "====" $
-  traceShow (pretty dp) $
+  --trace "====" $
+  --traceShow (pretty dp) $
   --trace (show (length (dp ^. dpRules))) $
   --trace (show (length (filter (isGround dp) (dp ^. dpRules)))) $
   dp & dpRules .~ rs'
