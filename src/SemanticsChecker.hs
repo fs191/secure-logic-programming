@@ -23,6 +23,7 @@ checkSemantics dp =
     let attrs = dp ^. dpDBClauses . to DBClause.vars
     -- Ensure that there are no duplicate attributes
     checkDuplicates attrs
+    -- TODO Ensure that all predicates are either in IDB or EDB
     return ()
 
 checkDuplicates :: [Expr] -> Either CompilerException ()
