@@ -429,11 +429,11 @@ scVarType ann =
   let scDom = scDomain Nothing dom in
   let sctype = case (dtype, dom) of
           (PPBool, _) -> SCBool
-          (PPInt,  _) -> SCInt32
+          (PPInt32,  _) -> SCInt32
           (PPStr,  Private) -> SCArray 1 SCXorUInt8
           (PPStr,  Public)  -> SCText
           (PPStr,  Unknown) -> error $ "cannot determine data type for a string of unknown domain"
-          (PPFloat, _)      -> SCFloat32
+          (PPFloat32, _)      -> SCFloat32
           _                 -> SCDynamicT Nothing
   in (scDom, sctype)
 
@@ -443,11 +443,11 @@ scStructType f i ann =
   let dtype  = ann ^. annType in
   case (dtype, dom) of
       (PPBool, _)       -> f (scDomain i dom) SCBool  SCBool
-      (PPInt,  _)       -> f (scDomain i dom) SCInt32 SCInt32
+      (PPInt32,  _)       -> f (scDomain i dom) SCInt32 SCInt32
       (PPStr,  Private) -> f (scDomain i dom) SCXorUInt32 SCXorUInt8
       (PPStr,  Public)  -> f (scDomain i dom) SCUInt32    SCUInt8
       (PPStr,  Unknown) -> error $ "cannot determine data type for a string of unknown domain"
-      (PPFloat, _)      -> f (scDomain i dom) SCFloat32 SCFloat32
+      (PPFloat32, _)      -> f (scDomain i dom) SCFloat32 SCFloat32
       _                 -> f (scDomain i dom) (SCDynamicT i) (SCDynamicS i)
 
 scStructPrivateType :: (SCDomain -> SCType -> SCType -> SCType) -> Maybe Int -> Ann -> SCType
@@ -455,9 +455,9 @@ scStructPrivateType f i ann =
   let dtype  = ann ^. annType in
   case dtype of
       PPBool -> f SCShared3p SCBool  SCBool
-      PPInt  -> f SCShared3p SCInt32 SCInt32
+      PPInt32 -> f SCShared3p SCInt32 SCInt32
       PPStr  -> f SCShared3p SCXorUInt32 SCXorUInt8
-      PPFloat -> f SCShared3p SCFloat32 SCFloat32
+      PPFloat32 -> f SCShared3p SCFloat32 SCFloat32
       _      -> f SCShared3p (SCDynamicT i) (SCDynamicS i)
 
 scColTypeI :: Int -> Ann -> SCType
@@ -1086,7 +1086,7 @@ exprToSC e =
     -- Cast arguments to float if either one is already float
     cast :: Expr -> Expr -> Expr -> SCExpr
     cast x y z 
-      | (typeof x == PPFloat || typeof y == PPFloat) && typeof z /= PPFloat
+      | (typeof x == PPFloat32 || typeof y == PPFloat32) && typeof z /= PPFloat32
         = SCFunCall "cast_float32" [exprToSC z]
       | otherwise = exprToSC z
     typeof = view $ annotation . annType
@@ -1126,8 +1126,8 @@ tableGenerationCode ds dbc (tableHeader:tableRows) =
         types = map (\x -> let dtype  = x ^. annotation ^. annType in
                         case dtype of
                             PPBool  -> 0
-                            PPInt   -> 1
-                            PPFloat -> 2
+                            PPInt32   -> 1
+                            PPFloat32 -> 2
                             PPStr   -> 3
                             _       -> error $ "Can only create a table for bool, int, float, string datatypes."
                 ) xs

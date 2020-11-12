@@ -229,14 +229,14 @@ constInt :: Int -> Expr
 constInt = ConstInt a
   where
     a = empty & annBound .~ True
-              & annType  .~ PPInt
+              & annType  .~ PPInt32
               & domain   .~ Public
 
 constFloat :: Float -> Expr
 constFloat = ConstFloat a
   where
     a = empty & annBound .~ True
-              & annType  .~ PPFloat
+              & annType  .~ PPFloat32
               & domain   .~ Public
 
 -- | Creates a new true boolean
@@ -311,7 +311,7 @@ eNot = Not e
 eSqrt :: Expr -> Expr
 eSqrt = Sqrt e
   where
-    e = empty & annType .~ PPFloat
+    e = empty & annType .~ PPFloat32
 
 -- | Creates a new power expression
 ePow :: Expr -> Expr -> Expr
