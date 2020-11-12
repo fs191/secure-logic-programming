@@ -104,6 +104,7 @@ isGroundPredicate Ge{} = True
 isGroundPredicate Gt{} = True
 -- by assumption, OR is applied only to ground predicates
 isGroundPredicate Or{} = True
+isGroundPredicate ConstBool{} = True
 isGroundPredicate _    = False
 
 -- | Removes facts that always evaluate to False

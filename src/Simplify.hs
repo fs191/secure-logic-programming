@@ -166,6 +166,9 @@ finalize_uns (u@(Un a l r):es) head@(b, o)
   | isLeaf l && not (isLeaf r) = [eFalse]
   | isLeaf l && isLeaf r       = Eq a l r : finalize_uns es head
   | otherwise = u : finalize_uns es head
+finalize_uns (u@(Is a l r):es) head@(b, o)
+  | isConstExpr l = Eq a l r : finalize_uns es head
+  | otherwise     = u : finalize_uns es head
 finalize_uns (e:es) head = e : finalize_uns es head
 finalize_uns [] _ = []
 

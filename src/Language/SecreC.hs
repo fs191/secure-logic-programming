@@ -967,11 +967,7 @@ formulaToSC ds branch q j =
         Le _ _ _ -> [addB (exprToSC q')]
         Gt _ _ _ -> [addB (exprToSC q')]
         Ge _ _ _ -> [addB (exprToSC q')]
-
-        -- TODO: so far, we use Eq also in place of unification, so put back the first variant after updating the preprocessing
-        -- Eq can only be a comparison
-        -- Eq  ann _ _ -> let dom = scDomainFromAnn ann in (dv, [VarInit (variable dom (SCArray 1 SCBool) (nameB j)) (exprToSC q')])
-        Eq _ e1 e2 -> formulaToSC_case (Is ann e1 e2)
+        Eq _ _ _ -> [addB (exprToSC q')]
 
         -- TODO this is a workaround for choose construction
         Is _ (Expr.List _ xs) (Choose _ (Expr.List _ zs) (Expr.List _ bs)) ->
@@ -980,9 +976,8 @@ formulaToSC ds branch q j =
             [ VarAsgn nameBB $ foldr1 (\x y -> funCat [x,y]) $ map (SCAnd (SCVarName nameBB) . bexprToSC) bs] ++
             zipWith (\(Var annx x) zs -> VarInit (variable SCPublic (scColType annx) (pack x)) $ foldr1 (\x y -> funCat [x,y]) $ map exprToSC zs) xs zss
 
-        -- Is may be a comparison as well as initialization
-        -- TODO we should become more strict about e1 being an expression
-        Is _ e1 e2 -> ex
+        -- unification may be a comparison as well as initialization (for strings)
+        Un _ e1 e2 ->  ex
                         where
                           bcomp = addB $ exprToSC (Eq ann e1 e2)
                           btrue = addB $ funTrueCol [SCVarName nameMM]
@@ -1002,9 +997,8 @@ formulaToSC ds branch q j =
                           -- if both x and y are not fresh, then compare
                           ez = [bcomp]
 
-        -- unification may be a comparison as well as initialization
-        -- most likely, there will be no Un constructions due to previous optimizations
-        Un _ e1 e2 -> formulaToSC_case (Is ann e1 e2)
+        -- TODO actually, we only have the initialization case due to previos processing
+        Is _ e1 e2 -> formulaToSC_case (Un ann e1 e2)
 
         Aggr _ _ _ _ _ -> aggrToSC ds q' j
 
@@ -1062,6 +1056,7 @@ bexprToSC e =
     ConstBool _ b -> funReshape [SCConstBool b, SCVarName nameMM]
     Var   _ x -> SCVarName $ pack x
     Not  _ e0 -> SCNot $ bexprToSC e0
+    -- TODO we have actual operators here, not a "funBoolOp"
     Lt   _ e1 e2 -> funBoolOp [SCConstStr "<", exprToSC e1, exprToSC e2]
     Le   _ e1 e2 -> funBoolOp [SCConstStr "<=", exprToSC e1, exprToSC e2]
     Eq   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2]

@@ -4,6 +4,8 @@ import Test.Hspec
 
 import Control.Monad
 
+import Adornment
+import TypeInference
 import Swipl
 import PostProcessing
 import Transform
@@ -19,5 +21,5 @@ spec =
 
 postProcPreserveSem :: String -> [Expr] -> Spec
 postProcPreserveSem f db = preservesSemanticsDB _fun f db
-  where _fun = return . postProcess <=< deriveAllGroundRules 3
+  where _fun = return . typeInference . adornProgram . postProcess <=< deriveAllGroundRules 3
 
