@@ -62,11 +62,10 @@ instance Pretty PPDomain where
 
 unifyTypes :: PPType -> PPType -> Maybe PPType
 unifyTypes x y = unifyTypes' x y <|> (widen x >>= flip unifyTypes y)
-
-unifyTypes' :: PPType -> PPType -> Maybe PPType
-unifyTypes' x y 
-  | x == y    = Just x
-  | otherwise = widen y >>= unifyTypes' x
+  where
+    unifyTypes' x' y'
+      | x' == y'  = Just x'
+      | otherwise = widen y' >>= unifyTypes' x'
 
 widen :: PPType -> Maybe PPType
 widen PPBool      = Just PPInt8
