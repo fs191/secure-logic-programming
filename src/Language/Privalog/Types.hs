@@ -7,7 +7,7 @@ module Language.Privalog.Types
   , unifyDomains
   ) where
 
-import Relude hiding (show, succ)
+import Relude hiding (show, widen)
 
 import Data.Text.Prettyprint.Doc
 import Data.Data
@@ -61,32 +61,32 @@ instance Pretty PPDomain where
   pretty = pretty . show
 
 unifyTypes :: PPType -> PPType -> Maybe PPType
-unifyTypes x y = unifyTypes' x y <|> (succ x >>= flip unifyTypes y)
+unifyTypes x y = unifyTypes' x y <|> (widen x >>= flip unifyTypes y)
 
 unifyTypes' :: PPType -> PPType -> Maybe PPType
 unifyTypes' x y 
   | x == y    = Just x
-  | otherwise = succ y >>= unifyTypes' x
+  | otherwise = widen y >>= unifyTypes' x
+
+widen :: PPType -> Maybe PPType
+widen PPBool      = Just PPInt8
+widen PPInt8      = Just PPInt16
+widen PPInt16     = Just PPInt32
+widen PPInt32     = Just PPInt64
+widen PPInt64     = Just PPFloat32
+widen PPFloat32   = Just PPFloat64
+widen PPUInt8     = Just PPInt16
+widen PPUInt16    = Just PPInt32
+widen PPUInt32    = Just PPInt64
+widen PPUInt64    = Just PPInt64
+widen PPXorUInt8  = Just PPXorUInt16
+widen PPXorUInt16 = Just PPXorUInt32
+widen PPXorUInt32 = Just PPXorUInt64
+widen _           = Nothing
 
 unifyDomains :: PPDomain -> PPDomain -> PPDomain
 unifyDomains Public Public = Public
 unifyDomains Unknown x     = x
 unifyDomains x Unknown     = x
 unifyDomains _ _           = Private
-
-succ :: PPType -> Maybe PPType
-succ PPBool      = Just PPInt8
-succ PPInt8      = Just PPInt16
-succ PPInt16     = Just PPInt32
-succ PPInt32     = Just PPInt64
-succ PPInt64     = Just PPFloat32
-succ PPFloat32   = Just PPFloat64
-succ PPUInt8     = Just PPInt16
-succ PPUInt16    = Just PPInt32
-succ PPUInt32    = Just PPInt64
-succ PPUInt64    = Just PPInt64
-succ PPXorUInt8  = Just PPXorUInt16
-succ PPXorUInt16 = Just PPXorUInt32
-succ PPXorUInt32 = Just PPXorUInt64
-succ _           = Nothing
 
