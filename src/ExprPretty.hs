@@ -109,7 +109,12 @@ prettyEx (Sqrt e x) =
     x' <- prettyEx x
     e' <- prettyExAnn e
     return $ "sqrt(" <> x' <> ")" <+> e'
-prettyEx x                = error . toText $ "pretty not defined for " ++ show x
+prettyEx (Mod e x y) = 
+  do
+    x' <- prettyEx x
+    y' <- prettyEx y
+    e' <- prettyExAnn e
+    return $ "mod(" <> x' <> ", " <> y' <> ")" <+> e'
 
 prettyExBin :: Ann -> Expr -> Expr -> Doc ann -> Reader PrettyConfig (Doc ann)
 prettyExBin e x y op = 

@@ -63,7 +63,7 @@ identifier = asum
       if x `elem` keywords
         then fail . toString $ "reserved keyword " <> x <> " cannot be an identifier."
         else return x
-    keywords = ["sqrt", "is"]
+    keywords = ["sqrt", "is", "mod"]
 
 attributeIdentifier :: Parser Text
 attributeIdentifier =
@@ -118,9 +118,26 @@ domainType =
 dataType :: Parser PPType
 dataType =
       (symbol "bool"   *> return PPBool)
-  <|> (symbol "int"    *> return PPInt)
-  <|> (symbol "float"  *> return PPFloat)
+  <|> (symbol "int"    *> return PPInt32)
+  <|> (symbol "float"  *> return PPFloat32)
   <|> (symbol "string" *> return PPStr)
+  <|> (symbol "bool" *> return PPBool)
+  <|> (symbol "int8" *> return PPInt8)
+  <|> (symbol "int16" *> return PPInt16)
+  <|> (symbol "int32" *> return PPInt32)
+  <|> (symbol "int64" *> return PPInt64)
+  <|> (symbol "uint8" *> return PPUInt8)
+  <|> (symbol "uint16" *> return PPUInt16)
+  <|> (symbol "uint32" *> return PPUInt32)
+  <|> (symbol "uint64" *> return PPUInt64)
+  <|> (symbol "xor_uint8" *> return PPXorUInt8)
+  <|> (symbol "xor_uint16" *> return PPXorUInt16)
+  <|> (symbol "xor_uint32" *> return PPXorUInt32)
+  <|> (symbol "xor_uint64" *> return PPXorUInt64)
+  <|> (symbol "string" *> return PPStr)
+  <|> (symbol "float32" *> return PPFloat32)
+  <|> (symbol "float64" *> return PPFloat64)
+  <|> (symbol "auto" *> return PPAuto)
   <?> "data type"
 
 typing :: Parser A.Ann

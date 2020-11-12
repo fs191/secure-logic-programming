@@ -73,16 +73,16 @@ day_of_week(DayOfWeek, 1, january, Year) :-
   
 day_of_week(DayOfWeek, 1, Month, Year) :-
   Month =/= january,
-  comes_after(Month, M),
-  comes_after(DayOfWeek, DW),
-  month_days_on_year(M, D, Year),
-  day_of_week(DW, D, M, Year).
+  comes_after(Month, X),
+  comes_after(DayOfWeek, Y),
+  month_days_on_year(X, N, Year),
+  day_of_week(Y, N, Year).
 
 day_of_week(DayOfWeek, Day, Month, Year) :-
   Day =/= 1,
-  D = Day-1,
-  comes_after(DayOfWeek, DW),
-  day_of_week(DW, D, Month, Year).
+  comes_after(Day, X),
+  comes_after(DayOfWeek, Y),
+  day_of_week(Y, X, Month, Year).
 
 goal(DayOfWeek) :-
   day(Day, Month, Year),

@@ -8,6 +8,7 @@ module Translator
 
 import Relude
 
+import Control.Lens
 import Control.Monad.Except
 
 import Data.Text.Prettyprint.Doc
@@ -53,6 +54,7 @@ process conf dp =
     printDebug debug "PKTransform" pk
     post' <- postProcess pk
     printDebug debug "PostProcess" post'
+    when (null $ post' ^. dpRules) . throwError $ compEx_ DoesNotConverge
     -- currently, simplifyRule may break some annotation, so we need to derive it again
     let ad = adornProgram post'
     let ti = typeInference ad
