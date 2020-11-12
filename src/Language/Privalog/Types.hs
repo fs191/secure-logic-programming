@@ -61,6 +61,8 @@ instance Pretty PPDomain where
   pretty = pretty . show
 
 unifyTypes :: PPType -> PPType -> Maybe PPType
+unifyTypes PPAuto x = Just x
+unifyTypes x PPAuto = Just x
 unifyTypes x y = unifyTypes' x y <|> (widen x >>= flip unifyTypes y)
   where
     unifyTypes' x' y'
