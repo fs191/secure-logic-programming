@@ -56,7 +56,8 @@ process conf dp =
     printDebug debug "PostProcess" post'
     when (null $ post' ^. dpRules) . throwError $ compEx_ DoesNotConverge
     -- currently, simplifyRule may break some annotation, so we need to derive it again
-    let ad = adornProgram post'
+    let ad = post' & dpRules . traversed %~ adornRule
+    printDebug debug "AdornRules" ad
     let ti = typeInference ad
     printDebug debug "TypeInference" ti
     return ti

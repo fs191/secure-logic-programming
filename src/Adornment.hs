@@ -5,6 +5,7 @@
 module Adornment 
   ( suffixPredicate
   , adornProgram
+  , adornRule
   , aBound
   ) where
 
@@ -84,7 +85,7 @@ graphLoop =
       then return _visited
       else do
         _next <- popQueue
-        adornRule _next
+        adornRule' _next
         graphLoop
 
 popQueue :: AdornM Adornable
@@ -95,8 +96,26 @@ popQueue =
     modify $ gsQueue %~ tail . fromMaybe undefined . nonEmpty
     return $ head . fromMaybe undefined $ nonEmpty _queue
 
-adornRule :: Adornable -> AdornM ()
-adornRule a@(Adornable r _bp) = 
+adornRule :: Rule -> Rule
+adornRule r = runAdornM $
+  do
+    -- Add all bound variables in the rule head to gsBound
+    let _bp = r ^. ruleHead . paramBindings
+    let _args = args r `zip` _bp
+    let _boundArgs = fst <$> L.filter snd _args
+    let _varNameFun (Var _ n) = Just n
+        _varNameFun _         = Nothing
+    let _boundNames = catMaybes $ _varNameFun <$> _boundArgs
+    modify $ gsBound .~ S.fromList _boundNames
+    _bound <- use gsBound
+
+    -- Reorder the terms in rule body
+    let _terms = (andsToList $ r ^. ruleTail)
+    _boundTerms <- bindTerms _terms
+    return $ r & ruleTail .~ foldWithAnds _boundTerms
+
+adornRule' :: Adornable -> AdornM ()
+adornRule' a@(Adornable r _bp) = 
   do
     -- Add all bound variables in the rule head to gsBound
     let _args = args r `zip` _bp
@@ -180,14 +199,14 @@ bindTerms [] = return []
 bindTerms l  =
   do
     _bound <- use gsBound
-    let _head = head . fromMaybe undefined $ nonEmpty l
+    let _head = L.head l
     -- Bind all the variables that are parameters of the best candidate
         _vars = [v | v@(Var _ _) <- U.universe _head]
         _newBound = [n | (Var _ n) <- _vars]
     let _pat = predPattern _bound _head
         _ad = U.transform (annotateWithBindings _bound) $ _head & paramBindings .~ _pat
     modify $ gsBound %~ S.union (S.fromList _newBound)
-    _t <- bindTerms $ tail . fromMaybe undefined $ nonEmpty l
+    _t <- bindTerms $ L.tail l
     return $ _ad:_t
 
 allBound :: Rule -> Adornable
