@@ -761,8 +761,7 @@ ruleBodyToSC ann argTableType ds input p xs ys q =
     asgnInputArgs  = map (\((Var xtype x),i) -> VarInit (variable SCPublic (scColType xtype) (pack x)) (SCVarName $ nameTableArg inputTable i)) xs
     asgnOutputArgs = map (\(z,i) -> VarAsgn (nameTableArg result i) (exprToSC z)) ys
 
-    -- TODO the domain should be (scDomainFromAnn ann), but we need to include the choose choice bit types for this to work
-    initFilter = [VarInit (variable SCShared3p (SCArray 1 SCBool) nameBB) (SCVarName (nameTableBB inputTable))]
+    initFilter = [VarInit (variable (scDomainFromAnn ann) (SCArray 1 SCBool) nameBB) (SCVarName (nameTableBB inputTable))]
 
     qs' = andsToList q
     qs  = mergeChoose qs'
@@ -950,24 +949,24 @@ formulaToSC ds branch q j =
             [addB $ SCNot (SCAnds $ zipWith (\z i -> SCEq (exprToSC z) (SCVarName (nameTableArg (nameTable j) i))) zs [0..])]
 
         Not _ e ->
-            let sc = exprToSC e in
+            let sc = bexprToSC e in
             [addB $ SCNot sc]
 
         Or _ e1 e2 ->
-            let sc1 = exprToSC e1 in
-            let sc2 = exprToSC e2 in
+            let sc1 = bexprToSC e1 in
+            let sc2 = bexprToSC e2 in
             [addB $ SCOr sc1 sc2]
 
         And _ e1 e2 ->
-            let sc1 = exprToSC e1 in
-            let sc2 = exprToSC e2 in
+            let sc1 = bexprToSC e1 in
+            let sc2 = bexprToSC e2 in
             [addB $ SCAnd sc1 sc2]
 
-        Lt _ _ _ -> [addB (exprToSC q')]
-        Le _ _ _ -> [addB (exprToSC q')]
-        Gt _ _ _ -> [addB (exprToSC q')]
-        Ge _ _ _ -> [addB (exprToSC q')]
-        Eq _ _ _ -> [addB (exprToSC q')]
+        Lt _ _ _ -> [addB $ exprToSC q']
+        Le _ _ _ -> [addB $ exprToSC q']
+        Gt _ _ _ -> [addB $ exprToSC q']
+        Ge _ _ _ -> [addB $ exprToSC q']
+        Eq _ _ _ -> [addB $ exprToSC q']
 
         -- TODO this is a workaround for choose construction
         Is _ (Expr.List _ xs) (Choose _ (Expr.List _ zs) (Expr.List _ bs)) ->
@@ -1056,7 +1055,7 @@ bexprToSC e =
     ConstBool _ b -> funReshape [SCConstBool b, SCVarName nameMM]
     Var   _ x -> SCVarName $ pack x
     Not  _ e0 -> SCNot $ bexprToSC e0
-    -- TODO we have actual operators here, not a "funBoolOp"
+
     Lt   _ e1 e2 -> funBoolOp [SCConstStr "<", exprToSC e1, exprToSC e2]
     Le   _ e1 e2 -> funBoolOp [SCConstStr "<=", exprToSC e1, exprToSC e2]
     Eq   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2]

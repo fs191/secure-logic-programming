@@ -1511,8 +1511,8 @@ relColumn<D, T, T> constColumn(T0 arg0){
 //}
 
 //if column size is not specified, we assume that it is 1
-template <domain D, type T0, type T>
-T0 constColumn(D T arg){
+template <domain D, type T0, type T, dim N>
+T0 constColumn(D T [[N]] arg){
     return constColumn(arg, 1 :: uint);
 }
 
