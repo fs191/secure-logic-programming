@@ -43,9 +43,9 @@ deriveAllGroundRules n program = f program'
         pl0 <- dp & id %~ inlineOnceBFS
                  & dpRules . traversed %~ refreshRule "X_"
                  & dpRules %%~ filterM checkConsistency
-        -- pl  <- pl0 & dpRules . traversed %%~ simplifySat
-        return $ pl0 & dpRules . traversed . ruleTail %~ simplifyAnds
-                    -- & dpRules %~ simplifyRules
+        pl  <- pl0 & dpRules . traversed %%~ simplifySat
+        return $ pl & dpRules . traversed . ruleTail %~ simplifyAnds
+                    & dpRules %~ simplifyRules
                     & dpRules %~ removeFalseFacts
                     & dpRules %~ L.nub
 
@@ -165,7 +165,7 @@ simplifySat r = do
                     let e = r ^. ruleTail
                     newTails <- (Solve.extractSatSolution vars . andsToList) e
                     let newTail = case nonEmpty newTails of
-                          Just x  -> foldr eAnd (head x) (tail x)
+                          Just x  -> L.foldl eAnd (head x) (tail x)
                           Nothing -> constFalse
                     return $ r & ruleTail .~ newTail
 
@@ -184,7 +184,7 @@ simplifyRule r =
     let newRuleBody = simplify rBody (boundedVarNames, freeVarNames) in
 
     let newRuleTail  = fromMaybe undefined . nonEmpty . ordNub . filter (not . isAnd) $ newRuleBody in
-    let newRuleTail' = foldr eAnd (head newRuleTail) (tail newRuleTail) in
+    let newRuleTail' = L.foldl eAnd (head newRuleTail) (tail newRuleTail) in
     --trace ("before: " ++ show (pretty r)) $
     --trace ("after: " ++ show (pretty (rule rName rArgs newRuleTail))) $
     --trace "=====" $
