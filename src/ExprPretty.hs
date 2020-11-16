@@ -79,8 +79,9 @@ prettyEx (Or e x y)       =
   do
     x' <- prettyEx x
     y' <- prettyEx y
-    e' <- prettyExAnn e
-    return $ x' <> ";\n" <> y' <+> e'
+    showAnn <- view pcShowAndAnns
+    e' <- if showAnn then (" " <>) <$> prettyExAnn e else return ""
+    return $ "(" <> x' <> ";\n" <> y' <> ")" <+> e'
 prettyEx (And e x y)      =
   do
     x' <- prettyEx x

@@ -39,7 +39,7 @@ process conf dp =
     let debug = _debug conf
     let skipSem = _skipSem conf
     printDebug debug "Original" dp
-    printDebug (debug && not skipSem) "SemTyped" . typeInference $ adornProgram dp
+    --printDebug (debug && not skipSem) "SemTyped" . typeInference $ adornProgram dp
     when (not skipSem) . liftEither $ checkSemantics dp
     liftIO . when debug $ putTextLn "Semantics check succeeded"
     let adp = adornProgram dp
@@ -54,7 +54,7 @@ process conf dp =
     printDebug debug "PKTransform" pk
     post' <- postProcess pk
     printDebug debug "PostProcess" post'
-    when (null $ post' ^. dpRules) . throwError $ compEx_ DoesNotConverge
+    when (null $ post' ^. dpRules) $ throwError DoesNotConverge
     -- currently, simplifyRule may break some annotation, so we need to derive it again
     let ad = post' & dpRules . traversed %~ adornRule
     printDebug debug "AdornRules" ad

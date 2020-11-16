@@ -14,6 +14,7 @@ import Expr
 import DatalogProgram
 import ErrorMsg
 import Rule
+import Adornment
 
 -- | Checks the code for errors that can be blamed on the user.
 checkSemantics 
@@ -28,6 +29,7 @@ checkSemantics dp =
     -- Ensure that there are no duplicate attributes
     checkDuplicates attrs
     checkPredicates dp
+    checkSinglePattern dp
     return ()
 
 checkDuplicates :: [Expr] -> Either CompilerException ()
@@ -39,7 +41,7 @@ checkDuplicates exprs = sequence_ $
       (Just x, Just y) -> if _attrName x == _attrName y
                             then return $ Left err
                             else return $ Right ()
-        where err = CompilerException (MultipleAttributeDeclarations $ _attrName x) (y ^. annotation . srcPos)
+        where err = MultipleAttributeDeclarations $ _attrName x
       _                -> return $ Right ()
 
 checkTyping :: Expr -> Either CompilerException ()
@@ -48,7 +50,7 @@ checkTyping Or{} = return ()
 checkTyping e =
   if e ^. annotation . typing . to isTyped
     then Right ()
-    else Left $ CompilerException (TypeInferenceFailed e) pos
+    else Left $ TypeInferenceFailed e
   where
     pos = e ^? annotation . srcPos . _Just
 
@@ -68,6 +70,22 @@ checkPredicates dp =
     let edbRules = zip (dp ^.. dpDBClauses . to name) (dp ^.. dpDBClauses . to (length . vars))
     let rules = idbRules <> edbRules
     case findIndex (flip notElem rules) preds of
-      Just i  -> Left $ CompilerException (UndefinedPredicate culprit) (culprit ^. annotation . srcPos)
+      Just i  -> Left $ UndefinedPredicate culprit
         where culprit = fromMaybe undefined $ preds' !!? i
       Nothing -> Right ()
+
+checkSinglePattern :: DatalogProgram -> Either CompilerException ()
+checkSinglePattern p =
+  do
+    let as = allAdornables p
+    let f a@(Adornable r1 bp1 _) b@(Adornable r2 bp2 _)
+          | ruleName r1 == ruleName r2 && 
+            bp1 /= bp2 = Left $ MultipleBindingPatterns a b
+          | otherwise = Right ()
+    sequence_ $
+      do
+        i <- [0..length as - 1]
+        j <- [i+1..length as - 1]
+        let err = error "This should never happen"
+        return . fromMaybe err $ f <$> (as !!? i) <*> (as !!? j)
+
