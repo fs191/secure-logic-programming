@@ -79,7 +79,7 @@ adornProgram p = runAdornM $
 
     let isGoal :: Rule -> Bool
         isGoal x = fromMaybe False $ x ^? ruleHead . _Pred . _2 . to(T.isPrefixOf goalStr)
-        _goal = head . fromMaybe undefined . nonEmpty $ L.filter isGoal _rules
+        _goal = L.head $ L.filter isGoal _rules
     return $ p & dpRules .~ L.filter (not . isGoal) _rules
                & dpGoal  .~ (_goal ^. ruleTail)
 
@@ -166,7 +166,7 @@ adornRule' a@(Adornable r _bp _) =
           (p, n) <- ordNub $ _boundTerms ^.. folded . to toPair . _Just
           let _rs  = findRulesByName _rules n
               _bindings = repeat $ p ^. paramBindings
-              _ads  = (\(r, b) -> Adornable r b p) <$> zip _rs _bindings
+              _ads  = (\(r', b) -> Adornable r' b p) <$> zip _rs _bindings
           L.filter (not . isVisited _visQueue) _ads
     _notEDB <- filterM (fmap not . isEDB . _aRule) _newPairs
     gsQueue <>= _newPairs
@@ -250,7 +250,7 @@ showBindings (True:bt)  = "b" <> showBindings bt
 showBindings (False:bt) = "f" <> showBindings bt
 
 allAdornables :: DatalogProgram -> [Adornable]
-allAdornables p = runAdornM $
+allAdornables p = ordNub . runAdornM $
   do
     initialize p
     graphLoop

@@ -110,12 +110,12 @@ main =
           Right x -> return x
 
     let conf = TranslatorConfig _ite debug skipSem
-    tr <- runExceptT $ process conf program
+    tr <- runExceptT . process conf $ toString inFileName
     case tr of
       Left ex -> 
         do
-          putStrLn . show $ errorMsg source ex 
-          fail "Compilation failed"
+          forM_ ex $ putStrLn . show . errorMsg source
+          exitFailure
       Right tr' -> 
         do
           let sc = secrecCode tr'

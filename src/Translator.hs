@@ -13,6 +13,7 @@ import Control.Monad.Except
 
 import Data.Text.Prettyprint.Doc
 
+import Parser.DatalogParser
 import Transform
 import SemanticsChecker
 import PreProcessing
@@ -30,21 +31,28 @@ data TranslatorConfig = TranslatorConfig
   }
 
 process 
-  :: (MonadIO m, MonadError CompilerException m)
-  => TranslatorConfig 
-  -> DatalogProgram 
-  -> m DatalogProgram
-process conf dp = 
+  :: TranslatorConfig 
+  -> FilePath 
+  -> ExceptT [CompilerException] IO DatalogProgram
+process conf path = 
   do
+    src <- readFileText path
+    dp <- case parseDatalog (toText path) src of
+      Right x -> return x
+      Left ex -> do
+        putTextLn . show $ errorMsg "" ex 
+        exitFailure
     let debug = _debug conf
     let skipSem = _skipSem conf
     printDebug debug "Original" dp
     --printDebug (debug && not skipSem) "SemTyped" . typeInference $ adornProgram dp
-    when (not skipSem) . liftEither $ checkSemantics dp
+    when (not skipSem) $ do
+      let (ex, success) = checkSemantics dp
+      forM_ ex $ putTextLn . show . errorMsg src
     liftIO . when debug $ putTextLn "Semantics check succeeded"
     let adp = adornProgram dp
     printDebug debug "Adornment" adp
-    pp <- preProcess adp
+    pp <- withExceptT return $ preProcess adp
     printDebug debug "PreProcessing" pp
     --let mag  = magicSets ap
     let ite   = _tcIterations conf
@@ -52,9 +60,9 @@ process conf dp =
     printDebug debug "Transform" tf
     let pk    = pkTransform tf
     printDebug debug "PKTransform" pk
-    post' <- postProcess pk
+    post' <- withExceptT return $ postProcess pk
     printDebug debug "PostProcess" post'
-    when (null $ post' ^. dpRules) $ throwError DoesNotConverge
+    when (null $ post' ^. dpRules) $ throwError [DoesNotConverge]
     -- currently, simplifyRule may break some annotation, so we need to derive it again
     let ad = post' & dpRules . traversed %~ adornRule
     printDebug debug "AdornRules" ad

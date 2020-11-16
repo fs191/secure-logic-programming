@@ -1,9 +1,11 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module SemanticsChecker (checkSemantics) where
 
 import Relude
 
 import Control.Lens
+import Control.Monad.Writer
 
 import qualified Data.Generics.Uniplate.Data as U
 import Data.List (findIndex)
@@ -19,7 +21,7 @@ import Adornment
 -- | Checks the code for errors that can be blamed on the user.
 checkSemantics 
   :: DatalogProgram 
-  -> Either CompilerException ()
+  -> ([CompilerException], Bool)
 checkSemantics dp = 
   do
     --let adorned = adornProgram dp
@@ -27,36 +29,50 @@ checkSemantics dp =
     --void . traverse checkTyping $ U.universeBi typed
     let attrs = dp ^. dpDBClauses . to DBClause.vars
     -- Ensure that there are no duplicate attributes
-    checkDuplicates attrs
-    checkPredicates dp
-    checkSinglePattern dp
-    return ()
+    andM
+      [ checkDuplicates attrs
+      , checkPredicates dp
+      , checkSinglePattern dp
+      ]
 
-checkDuplicates :: [Expr] -> Either CompilerException ()
-checkDuplicates exprs = sequence_ $
+checkDuplicates 
+  :: (MonadWriter [CompilerException] m) 
+  => [Expr] 
+  -> m Bool
+checkDuplicates exprs = andM $
   do
     i <- [0..length exprs - 1]
     j <- [i+1..length exprs - 1]
-    case (exprs !!? i, exprs !!? j) of
+    return $ case (exprs !!? i, exprs !!? j) of
       (Just x, Just y) -> if _attrName x == _attrName y
-                            then return $ Left err
-                            else return $ Right ()
-        where err = MultipleAttributeDeclarations x y
-      _                -> return $ Right ()
+                            then do
+                              tell [MultipleAttributeDeclarations x y]
+                              return False
+                            else do
+                              return True
+      _                -> return True
 
-checkTyping :: Expr -> Either CompilerException ()
-checkTyping And{} = return ()
-checkTyping Or{} = return ()
+checkTyping 
+  :: (MonadWriter [CompilerException] m) 
+  => Expr 
+  -> m Bool
+checkTyping And{} = return True
+checkTyping Or{} = return True
 checkTyping e =
   if e ^. annotation . typing . to isTyped
-    then Right ()
-    else Left $ TypeInferenceFailed e
+    then return True
+    else do
+      tell [TypeInferenceFailed e]
+      return False
   where
     pos = e ^? annotation . srcPos . _Just
 
 -- | Check whether each predicate can be found in either EDB or IDB.
 -- Only the name and number of arguments are considered.
-checkPredicates :: DatalogProgram -> Either CompilerException ()
+checkPredicates 
+  :: (MonadWriter [CompilerException] m)
+  => DatalogProgram 
+  -> m Bool
 checkPredicates dp = 
   do
     let toNameArgNum p = fromMaybe (error "Expected a predicate") $
@@ -71,22 +87,29 @@ checkPredicates dp =
     let edbRules = zip (dp ^.. dpDBClauses . to name) (dp ^.. dpDBClauses . to (length . vars))
     let rules = idbRules <> edbRules
     case findIndex (flip notElem rules) preds of
-      Just i  -> Left $ UndefinedPredicate culprit
-        where culprit = fromMaybe (dp ^. dpGoal) $ preds' !!? i
-      Nothing -> Right ()
+      Just i  ->
+        do
+          let culprit = fromMaybe (dp ^. dpGoal) $ preds' !!? i
+          tell [UndefinedPredicate culprit]
+          return False
+      Nothing -> return True
 
-checkSinglePattern :: DatalogProgram -> Either CompilerException ()
+checkSinglePattern 
+  :: (MonadWriter [CompilerException] m)
+  => DatalogProgram 
+  -> m Bool
 checkSinglePattern p =
   do
-    let as = allAdornables p
-    let f a@(Adornable r1 bp1 _) b@(Adornable r2 bp2 _)
-          | ruleName r1 == ruleName r2 && 
-            bp1 /= bp2 = Left $ MultipleBindingPatterns a b
-          | otherwise = Right ()
+    let as = ordNub $ (\(Adornable r bp e) -> (ruleName r, bp, e)) <$> allAdornables p
+    let f a@(n1, bp1, _) b@(n2, bp2, _)
+          | n1 == n2 && 
+            bp1 /= bp2 = tell [MultipleBindingPatterns a b]
+          | otherwise = return ()
     sequence_ $
       do
         i <- [0..length as - 1]
         j <- [i+1..length as - 1]
         let err = error "This should never happen"
         return . fromMaybe err $ f <$> (as !!? i) <*> (as !!? j)
+    return True
 

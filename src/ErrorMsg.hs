@@ -54,7 +54,7 @@ data CompilerException
   | TypeApplicationFailed PPType Expr
   | MultipleAttributeDeclarations Expr Expr
   | UndefinedPredicate Expr
-  | MultipleBindingPatterns Adornable Adornable
+  | MultipleBindingPatterns (Text, [Bool], Expr) (Text, [Bool], Expr)
   deriving (Typeable, Eq, Ord, Exception)
 
 instance Pretty Severity where
@@ -125,7 +125,7 @@ errorMsg s (UndefinedPredicate p) = vsep
   [ "No rules found matching predicate " <> prettyMinimal p <> ":"
   , prettyPosContext (p ^. annotation . srcPos) s
   ]
-errorMsg s (MultipleBindingPatterns a@(Adornable _ bp1 _) b@(Adornable _ bp2 _)) = vsep
+errorMsg s (MultipleBindingPatterns a b) = vsep
   [ "Same rule is called with different binding patterns: " 
   , prettyAdornment s a
   , "and" <+> prettyAdornment s b
@@ -163,8 +163,8 @@ prettyPosContext pos src = srcDoc
           filler = stimes (length $ show p') " "
       Nothing -> emptyDoc
 
-prettyAdornment :: Text -> Adornable -> Doc ann
-prettyAdornment src (Adornable _ bp pr) = vsep
+prettyAdornment :: Text -> (Text, [Bool], Expr) -> Doc ann
+prettyAdornment src (_, bp, pr) = vsep
   [ "with binding pattern `" <> (pretty $ showBindings bp) <> "` at"
   , prettyPosContext (pr ^. annotation . srcPos) src
   ]
