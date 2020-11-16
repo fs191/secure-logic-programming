@@ -100,7 +100,7 @@ checkSinglePattern
   -> m Bool
 checkSinglePattern p =
   do
-    let as = ordNub $ (\(Adornable r bp e) -> (ruleName r, bp, e)) <$> allAdornables p
+    let as = ordNub $ ((\(Adornable r bp e) -> (ruleName r, bp, e)) <$> allAdornables p)
     let f a@(n1, bp1, _) b@(n2, bp2, _)
           | n1 == n2 && 
             bp1 /= bp2 = tell [MultipleBindingPatterns a b]
