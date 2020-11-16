@@ -52,7 +52,7 @@ data CompilerException
   | CannotReadFile Text Text
   | UnificationFailed Expr Expr
   | TypeApplicationFailed PPType Expr
-  | MultipleAttributeDeclarations Text
+  | MultipleAttributeDeclarations Expr Expr
   | UndefinedPredicate Expr
   | MultipleBindingPatterns Adornable Adornable
   deriving (Typeable, Eq, Ord, Exception)
@@ -115,8 +115,16 @@ errorMsg _ (TypeApplicationFailed t x) = vsep
 errorMsg _ DoesNotConverge = "The program does not converge. Try increasing the number of iterations using `-n`"
 errorMsg _ (TypeInferenceFailed e) = "Could not infer type for\n\n" <> prettyMinimal e
 errorMsg _ (ParserException x) = "Could not parse program:\n" <> pretty x
-errorMsg _ (MultipleAttributeDeclarations e) = "Attribute @" <> pretty e <> " is already defined elsewhere"
-errorMsg _ (UndefinedPredicate p) = "No rules found that would correspond to " <> hardline <> hardline <> prettyFull p <> hardline
+errorMsg s (MultipleAttributeDeclarations a b) = vsep 
+  [ "Attribute @" <> prettyMinimal b <> " is already defined elsewhere at"
+  , prettyPosContext (b ^. annotation . srcPos) s
+  , "First defined here:"
+  , prettyPosContext (a ^. annotation . srcPos) s
+  ]
+errorMsg s (UndefinedPredicate p) = vsep
+  [ "No rules found matching predicate " <> prettyMinimal p <> ":"
+  , prettyPosContext (p ^. annotation . srcPos) s
+  ]
 errorMsg s (MultipleBindingPatterns a@(Adornable _ bp1 _) b@(Adornable _ bp2 _)) = vsep
   [ "Same rule is called with different binding patterns: " 
   , prettyAdornment s a

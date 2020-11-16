@@ -41,7 +41,7 @@ checkDuplicates exprs = sequence_ $
       (Just x, Just y) -> if _attrName x == _attrName y
                             then return $ Left err
                             else return $ Right ()
-        where err = MultipleAttributeDeclarations $ _attrName x
+        where err = MultipleAttributeDeclarations x y
       _                -> return $ Right ()
 
 checkTyping :: Expr -> Either CompilerException ()
@@ -65,13 +65,14 @@ checkPredicates dp =
             a <- p ^? predArgs . to length
             return (n, a)
     let preds' = [p | p@Pred{} <- U.universeBi $ dp ^.. dpRules . folded . ruleTail]
-        preds  = toNameArgNum <$> preds'
+        goalPreds = [dp ^. dpGoal]
+        preds  = toNameArgNum <$> (preds' <> goalPreds)
     let idbRules = toNameArgNum <$> dp ^.. dpRules . folded . ruleHead
     let edbRules = zip (dp ^.. dpDBClauses . to name) (dp ^.. dpDBClauses . to (length . vars))
     let rules = idbRules <> edbRules
     case findIndex (flip notElem rules) preds of
       Just i  -> Left $ UndefinedPredicate culprit
-        where culprit = fromMaybe undefined $ preds' !!? i
+        where culprit = fromMaybe (dp ^. dpGoal) $ preds' !!? i
       Nothing -> Right ()
 
 checkSinglePattern :: DatalogProgram -> Either CompilerException ()
