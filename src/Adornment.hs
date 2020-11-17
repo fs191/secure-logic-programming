@@ -3,9 +3,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Adornment 
-  ( suffixPredicate
+  ( Adornable(..)
+  , suffixPredicate
   , adornProgram
+  , adornRule
+  , allAdornables
   , aBound
+  , showBindings
   ) where
 
 import Relude
@@ -22,10 +26,12 @@ import Data.Generics.Uniplate.Data as U
 import Data.Set as S
 import qualified Data.List as L hiding (nub)
 import qualified Data.Text as T
+import Data.Text.Prettyprint.Doc
 
 data Adornable = Adornable 
-  { _aRule  :: Rule 
-  , _aBound :: [Bool]
+  { _aRule   :: Rule 
+  , _aBound  :: [Bool]
+  , _aUsedAt :: Expr
   }
   deriving (Eq, Ord, Show)
 
@@ -48,27 +54,32 @@ goalStr = "$goal"
 runAdornM :: AdornM a -> a
 runAdornM x = evalState x (AdornState [] [] S.empty [] [])
 
--- | Assigns correct bindings to variables. Creates new rules based on
--- which arguments are bound when the rule gets called
-adornProgram :: DatalogProgram -> DatalogProgram
-adornProgram p = runAdornM $
+initialize :: DatalogProgram -> AdornM ()
+initialize p = 
   do
     let _gRule = goalToRule $ p ^. dpGoal
     -- Initialize the state
     gsRules .= p ^. dpRules
     gsRules %= L.insert _gRule
-    gsQueue .= [allBound _gRule]
+    gsQueue .= [allBound _gRule (p ^. dpGoal)]
     gsDBClauses .= p ^.. dpDBClauses 
+
+-- | Assigns correct bindings to variables. Creates new rules based on
+-- which arguments are bound when the rule gets called
+adornProgram :: DatalogProgram -> DatalogProgram
+adornProgram p = runAdornM $
+  do
+    initialize p
 
     -- Begin iterating through the rules starting from the goal
     _adornables <- graphLoop
     let _rules = [r & ruleHead %~ suffixPredicate bp 
                     & ruleHead . paramBindings .~ bp 
-                    | (Adornable r bp) <- _adornables]
+                    | (Adornable r bp _) <- _adornables]
 
     let isGoal :: Rule -> Bool
         isGoal x = fromMaybe False $ x ^? ruleHead . _Pred . _2 . to(T.isPrefixOf goalStr)
-        _goal = head . fromMaybe undefined . nonEmpty $ L.filter isGoal _rules
+        _goal = L.head $ L.filter isGoal _rules
     return $ p & dpRules .~ L.filter (not . isGoal) _rules
                & dpGoal  .~ (_goal ^. ruleTail)
 
@@ -84,7 +95,7 @@ graphLoop =
       then return _visited
       else do
         _next <- popQueue
-        adornRule _next
+        adornRule' _next
         graphLoop
 
 popQueue :: AdornM Adornable
@@ -95,8 +106,26 @@ popQueue =
     modify $ gsQueue %~ tail . fromMaybe undefined . nonEmpty
     return $ head . fromMaybe undefined $ nonEmpty _queue
 
-adornRule :: Adornable -> AdornM ()
-adornRule a@(Adornable r _bp) = 
+adornRule :: Rule -> Rule
+adornRule r = runAdornM $
+  do
+    -- Add all bound variables in the rule head to gsBound
+    let _bp = r ^. ruleHead . paramBindings
+    let _args = args r `zip` _bp
+    let _boundArgs = fst <$> L.filter snd _args
+    let _varNameFun (Var _ n) = Just n
+        _varNameFun _         = Nothing
+    let _boundNames = catMaybes $ _varNameFun <$> _boundArgs
+    modify $ gsBound .~ S.fromList _boundNames
+    _bound <- use gsBound
+
+    -- Reorder the terms in rule body
+    let _terms = (andsToList $ r ^. ruleTail)
+    _boundTerms <- bindTerms _terms
+    return $ r & ruleTail .~ foldWithAnds _boundTerms
+
+adornRule' :: Adornable -> AdornM ()
+adornRule' a@(Adornable r _bp _) = 
   do
     -- Add all bound variables in the rule head to gsBound
     let _args = args r `zip` _bp
@@ -137,7 +166,7 @@ adornRule a@(Adornable r _bp) =
           (p, n) <- ordNub $ _boundTerms ^.. folded . to toPair . _Just
           let _rs  = findRulesByName _rules n
               _bindings = repeat $ p ^. paramBindings
-              _ads  = uncurry Adornable <$> zip _rs _bindings
+              _ads  = (\(r', b) -> Adornable r' b p) <$> zip _rs _bindings
           L.filter (not . isVisited _visQueue) _ads
     _notEDB <- filterM (fmap not . isEDB . _aRule) _newPairs
     gsQueue <>= _newPairs
@@ -151,9 +180,9 @@ isQueueEmpty :: AdornM Bool
 isQueueEmpty = use $ gsQueue . to L.null
 
 isVisited :: [Adornable] -> Adornable -> Bool
-isVisited visited (Adornable r bp) = anyOf folded f visited
+isVisited visited (Adornable r bp _) = anyOf folded f visited
   where
-    f (Adornable r' bp') = (r ^. ruleHead == r' ^. ruleHead) && bp == bp'
+    f (Adornable r' bp' _) = (r ^. ruleHead == r' ^. ruleHead) && bp == bp'
 
 -- | Suffixes a predicate based on a given binding pattern. A value of `True` at
 -- the index `n` means that the n-th argument of the predicate is bound.
@@ -180,18 +209,18 @@ bindTerms [] = return []
 bindTerms l  =
   do
     _bound <- use gsBound
-    let _head = head . fromMaybe undefined $ nonEmpty l
+    let _head = L.head l
     -- Bind all the variables that are parameters of the best candidate
         _vars = [v | v@(Var _ _) <- U.universe _head]
         _newBound = [n | (Var _ n) <- _vars]
     let _pat = predPattern _bound _head
         _ad = U.transform (annotateWithBindings _bound) $ _head & paramBindings .~ _pat
     modify $ gsBound %~ S.union (S.fromList _newBound)
-    _t <- bindTerms $ tail . fromMaybe undefined $ nonEmpty l
+    _t <- bindTerms $ L.tail l
     return $ _ad:_t
 
-allBound :: Rule -> Adornable
-allBound r = Adornable r $ True <$ args r
+allBound :: Rule -> Expr -> Adornable
+allBound r e = Adornable r (True <$ args r) e
 
 -- | Suffixes the predicate based on its annotations
 suffixExpr :: Expr -> Expr
@@ -219,4 +248,10 @@ showBindings :: [Bool] -> Text
 showBindings [] = ""
 showBindings (True:bt)  = "b" <> showBindings bt
 showBindings (False:bt) = "f" <> showBindings bt
+
+allAdornables :: DatalogProgram -> [Adornable]
+allAdornables p = ordNub . runAdornM $
+  do
+    initialize p
+    graphLoop
 

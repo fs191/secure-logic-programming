@@ -44,7 +44,7 @@ canParse file = it (toString $ "can parse " <> file) $ action `shouldReturn` ()
             res <- parseDatalog file <$> readFileText (toString file)
             case res of
               Right _ -> return ()
-              Left  e -> error e
+              Left  e -> fail $ show e
 
 cannotParse :: T.Text -> Spec
 cannotParse file = it (toString $ "does not parse " <> file) $ do

@@ -347,11 +347,13 @@ eInv = Inv empty
 
 -- | Creates a new boolean and expression
 eAnd :: Expr -> Expr -> Expr
-eAnd = And empty
+eAnd = And e
+  where e = empty & annType .~ PPBool
 
 -- | Creates a new boolean or expression
 eOr :: Expr -> Expr -> Expr
-eOr = Or empty
+eOr = Or e
+  where e = empty & annType .~ PPBool
 
 -- | Creates a new list expression
 eList :: [Expr] -> Expr

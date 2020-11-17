@@ -28,6 +28,7 @@ import Test.Hspec
 
 import qualified Text.Show
 
+import ErrorMsg
 import Parser.DatalogParser
 import DatalogProgram
 import Expr
@@ -153,12 +154,18 @@ compileSC file iterations = errExit False $ withTmpDir act
   where
     act tmp = 
       do
+        src <- readFileText $ toString file
         _prog' <- liftIO $ parseDatalogFromFile file
         let err = error "Cannot parse file"
         let _prog = fromRight err _prog'
         let conf = TranslatorConfig iterations False False
-        trans <- runExceptT $ process conf _prog
-        let trans' = either throw id trans
+        trans <- liftIO . runExceptT . process conf $ toString file
+        trans' <- case trans of
+          Left ex -> do
+            forM_ ex $ \x -> do
+              putTextLn . show $ errorMsg src x
+            exitFailure
+          Right x -> return x
         let sc = secrecCode trans'
         cp "SecreC/lp_essentials.sc" tmp
         let _path = tmp <> "prog.sc"

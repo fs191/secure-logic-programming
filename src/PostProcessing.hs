@@ -25,7 +25,7 @@ postProcess
 postProcess prog = 
   do
     let prog' = removeFalseDP . filterGoalRules $ filterGroundRules prog
-    when (prog' ^. dpRules . to null) $ (return $ compEx_ DoesNotConverge) *> return ()
+    when (prog' ^. dpRules . to null) $ (return $ DoesNotConverge) *> return ()
     return prog'
 
 -- | Filters out rules that contain predicates that are not facts

@@ -41,7 +41,7 @@ datalogParser =
       _   -> 
         do
           pos <- getSourcePos
-          customFailure $ compEx TooManyGoals pos
+          customFailure $ TooManyGoals
 
 clause :: Parser Clause
 clause =  label "clause" $
@@ -114,10 +114,10 @@ goal =
 -----------------------
 
 -- | Parses a privacy datalog program from a string
-parseDatalog :: Text -> Text -> Either Text DP.DatalogProgram
+parseDatalog :: Text -> Text -> Either CompilerException DP.DatalogProgram
 parseDatalog path content = 
     case res of
-      Left x  -> Left . toText $ errorBundlePretty x
+      Left x  -> Left . ParserException . toText $ errorBundlePretty x
       Right x -> Right x
   where
     res = runParser datalogParser (toString path) content
@@ -130,7 +130,7 @@ parseDatalogFromFile filepath =
     let res = parse datalogParser (toString filepath) file
     case res of
       Left x  -> 
-          return . Left . compEx_ . ParserException . toText $ errorBundlePretty x
+          return . Left . ParserException . toText $ errorBundlePretty x
       Right x -> return $ Right x
 
 -- | Unsafe version of `parseDatalogFromFile`

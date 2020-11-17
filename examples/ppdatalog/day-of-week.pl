@@ -43,46 +43,51 @@ month_days_on_year(october, 31, _).
 month_days_on_year(november, 30, _).
 month_days_on_year(december, 31, _).
 
-comes_after(february, january).
-comes_after(march, february).
-comes_after(april, march).
-comes_after(may, april).
-comes_after(june, may).
-comes_after(july, june).
-comes_after(august, july).
-comes_after(september, august).
-comes_after(october, september).
-comes_after(november, october).
-comes_after(december, november).
-comes_after(january, december).
+month_comes_after(february, january).
+month_comes_after(march, february).
+month_comes_after(april, march).
+month_comes_after(may, april).
+month_comes_after(june, may).
+month_comes_after(july, june).
+month_comes_after(august, july).
+month_comes_after(september, august).
+month_comes_after(october, september).
+month_comes_after(november, october).
+month_comes_after(december, november).
+month_comes_after(january, december).
 
-comes_after(tuesday, monday).
-comes_after(wednesday, tuesday).
-comes_after(thursday, wednesday).
-comes_after(friday, thursday).
-comes_after(saturday, friday).
-comes_after(sunday, saturday).
-comes_after(monday, sunday).
+dow_comes_after(tuesday, monday).
+dow_comes_after(wednesday, tuesday).
+dow_comes_after(thursday, wednesday).
+dow_comes_after(friday, thursday).
+dow_comes_after(saturday, friday).
+dow_comes_after(sunday, saturday).
+dow_comes_after(monday, sunday).
 
 day_of_week(monday, 1, january, 1900).
 
+% if we call day_of_week with fbbb, then there is no need to generate bbbb rules
+% for day_of_week. We should think if this can be made as an optimization.
 day_of_week(DayOfWeek, 1, january, Year) :-
-  X = comes_after(DayOfWeek, X),
-  Y = Year-1,
-  day_of_week(X, 31, december, Y).
+  X is dow_comes_after(DayOfWeek, X),
+  Y is Year-1,
+  day_of_week(DW, 31, december, Y),
+  DW =:= X.
   
 day_of_week(DayOfWeek, 1, Month, Year) :-
   Month =/= january,
-  comes_after(Month, M),
-  comes_after(DayOfWeek, DW),
+  month_comes_after(Month, M),
+  dow_comes_after(DayOfWeek, DW),
   month_days_on_year(M, D, Year),
-  day_of_week(DW, D, M, Year).
+  day_of_week(DW2, D, M, Year),
+  DW2 =:= DW.
 
 day_of_week(DayOfWeek, Day, Month, Year) :-
   Day =/= 1,
-  D = Day-1,
-  comes_after(DayOfWeek, DW),
-  day_of_week(DW, D, Month, Year).
+  D is Day-1,
+  dow_comes_after(DayOfWeek, DW),
+  day_of_week(DW2, D, Month, Year),
+  DW2 =:= DW.
 
 goal(DayOfWeek) :-
   day(Day, Month, Year),
@@ -90,3 +95,4 @@ goal(DayOfWeek) :-
 
 :-outputs([DayOfWeek]).
 ?-goal(DayOfWeek).
+

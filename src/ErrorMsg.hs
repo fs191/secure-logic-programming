@@ -3,17 +3,14 @@
 
 module ErrorMsg 
   ( CompilerException(..)
-  , CompilerExceptionInfo(..)
   , Severity(..)
   , severity
-  , errorMsgWithSource
-  , compEx_, compEx, throwCompEx
+  , errorMsg
   ) where
 
 import Relude hiding (show)
 
 import Control.Lens
-import Control.Monad.Except
 
 import Data.Text.Prettyprint.Doc
 
@@ -25,6 +22,7 @@ import Language.Privalog.Types
 import Expr
 import ExprPretty
 import Annotation
+import Adornment
 import Text.Megaparsec
 
 class HasSeverity a where
@@ -41,11 +39,7 @@ data Severity
   | Debug5 -- Most detailed
   deriving (Enum, Eq, Ord)
 
-data CompilerException = 
-  CompilerException CompilerExceptionInfo (Maybe SourcePos)
-  deriving (Typeable, Eq, Ord)
-
-data CompilerExceptionInfo
+data CompilerException
   = NoGoal
   | ParserException Text
   | DoesNotConverge
@@ -58,81 +52,54 @@ data CompilerExceptionInfo
   | CannotReadFile Text Text
   | UnificationFailed Expr Expr
   | TypeApplicationFailed PPType Expr
-  | MultipleAttributeDeclarations Text
+  | MultipleAttributeDeclarations Expr Expr
   | UndefinedPredicate Expr
-  deriving (Typeable, Eq, Ord)
-
-instance Exception CompilerException where
-  displayException ex = show $ sev <+> (align $ pretty ex)
-    where sev = pretty $ severity ex
-
-instance ShowErrorComponent CompilerException where
-  showErrorComponent = displayException
+  | MultipleBindingPatterns (Text, [Bool], Expr) (Text, [Bool], Expr)
+  deriving (Typeable, Eq, Ord, Exception)
 
 instance Pretty Severity where
-  pretty Warning  = "[WARNING ]"
-  pretty Error    = "[ERROR   ]"
-  pretty Internal = "[INTERNAL]"
-  pretty Debug5   = "[DEBUG 5 ]"
-  pretty Debug4   = "[DEBUG 4 ]"
-  pretty Debug3   = "[DEBUG 3 ]"
-  pretty Debug2   = "[DEBUG 2 ]"
-  pretty Debug1   = "[DEBUG 1 ]"
+  pretty Warning  = "[WRN]"
+  pretty Error    = "[ERR]"
+  pretty Internal = "[BUG]"
+  pretty Debug5   = "[DB5]"
+  pretty Debug4   = "[DB4]"
+  pretty Debug3   = "[DB3]"
+  pretty Debug2   = "[DB2]"
+  pretty Debug1   = "[DB1]"
 
 instance Show Severity where
   show = show . pretty
 
 instance Show CompilerException where
-  show = show . pretty
-
-instance Show CompilerExceptionInfo where
-  show = show . errorMsg
-
-instance HasSeverity CompilerExceptionInfo where
-  severity _ = Error
+  show = show . errorMsg ""
 
 instance HasSeverity CompilerException where
-  severity (CompilerException info _) = severity info
+  severity MultipleBindingPatterns{} = Warning
+  severity _ = Error
 
-instance Pretty CompilerException where
-  pretty (CompilerException info _) = 
-    (pretty $ severity info) <+> (align $ errorMsg info)
+instance ShowErrorComponent CompilerException where
+  showErrorComponent = show
 
-errorMsgWithSource :: Text -> CompilerException -> Doc ann
-errorMsgWithSource src ex@(CompilerException _ pos) = align $ vsep [pretty ex, srcDoc]
-  where
-    err = "<source location invalid>"
-    srcDoc = case pos of
-      Just p -> vsep
-        [ pretty $ sourceName p
-        , filler <+> "|"
-        , p'     <+> "|" <+> pretty errorLine
-        , filler <+> "|" <+> pretty errorIndicator
-        ]
-        where
-          errorLine = fromMaybe err $ lines src !!? ((unPos $ sourceLine p) - 1)
-          errorIndicator = replicate (unPos $ sourceColumn p) ' ' <> "^"
-          p' = pretty . unPos $ sourceLine p
-          filler = stimes (length $ show p') " "
-      Nothing -> emptyDoc
+errorMsg :: Text -> CompilerException -> Doc ann
+errorMsg src ex = (pretty $ severity ex) <+> (align $ errorMsg' src ex)
 
-errorMsg :: CompilerExceptionInfo -> Doc ann
-errorMsg NoGoal = "Program has no goal."
-errorMsg TooManyGoals = "Program has more than one goal."
-errorMsg (TypeMismatch expected got) = 
+errorMsg' :: Text -> CompilerException -> Doc ann
+errorMsg' _ NoGoal = "Program has no goal."
+errorMsg' _ TooManyGoals = "Program has more than one goal."
+errorMsg' _ (TypeMismatch expected got) = 
   pretty expected `expectedGot` pretty got
-errorMsg (ExpectedConstant expr) = 
+errorMsg' _ (ExpectedConstant expr) = 
   "a constant" `expectedGot` prettyMinimal expr
-errorMsg (ExpectedGroundTerm expr) = 
+errorMsg' _ (ExpectedGroundTerm expr) = 
   "a ground term" `expectedGot` prettyMinimal expr
-errorMsg (NonVariableArgument expr) = 
+errorMsg' _ (NonVariableArgument expr) = 
   "a variable argument" `expectedGot` prettyMinimal expr
-errorMsg (CannotReadFile f ex) = vsep
+errorMsg' _ (CannotReadFile f ex) = vsep
   [ "Cannot read from file" <+> pretty f <> ":"
   , pretty $ show ex <> "."
   , "Ensure that the file uses a supported encoding (e.g. utf-8)."
   ]
-errorMsg (UnificationFailed x y) = hsep
+errorMsg' _ (UnificationFailed x y) = hsep
   [ "Failed to unify expressions"
   , prettyMinimal x
   , prettyLoc x
@@ -140,7 +107,7 @@ errorMsg (UnificationFailed x y) = hsep
   , prettyMinimal y
   , prettyLoc y
   ]
-errorMsg (TypeApplicationFailed t x) = vsep 
+errorMsg' _ (TypeApplicationFailed t x) = vsep 
   [ hsep
     [ "Failed to apply type"
     , pretty t
@@ -149,11 +116,24 @@ errorMsg (TypeApplicationFailed t x) = vsep
   , prettyFull x
   , prettyLoc x
   ]
-errorMsg DoesNotConverge = "The program does not converge. Try increasing the number of iterations using `-n`"
-errorMsg (TypeInferenceFailed e) = "Could not infer type for\n\n" <> prettyMinimal e
-errorMsg (ParserException x) = "Could not parse program:\n" <> pretty x
-errorMsg (MultipleAttributeDeclarations e) = "Attribute @" <> pretty e <> " is already defined elsewhere"
-errorMsg (UndefinedPredicate p) = "No rules found that would correspond to " <> hardline <> hardline <> prettyFull p <> hardline
+errorMsg' _ DoesNotConverge = "The program does not converge. Try increasing the number of iterations using `-n`"
+errorMsg' _ (TypeInferenceFailed e) = "Could not infer type for\n\n" <> prettyMinimal e
+errorMsg' _ (ParserException x) = "Could not parse program:\n" <> pretty x
+errorMsg' s (MultipleAttributeDeclarations a b) = vsep 
+  [ "Attribute @" <> prettyMinimal b <> " is already defined elsewhere at"
+  , prettyPosContext (b ^. annotation . srcPos) s
+  , "First defined here:"
+  , prettyPosContext (a ^. annotation . srcPos) s
+  ]
+errorMsg' s (UndefinedPredicate p) = vsep
+  [ "No rules found matching predicate " <> prettyMinimal p <> ":"
+  , prettyPosContext (p ^. annotation . srcPos) s
+  ]
+errorMsg' s (MultipleBindingPatterns a b) = vsep
+  [ "Same rule is called with different binding patterns: " 
+  , prettyAdornment s a
+  , "and" <+> prettyAdornment s b
+  ]
 
 -- Utilities
 
@@ -169,16 +149,27 @@ prettyLoc expr = "at" <+> prettyPos
                   Nothing     -> "an unknown position"
                   Just x -> pretty $ sourcePosPretty x
 
-throwCompEx
-  :: (MonadError CompilerException m) 
-  => CompilerExceptionInfo 
-  -> SourcePos 
-  -> m ()
-throwCompEx info pos = throwError $ compEx info pos
+prettyPosContext :: Maybe SourcePos -> Text -> Doc ann
+prettyPosContext pos src = srcDoc
+  where
+    err = "<source location invalid>"
+    srcDoc = case pos of
+      Just p -> vsep
+        [ pretty $ sourceName p
+        , filler <+> "|"
+        , p'     <+> "|" <+> pretty errorLine
+        , filler <+> "|" <> pretty errorIndicator
+        ]
+        where
+          errorLine = fromMaybe err $ lines src !!? ((unPos $ sourceLine p) - 1)
+          errorIndicator = replicate (unPos $ sourceColumn p) ' ' <> "^"
+          p' = pretty . unPos $ sourceLine p
+          filler = stimes (length $ show p') " "
+      Nothing -> emptyDoc
 
-compEx :: CompilerExceptionInfo -> SourcePos -> CompilerException
-compEx info pos = CompilerException info $ Just pos
-
-compEx_ :: CompilerExceptionInfo -> CompilerException
-compEx_ x = CompilerException x Nothing
+prettyAdornment :: Text -> (Text, [Bool], Expr) -> Doc ann
+prettyAdornment src (_, bp, pr) = vsep
+  [ "with binding pattern `" <> (pretty $ showBindings bp) <> "` at"
+  , prettyPosContext (pr ^. annotation . srcPos) src
+  ]
 

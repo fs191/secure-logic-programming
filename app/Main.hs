@@ -102,17 +102,20 @@ main =
     -- parse the input datalog program
     source <- liftIO . readFileText $ toString inFileName
     let program' = parseDatalog inFileName source
-    let program = case program' of
-          Left ex -> error ex
-          Right x -> x
+    program <- case program' of
+          Left ex -> 
+            do
+              putStrLn . show $ errorMsg source ex
+              exitFailure
+          Right x -> return x
 
     let conf = TranslatorConfig _ite debug skipSem
-    tr <- runExceptT $ process conf program
+    tr <- runExceptT . process conf $ toString inFileName
     case tr of
       Left ex -> 
         do
-          putStrLn . show $ errorMsgWithSource source ex 
-          fail "Compilation failed"
+          forM_ ex $ putStrLn . show . errorMsg source
+          exitFailure
       Right tr' -> 
         do
           let sc = secrecCode tr'

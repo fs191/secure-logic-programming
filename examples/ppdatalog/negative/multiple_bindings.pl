@@ -6,8 +6,7 @@ sg(X,Y) :- X = Y.
 sg(X,Y) :-
   par(X,X1),
   par(Y,Y1),
-  sg(X1,Z),
-  Y1 = Z.
+  sg(X1,Y1).
 
 :-outputs([Y]).
 ?-sg('chris',Y).

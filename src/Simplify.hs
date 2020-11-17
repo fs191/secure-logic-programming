@@ -288,6 +288,7 @@ simplifyConst = U.rewrite f
     f (Add _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x + y
     f (Sub _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x - y
     f (Mul _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x * y
+    f (Mod _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x `mod` y
     --f (Min _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x `min` y
     --f (Max _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x `max` y
     f (Lt _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x < y

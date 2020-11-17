@@ -243,7 +243,7 @@ typable e =
           Just p  -> p
           Nothing -> A.empty
     pos <- getSourcePos
-    let err = customFailure $ compEx (TypeApplicationFailed (f ^. annType) e') pos
+    let err = customFailure $ TypeApplicationFailed (f ^. annType) e'
     maybe err return $ applyAnnotation f e'
 
 withSrcPos :: Parser Expr -> Parser Expr
