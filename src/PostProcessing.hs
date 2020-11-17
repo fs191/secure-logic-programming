@@ -116,19 +116,19 @@ prepareRule :: DatalogProgram -> Rule -> Rule
 prepareRule dp r = r & ruleTail %~ extendEDB_DP dp
                      & ruleTail %~ reorderTail
 
--- order the tail expressions as Predicates - Assignments - Comparisons
+-- order the tail expressions as Predicates - Comparisons - Assignments
 reorderTail :: Expr -> Expr
 reorderTail ttl =
-       let (ps,as,cs) = splitTail ttl in
-       foldr1 eAnd $ ps ++ as ++ cs
+       let (ps,cs,as) = splitTail ttl in
+       foldr1 eAnd $ ps ++ cs ++ as
 
--- split the tail expressions to Predicates - Assignments - Comparisons
+-- split the tail expressions to Predicates - Comparisons - Assignments
 splitTail :: Expr -> ([Expr], [Expr], [Expr])
 splitTail ttl =
        let es      = simplifyAnds' ttl in
        let (ps,rs) = partition isPredicate es in
        let (cs,as) = partition isGroundPredicate rs in
-       (ps,as,cs)
+       (ps,cs,as)
 
 -- fills all EDB predicates with fresh variables
 -- while it makes rules longer, it is easier to optimize them in this form
@@ -165,15 +165,15 @@ mergeTwoMatchingRules r1 r2 =
    if (hash . show) (r1 ^. ruleHead) /= (hash . show) (r2 ^. ruleHead) then
        [r1,r2]
    else
-       let (ps1,as1,cs1) = splitTail (r1 ^. ruleTail) in
+       let (ps1,cs1,as1) = splitTail (r1 ^. ruleTail) in
        let hps1 = map (hash . show) ps1 in
-       let has1 = map (hash . show) as1 in
        let hcs1 = map (hash . show) cs1 in
+       let has1 = map (hash . show) as1 in
 
-       let (ps2,as2,cs2) = splitTail (r2 ^. ruleTail) in
+       let (ps2,cs2,as2) = splitTail (r2 ^. ruleTail) in
        let hps2 = map (hash . show) ps2 in
-       let has2 = map (hash . show) as2 in
        let hcs2 = map (hash . show) cs2 in
+       let has2 = map (hash . show) as2 in
 
        -- 2. check that the rules have the same EDB inputs
        -- together, 1 and 2 ensure that the rules operate on the same input state
