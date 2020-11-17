@@ -40,7 +40,7 @@ If dependencies or project structure has changed then
 
 may be necessary.
 
-## Testing:
+## Testing
 
 The testing suite relies on SWI-Prolog and Sharemind emulator. To make it easier
 to set up the environment, we use Docker. To run the tests, install Docker and run
@@ -48,7 +48,7 @@ to set up the environment, we use Docker. To run the tests, install Docker and r
     docker build --tag lpsec:latest .
     docker run -it lpsec:latest
 
-## Example run:
+## Example run
 
 The executable is created in the subdirectory `dist/build/lpsec`, thus to execute it:
 
