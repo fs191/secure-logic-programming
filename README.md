@@ -4,7 +4,7 @@
 
 ## Building
 
-### Dependencies
+### Installing dependencies
 
 #### Debian
 
