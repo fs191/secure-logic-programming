@@ -1,4 +1,4 @@
-:-type(par, [@child:private string, @parent:private string]).
+:-type(par(@child:private string, @parent:private string)).
 
 % type of X is public since it is goal's input
 % in this case, we could actually deduce that Y should also be a public string

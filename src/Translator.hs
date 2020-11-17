@@ -46,9 +46,10 @@ process conf path =
     let skipSem = _skipSem conf
     printDebug debug "Original" dp
     --printDebug (debug && not skipSem) "SemTyped" . typeInference $ adornProgram dp
-    when (not skipSem) $ do
+    unless skipSem $ do
       let (ex, success) = checkSemantics dp
       forM_ ex $ putTextLn . show . errorMsg src
+      unless success exitFailure
     liftIO . when debug $ putTextLn "Semantics check succeeded"
     let adp = adornProgram dp
     printDebug debug "Adornment" adp

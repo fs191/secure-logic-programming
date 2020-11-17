@@ -8,7 +8,6 @@ module Rule
   , args
   , isFact
   , ruleHead, ruleTail
-  , dbClauseToRule
   , refreshRule
   , applySubst
   , ruleAnn
@@ -36,7 +35,6 @@ import           Language.Prolog.PrologSource
 import           Expr
 import           ExprPretty
 import           Substitution
-import           DBClause
 import           Annotation
 
 -- | A rule has a list of arguments and a formula that represents rule premise
@@ -90,10 +88,6 @@ refreshRule prefix r = applySubst s r
 applySubst :: Subst -> Rule -> Rule
 applySubst s r = r & ruleHead %~ applyToExpr s
                    & ruleTail %~ applyToExpr s
-
--- | Convert a database clause to a rule
-dbClauseToRule :: DBClause -> Rule
-dbClauseToRule dbc = Rule (predicate (name dbc) $ vars dbc) constTrue
 
 -- | Get the name of the rule
 ruleName :: Rule -> Text

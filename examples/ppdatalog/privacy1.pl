@@ -1,4 +1,4 @@
-:-type(db, [@a:private string, @b:private string]).
+:-type(db(@a:private string, @b:private string)).
 
 :-outputs([A]).
 :-inputs([@b:public string]).

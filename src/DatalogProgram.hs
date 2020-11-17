@@ -7,7 +7,6 @@ module DatalogProgram
   ( DatalogProgram
   , Aggregation
   , Directive
-  , DBClause
   , fromRulesAndGoal
   , ppDatalogProgram
   , dpRules
@@ -37,14 +36,13 @@ import           Rule
 import           Expr
 import           ExprPretty
 import           Data.Text.Prettyprint.Doc
-import           DBClause
 import           Language.Prolog.PrologSource
 
 -- | Directives are the top-level function calls in Datalog.
 data Directive
   = InputDirective ![Expr]
   | OutputDirective ![Expr]
-  | DBDirective Text ![Expr]
+  | DBDirective !Expr
   deriving (Show, Eq, Data, Typeable)
 
 instance Pretty Directive where
@@ -52,8 +50,8 @@ instance Pretty Directive where
     where _ps = cat . punctuate ", " $ prettyFull <$> as
   pretty (OutputDirective as) = ":-outputs([" <> _ps <> "])"
     where _ps = cat . punctuate ", " $ prettyFull <$> as
-  pretty (DBDirective n as) = ":-type(" <> pretty n <> ",[" <> _ps <> "])"
-    where _ps = cat . punctuate ", " $ prettyFull <$> as
+  pretty (DBDirective p@Pred{}) = ":-type(" <> prettyMinimal p <>")"
+  pretty (DBDirective _) = error "DB directive with a non-predicate argument"
 
 -- | A datatype for representing privalog programs. Consists of rules, a goal
 -- and directives.
@@ -91,12 +89,12 @@ fromRulesAndGoal rs g = DatalogProgram rs g []
 ppDatalogProgram :: [Rule] -> Expr -> [Directive] -> DatalogProgram
 ppDatalogProgram = DatalogProgram
 
-dpDBClauses :: Fold DatalogProgram DBClause
+dpDBClauses :: Fold DatalogProgram Expr
 dpDBClauses = dpDirectives . folded . to dirToDBC . _Just
 
 -- | Attempts to convert a directive to DBClause
-dirToDBC :: Directive -> Maybe DBClause
-dirToDBC (DBDirective n as) = Just $ dbClause n as
+dirToDBC :: Directive -> Maybe Expr
+dirToDBC (DBDirective p@Pred{}) = Just p
 dirToDBC _ = Nothing
 
 -- | Traverse all input directives for input variables
@@ -135,7 +133,7 @@ extensionalFacts dp = dp ^.. dpDirectives
                            . folded
                            . to dirToDBC
                            . _Just
-                           . to dbClauseToRule
+                           . to (`Rule` constTrue)
 
 -- | Returns a list of both intentional and extensional facts of the program
 facts :: DatalogProgram -> [Rule]
@@ -150,8 +148,8 @@ outputDirective :: [Expr] -> Directive
 outputDirective = OutputDirective
 
 -- | Creates a new database directive
-dbDirective :: Text -> [Expr] -> Directive
-dbDirective = DBDirective
+dbDirective :: Expr -> Directive
+dbDirective p = DBDirective p
 
 -- | Finds all rules with name `n` from the program
 findRules :: DatalogProgram -> Text -> [Rule]
