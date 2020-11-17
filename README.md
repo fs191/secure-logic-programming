@@ -14,13 +14,13 @@
 
     pacman -Sy z3
 
-### Stack (recommended)
+### Building with Stack (recommended)
 
 Simply run
 
     stack install
 
-### Cabal
+### Building with Cabal
 
 Building for the first time:
 
