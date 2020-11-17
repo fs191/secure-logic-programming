@@ -21,7 +21,6 @@ import Data.Text.Prettyprint.Doc
 
 import Annotation
 import qualified DatalogProgram as DP
-import DBClause
 import Expr
 import ExprPretty
 import Rule
@@ -543,16 +542,16 @@ header =
   , Empty
   ]
 
-extPredDecl :: DBClause -> StructDecl
+extPredDecl :: Expr -> StructDecl
 extPredDecl dbc = struct (SCTemplateDecl Nothing) (nameOutTableStruct p) (y:ys)
   where
-    p  = name dbc
-    xs = vars dbc
+    p  = view predName dbc
+    xs = view predArgs dbc
     y  = variable SCPublic (SCArray 1 SCBool) nameBB
     is = [0..length xs - 1]
     ys = zipWith (\x i -> case x of {(Attribute pptype _) -> variable SCPublic (scColTypeI i pptype) (nameArg i) ; _ -> error $ "Expected an attribute, but got " <> show x}) xs is
 
-extPredGet :: DBClause -> FunctionDecl
+extPredGet :: Expr -> FunctionDecl
 extPredGet dbc = function (SCTemplateDecl Nothing) returnType fname fargs fbody
   where
     result = "result"
@@ -560,8 +559,8 @@ extPredGet dbc = function (SCTemplateDecl Nothing) returnType fname fargs fbody
     m  = "m"
     mi = "mi"
     ni = "ni"
-    p = name dbc
-    n = length $ vars dbc
+    p = view predName dbc
+    n = length $ view predArgs dbc
     is = [0..n-1]
     returnType = Just $ SCStruct (nameOutTableStruct p) (SCTemplateUse Nothing)
     fname = nameGetTableStruct p
@@ -1099,7 +1098,7 @@ csvImportCode :: DP.DatalogProgram -> IO (SCProgram)
 csvImportCode dp = do
   let ds = "ds"
   let extPreds = dp ^.. DP.dpDBClauses
-  tableData <- mapM (getTableData . name) extPreds
+  tableData <- mapM (getTableData . view predName) extPreds
   return $ program $ header
                      <> [Funct $ mainFun $
                                      [ VarInit (variable SCPublic SCText ds) strDataset
@@ -1107,7 +1106,7 @@ csvImportCode dp = do
                                      <> concat (zipWith (tableGenerationCode ds) extPreds tableData) <>
                                      [funTdbCloseConnection [SCVarName ds]]]
 
-tableGenerationCode :: Text -> DBClause -> [[Text]] -> [Statement]
+tableGenerationCode :: Text -> Expr -> [[Text]] -> [Statement]
 tableGenerationCode ds dbc (tableHeader:tableRows) =
 
   [ funCreateTable  [ SCVarName ds, SCConstStr p, SCConstArr (map  SCConstInt types), SCConstArr (map  SCConstInt domains)
@@ -1121,8 +1120,8 @@ tableGenerationCode ds dbc (tableHeader:tableRows) =
   ]
 
   where
-        p  = name dbc
-        xs = vars dbc
+        p  = dbc ^. predName
+        xs = dbc ^. predArgs
         types = map (\x -> let dtype  = x ^. annotation ^. annType in
                         case dtype of
                             PPBool  -> 0

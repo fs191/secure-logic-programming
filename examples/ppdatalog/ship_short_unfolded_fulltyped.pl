@@ -1,14 +1,14 @@
-:-type(ship,[@name : public string,
-             @latitude : private float,
-             @longitude : private float,
-             @speed : public int,
-             @cargotype : private string,
-             @cargoamount : private int]).
+:-type(ship(@name : public string,
+            @latitude : private float,
+            @longitude : private float,
+            @speed : public int,
+            @cargotype : private string,
+            @cargoamount : private int)).
 
-:-type(port,[@name : public string,
-             @latitude : public float,
-             @longitude : public float,
-             @offloadcapacity : public int]).
+:-type(port(@name : public string,
+            @latitude : public float,
+            @longitude : public float,
+            @offloadcapacity : public int)).
 
 :-inputs([@portname : private string, @cargotype : private string]).
 

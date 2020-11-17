@@ -1,15 +1,15 @@
 % TODO this program is not parsed by PrivaLog yet
-:-type(ship, [@shipname:primary public string,
-              @latitude:private float,
-              @longitude:private float,
-              @speed:public int,
-              @cargotype:private string,
-              @cargoamount:private int]).
+:-type(ship(@shipname:primary public string,
+            @latitude:private float,
+            @longitude:private float,
+            @speed:public int,
+            @cargotype:private string,
+            @cargoamount:private int)).
 
-:-type(port, [@portname:primary public string,
-              @port_latitude:public float,
-              @port_longitude:public float,
-              @offloadcapacity:public int]).
+:-type(port(@portname:primary public string,
+            @port_latitude:public float,
+            @port_longitude:public float,
+            @offloadcapacity:public int)).
 
 %how much Time it takes for Ship to reach the Port?
 reachability_time(Ship,Port,Time) :-

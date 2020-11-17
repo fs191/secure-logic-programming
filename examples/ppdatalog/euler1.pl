@@ -3,7 +3,7 @@
 # are multiples of any of the values in the database.
 #
 
-:- type(fac, [@f:private int]).
+:- type(fac(@f:private int)).
 
 sm(X, M, S) :-
   X < 1000,

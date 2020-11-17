@@ -55,6 +55,7 @@ data CompilerException
   | MultipleAttributeDeclarations Expr Expr
   | UndefinedPredicate Expr
   | MultipleBindingPatterns (Text, [Bool], Expr) (Text, [Bool], Expr)
+  | DBNameClash Expr Expr
   deriving (Typeable, Eq, Ord, Exception)
 
 instance Pretty Severity where
@@ -134,6 +135,12 @@ errorMsg' s (MultipleBindingPatterns a b) = vsep
   , prettyAdornment s a
   , "and" <+> prettyAdornment s b
   ]
+errorMsg' s (DBNameClash a b) = vsep
+  [ "Name clash between IDB fact"
+  , prettyPosContext (a ^. annotation . srcPos) s
+  , "and EDB fact"
+  , prettyPosContext (b ^. annotation . srcPos) s
+  ]
 
 -- Utilities
 
@@ -161,15 +168,19 @@ prettyPosContext pos src = srcDoc
         , filler <+> "|" <> pretty errorIndicator
         ]
         where
-          errorLine = fromMaybe err $ lines src !!? ((unPos $ sourceLine p) - 1)
+          errorLine = fromMaybe err $ lines src !!? (unPos (sourceLine p) - 1)
           errorIndicator = replicate (unPos $ sourceColumn p) ' ' <> "^"
           p' = pretty . unPos $ sourceLine p
           filler = stimes (length $ show p') " "
-      Nothing -> emptyDoc
+      Nothing ->  vsep
+        [ ""
+        , "<missing lexeme location information>"
+        , ""
+        ]
 
 prettyAdornment :: Text -> (Text, [Bool], Expr) -> Doc ann
 prettyAdornment src (_, bp, pr) = vsep
-  [ "with binding pattern `" <> (pretty $ showBindings bp) <> "` at"
+  [ "with binding pattern `" <> pretty (showBindings bp) <> "` at"
   , prettyPosContext (pr ^. annotation . srcPos) src
   ]
 

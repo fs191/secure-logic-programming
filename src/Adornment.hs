@@ -18,7 +18,6 @@ import Annotation
 import DatalogProgram
 import Expr
 import Rule
-import DBClause
 
 import Control.Lens
 
@@ -26,7 +25,6 @@ import Data.Generics.Uniplate.Data as U
 import Data.Set as S
 import qualified Data.List as L hiding (nub)
 import qualified Data.Text as T
-import Data.Text.Prettyprint.Doc
 
 data Adornable = Adornable 
   { _aRule   :: Rule 
@@ -40,7 +38,7 @@ data AdornState = AdornState
   , _gsQueue     :: [Adornable]
   , _gsBound     :: Set Text
   , _gsRules     :: [Rule]
-  , _gsDBClauses :: [DBClause]
+  , _gsDBClauses :: [Expr]
   }
 type AdornM = 
   State AdornState 
@@ -78,7 +76,7 @@ adornProgram p = runAdornM $
                     | (Adornable r bp _) <- _adornables]
 
     let isGoal :: Rule -> Bool
-        isGoal x = fromMaybe False $ x ^? ruleHead . _Pred . _2 . to(T.isPrefixOf goalStr)
+        isGoal x = Just True == x ^? ruleHead . _Pred . _2 . to(T.isPrefixOf goalStr)
         _goal = L.head $ L.filter isGoal _rules
     return $ p & dpRules .~ L.filter (not . isGoal) _rules
                & dpGoal  .~ (_goal ^. ruleTail)
@@ -235,7 +233,7 @@ goalToRule = rule goalStr []
 isPredEDB :: Expr -> AdornM Bool
 isPredEDB x = use $ gsDBClauses . to (any f)
   where n = x ^? _Pred . _2
-        f c = maybe False (name c ==) n
+        f c = Just (c ^. predName) == n
 
 -- | Returns true if rule is an extensional database fact
 isEDB :: Rule -> AdornM Bool

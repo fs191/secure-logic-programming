@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4ac9a4c19de93ca663cb1a12de88684ba1f3faca9dc0ce432b06e6a00bb8e5b3
+-- hash: 69f21c1187508518742d179cee8a5e600cd024019d480fcbb09857430f856f63
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -30,7 +30,6 @@ library
       Adornment
       Annotation
       DatalogProgram
-      DBClause
       ErrorMsg
       Expr
       Expr.Classes

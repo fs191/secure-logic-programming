@@ -38,10 +38,7 @@ datalogParser =
     case qs of
       []  -> error $ show NoGoal
       [q] -> return $ DP.ppDatalogProgram rs q dirs
-      _   -> 
-        do
-          pos <- getSourcePos
-          customFailure $ TooManyGoals
+      _   -> customFailure TooManyGoals
 
 clause :: Parser Clause
 clause =  label "clause" $
@@ -59,7 +56,9 @@ ruleP = label "rule" $
     b <- option [] $ impliedBy *> body
     let expr = joinExprs b
         t = a ^. A.typing
-    (return $ R.rule n xs expr & R.ruleHead . annotation . A.typing .~ t) 
+    return $ R.rule n xs expr 
+      & R.ruleHead . annotation . A.typing .~ t
+      & R.ruleHead . annotation . A.srcPos .~ (a ^. srcPos)
 
 funCall :: Parser DP.Directive
 funCall = 
@@ -91,13 +90,9 @@ dbDir :: Parser DP.Directive
 dbDir = 
   do
     try . void $ symbol "type"
-    _dir <- parens $ do
-      _id <- identifier
-      void comma
-      _ins <- brackets $ do
-        sepBy attributeParse comma
-      return $ DP.dbDirective _id _ins
-    return _dir
+    parens $ do
+      pred <- predParse
+      return $ DP.dbDirective pred
 
 body :: Parser [Expr]
 body = sepBy1 aExpr comma
@@ -106,8 +101,7 @@ goal :: Parser Expr
 goal = 
   do
     try . void $ symbol "?-"
-    p <- try aggregation <|> predParse
-    return p
+    try aggregation <|> predParse
 
 -----------------------
 -- Exports

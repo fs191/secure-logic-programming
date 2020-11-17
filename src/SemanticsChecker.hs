@@ -8,9 +8,8 @@ import Control.Lens
 import Control.Monad.Writer
 
 import qualified Data.Generics.Uniplate.Data as U
-import Data.List (findIndex)
+import qualified Data.List as L
 
-import DBClause
 import Annotation
 import Expr
 import DatalogProgram
@@ -27,13 +26,28 @@ checkSemantics dp =
     --let adorned = adornProgram dp
     --let typed = typeInference adorned
     --void . traverse checkTyping $ U.universeBi typed
-    let attrs = dp ^. dpDBClauses . to DBClause.vars
+    let attrs = dp ^. dpDBClauses . predArgs
     -- Ensure that there are no duplicate attributes
     andM
-      [ checkDuplicates attrs
+      [ checkDBDuplicates dp
+      , checkDuplicates attrs
       , checkPredicates dp
       , checkSinglePattern dp
       ]
+
+checkDBDuplicates 
+  :: (MonadWriter [CompilerException] m) 
+  => DatalogProgram 
+  -> m Bool
+checkDBDuplicates dp = andM $
+  do
+    idb <- dp ^.. dpRules . folded
+    edb <- dp ^.. dpDBClauses
+    return $ if ruleName idb == view predName edb
+      then do
+        tell [DBNameClash (idb ^. ruleHead) edb]
+        return False
+      else return True
 
 checkDuplicates 
   :: (MonadWriter [CompilerException] m) 
@@ -64,8 +78,6 @@ checkTyping e =
     else do
       tell [TypeInferenceFailed e]
       return False
-  where
-    pos = e ^? annotation . srcPos . _Just
 
 -- | Check whether each predicate can be found in either EDB or IDB.
 -- Only the name and number of arguments are considered.
@@ -84,9 +96,9 @@ checkPredicates dp =
         goalPreds = [dp ^. dpGoal]
         preds  = toNameArgNum <$> (preds' <> goalPreds)
     let idbRules = toNameArgNum <$> dp ^.. dpRules . folded . ruleHead
-    let edbRules = zip (dp ^.. dpDBClauses . to name) (dp ^.. dpDBClauses . to (length . vars))
+    let edbRules = zip (dp ^.. dpDBClauses . predName) (dp ^.. dpDBClauses . predArgs . to length)
     let rules = idbRules <> edbRules
-    case findIndex (flip notElem rules) preds of
+    case L.findIndex (`notElem` rules) preds of
       Just i  ->
         do
           let culprit = fromMaybe (dp ^. dpGoal) $ preds' !!? i
@@ -100,7 +112,7 @@ checkSinglePattern
   -> m Bool
 checkSinglePattern p =
   do
-    let as = ordNub $ ((\(Adornable r bp e) -> (ruleName r, bp, e)) <$> allAdornables p)
+    let as = ordNub ((\(Adornable r bp e) -> (ruleName r, bp, e)) <$> allAdornables p)
     let f a@(n1, bp1, _) b@(n2, bp2, _)
           | n1 == n2 && 
             bp1 /= bp2 = tell [MultipleBindingPatterns a b]
