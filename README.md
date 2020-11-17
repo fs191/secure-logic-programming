@@ -1,16 +1,18 @@
 # Transforming Datalog program to a privacy-preserving application based on Sharemind
 
-## Dependencies
 
-### Debian
+
+## Building
+
+### Dependencies
+
+#### Debian
 
     apt install z3
 
-### Arch Linux
+#### Arch Linux
 
     pacman -Sy z3
-
-## Building
 
 ### Stack (recommended)
 
