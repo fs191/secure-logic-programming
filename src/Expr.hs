@@ -11,7 +11,7 @@ module Expr
   , Ann
   , isLeaf
   , isVar
-  , _Pred
+  , _Pred, _Is
   , varName
   , predName
   , predArgs
@@ -26,6 +26,7 @@ module Expr
   , less, lessEqual
   , greater, greaterEqual
   , equal
+  , eChoose
   , eIs, eUn
   , eNeg
   , eNot
@@ -44,6 +45,7 @@ module Expr
   , varNames
   , annotation
   , leftHand, rightHand
+  , vals
   , aggr, aggrPred, sourceExpr, targetExpr
   , arg
   , annType, domain
@@ -144,6 +146,7 @@ data Expr
   | List {_annotation :: !Ann, _vals :: ![Expr]}
   | Hole {_annotation :: !Ann}
   | Aggr {_annotation :: !Ann, _aggr :: !Aggregation, _aggrPred :: !Expr, _sourceExpr :: !Expr, _targetExpr :: !Expr}
+  | Choose {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   deriving (Show, Eq, Ord, Data, Typeable)
 makeLenses ''Expr
 makePrisms ''Expr
@@ -168,9 +171,23 @@ instance PrologSource Expr where
   prolog (Sub _ x y)         = "(" <> prolog x <+> "-"    <+> prolog y <> ")"
   prolog (Lt _ x y)          = "(" <> prolog x <+> "<"    <+> prolog y <> ")"
   prolog (Le _ x y)          = "(" <> prolog x <+> "=<"   <+> prolog y <> ")"
-  prolog (Eq _ x y)          = "(" <> prolog x <+> "=:="  <+> prolog y <> ")"
+  prolog (Eq _ x y)          = let op = case y ^.annotation ^. annType of
+                                            PPStr   -> "="
+                                            _       -> "=:="
+                               in
+                               "(" <> prolog x <+> op     <+> prolog y <> ")"
+  prolog (Is _ x (Choose _ (List _ xs) (List _ bs))) =
+                               let op = case x ^.annotation ^. annType of
+                                            PPStr   -> "="
+                                            _       -> "is"
+                               in
+                               encloseSep "(" ")" ";" $ zipWith (\b x' -> "(" <> prolog b <> "," <> prolog x <+> op <+> prolog x' <> ")") bs xs
+  prolog (Is _ x y)          = let op = case y ^.annotation ^. annType of
+                                            PPStr   -> "="
+                                            _       -> "is"
+                               in
+                               "(" <> prolog x <+> op     <+> prolog y <> ")"
   prolog (Un _ x y)          = "(" <> prolog x <+> "="    <+> prolog y <> ")"
-  prolog (Is _ x y)          = "(" <> prolog x <+> "is"   <+> prolog y <> ")"
   prolog (Neq _ x y)         = "(" <> prolog x <+> "=\\=" <+> prolog y <> ")"
   prolog (Gt _ x y)          = "(" <> prolog x <+> ">"    <+> prolog y <> ")"
   prolog (Ge _ x y)          = "(" <> prolog x <+> ">="   <+> prolog y <> ")"
@@ -180,6 +197,7 @@ instance PrologSource Expr where
   prolog (Or _ x y)          = prolog x <> ";\n" <> prolog y
   prolog (And _ x y)         = prolog x <> ",\n" <> prolog y
   prolog (List _ x)          = list $ prolog <$> x
+
   -- TODO there may be more compact/better ways for aggregations
   prolog (Aggr _ Prod p x y) = "findall(" <> "X0" <> "," <> "(" <> prolog p <> "," <> "X0 is log(" <> prolog x <> ")), Xs)" <> "," <+>
                                   "sum_list(Xs,Y0)" <> "," <+>
@@ -367,9 +385,14 @@ eAggr = Aggr empty
 eIs :: Expr -> Expr -> Expr
 eIs = Is empty
 
+-- | Creates a new neq expression
 eNeq :: Expr -> Expr -> Expr
 eNeq = Neq e
   where e = empty & annType .~ PPBool
+
+-- | Creates a new choice expression
+eChoose :: Expr -> Expr -> Expr
+eChoose = Choose empty
 
 eTrue :: Expr
 eTrue = constBool True

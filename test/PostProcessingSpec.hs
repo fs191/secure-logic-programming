@@ -8,6 +8,8 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.Except
 
+import Adornment
+import TypeInference
 import Swipl
 import PostProcessing
 import Transform

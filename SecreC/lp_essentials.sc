@@ -1533,11 +1533,13 @@ relColumn<D, T, S> freeVarColumn(){
 
 //a column of booleans
 //used for non-prolog internal SecreC booleans only
-bool [[1]] trueColumn(uint m){
+template<domain D>
+D bool [[1]] trueColumn(uint m){
     return reshape(true,m);
 }
 
-bool [[1]] trueColumn(){
+template<domain D>
+D bool [[1]] trueColumn(){
     return trueColumn(1 :: uint);
 }
 
@@ -1892,13 +1894,48 @@ D bool [[1]] apply_bop(string s, D0 T [[1]] x, D1 T [[1]] y){
     return b;
 }
 
-template<domain D, domain D0, type T0, type S0, domain D1, type T1, type S1>
+template<type T0, type S0, type T1, type S1>
+pd_shared3p bool [[1]] bop(string s, relColumn<pd_shared3p, T0, S0> x, relColumn<public, T1, S1> y){
+    assert(sum((uint)x.fv) == 0);
+    assert(sum((uint)y.fv) == 0);
+    pd_shared3p bool [[1]] b = apply_bop(s, x.val, y.val);
+    return b;
+}
+
+template<type T0, type S0, type T1, type S1>
+pd_shared3p bool [[1]] bop(string s, relColumn<public, T0, S0> x, relColumn<pd_shared3p, T1, S1> y){
+    assert(sum((uint)x.fv) == 0);
+    assert(sum((uint)y.fv) == 0);
+    pd_shared3p bool [[1]] b = apply_bop(s, x.val, y.val);
+    return b;
+}
+
+template<type T0, type S0, type T1, type S1>
+pd_shared3p bool [[1]] bop(string s, relColumn<public, T0, S0> x, relColumn<public, T1, S1> y){
+    assert(sum((uint)x.fv) == 0);
+    assert(sum((uint)y.fv) == 0);
+    pd_shared3p bool [[1]] b = apply_bop(s, x.val, y.val);
+    return b;
+}
+
+template<domain D, type T0, type S0, type T1, type S1>
+D bool [[1]] bop(string s, relColumn<D, T0, S0> x, relColumn<D, T1, S1> y){
+    assert(sum((uint)x.fv) == 0);
+    assert(sum((uint)y.fv) == 0);
+    D bool [[1]] b = apply_bop(s, x.val, y.val);
+    return b;
+}
+
+
+/*
+template<domain D, domain D0, domain D1, type T0, type S0, type T1, type S1>
 D bool [[1]] bop(string s, relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y){
     assert(sum((uint)x.fv) == 0);
     assert(sum((uint)y.fv) == 0);
     D bool [[1]] b = apply_bop(s, x.val, y.val);
     return b;
 }
+*/
 
 template<domain D, type T1, type S1>
 D bool [[1]] bop(string s, T1 x, relColumn<D, T1, S1> y){

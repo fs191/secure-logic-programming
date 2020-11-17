@@ -1,7 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Substitution
-  ( Subst
+  ( Subst(..)
+  , substFromMap
   , refreshExpr
   , applyToExpr
   , refreshAndApply
@@ -10,6 +11,7 @@ module Substitution
   , compress
   , (|->)
   , keys, elems
+  , getValue
   ) where
 
 ---------------------------------------------------------
@@ -51,6 +53,9 @@ instance Pretty Subst where
 -- of which variables have already been substituted. Only used internally.
 safeStr :: Text
 safeStr = "$!!?"
+
+substFromMap :: M.Map Text Expr -> Subst
+substFromMap = Th
 
 -- | Compresses the substitution using union-find. 
 --
@@ -211,3 +216,4 @@ keys (Th theta) = map var (M.keys theta)
 
 elems :: Subst -> [Expr]
 elems (Th theta) = M.elems theta
+getValue (Th theta) = (theta M.!)
