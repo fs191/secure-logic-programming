@@ -56,6 +56,6 @@ transPreserveSem f n =
   preservesSemantics (deriveAllGroundRules n) f
 
 transPreserveSemDB :: Text -> Int -> [Expr] -> Spec
-transPreserveSemDB f n db = 
-  preservesSemanticsDB (deriveAllGroundRules n) f db
+transPreserveSemDB f n = 
+  preservesSemanticsDB (deriveAllGroundRules n) f
 

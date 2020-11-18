@@ -9,9 +9,10 @@ import Control.Monad
 import Control.Monad.Except
 
 import Adornment
-import TypeInference
+import PreProcessing
 import Swipl
 import PostProcessing
+import PKTransform
 import Transform
 import Expr
 import TestResults
@@ -31,5 +32,6 @@ postProcPreserveSem f db =
     _fun x = either throw id <$> act x
     act x = runExceptT $
       do
-        tr <- liftIO $ deriveAllGroundRules 3 x
-        postProcess tr
+        pp <- preProcess $ adornProgram x
+        tr <- liftIO $ deriveAllGroundRules 10 pp
+        postProcess $ pkTransform tr

@@ -10,7 +10,6 @@ import Data.Generics.Uniplate.Data
 import Data.Generics.Uniplate.Operations as U
 import qualified Data.Map as M
 import qualified Data.List as L
-import Data.Hashable
 import Data.Text.Prettyprint.Doc
 
 import Debug.Trace
