@@ -15,6 +15,7 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
 
+import Adornment
 import DatalogProgram
 import Expr
 import ErrorMsg
@@ -23,6 +24,7 @@ import Annotation
 import Simplify
 import Substitution
 
+import Data.Text.Prettyprint.Doc
 -- | Removes all rules that are not called by the goal clause and also removes
 -- rules that contain calls to other rules that are not facts.
 postProcess 
@@ -45,6 +47,7 @@ mergeRulesDP :: DatalogProgram -> DatalogProgram
 mergeRulesDP dp = dp & dpRules %~ map prepareRule
                      & dpRules %~ map (refreshRule "X_")
                      & dpRules %~ simplifyRules
+                     & dpRules %~ map adornRule
                      & dpRules %~ mergeMatchingRules
 
 -- | Filters out rules that contain predicates that are not facts
@@ -110,12 +113,10 @@ prepareRule r = r & ruleTail %~ extendDP
 -- order the tail expressions as Predicates - Assignments - Comparisons
 reorderTail :: Expr -> Expr
 reorderTail ttl = assert (null $ exprs L.\\ (ps <> cs <> as)) $ 
-  L.foldr1 eAnd $ ps <> as <> cs
+  L.foldr1 eAnd $ ps <> cs <> as
   where
     exprs = andsToList ttl
-    ps = exprs ^.. folded . filtered (has _Pred)
-    cs = exprs ^.. folded . filtered isGroundPredicate
-    as = exprs ^.. folded . filtered (has _Is)
+    (ps,cs,as) = splitTail ttl
 
 isGroundPredicate :: Expr -> Bool
 isGroundPredicate Eq{}  = True
@@ -124,18 +125,18 @@ isGroundPredicate Le{} = True
 isGroundPredicate Lt{} = True
 isGroundPredicate Ge{} = True
 isGroundPredicate Gt{} = True
--- by assumption, OR is applied only to ground predicates
 isGroundPredicate Or{} = True
 isGroundPredicate ConstBool{} = True
 isGroundPredicate _    = False
 
--- split the tail expressions to Predicates - Assignments - Comparisons
+-- split the tail expressions to Predicates - Comparisons - Assignments
 splitTail :: Expr -> ([Expr], [Expr], [Expr])
-splitTail ttl =
-       let es      = simplifyAnds' ttl in
-       let (ps,rs) = L.partition (has _Pred) es in
-       let (cs,as) = L.partition isGroundPredicate rs in
-       (ps,as,cs)
+splitTail ttl = (ps,cs,as)
+  where
+    exprs = andsToList ttl
+    ps = exprs ^.. folded . filtered (has _Pred)
+    cs = exprs ^.. folded . filtered groundTerm
+    as = exprs ^.. folded . filtered (\x -> not ((has _Pred) x) && not (groundTerm x))
 
 -- fills all EDB predicates with fresh variables
 -- while it makes rules longer, it is easier to optimize them in this form
@@ -172,12 +173,12 @@ mergeTwoMatchingRules r1 r2 =
    if show (r1 ^. ruleHead) /= show (r2 ^. ruleHead) then
        [r1,r2]
    else
-       let (ps1,as1,cs1) = splitTail (r1 ^. ruleTail) in
+       let (ps1,cs1,as1) = splitTail (r1 ^. ruleTail) in
        let hps1 = map show ps1 in
        let has1 = map show as1 in
        let hcs1 = map show cs1 in
 
-       let (ps2,as2,cs2) = splitTail (r2 ^. ruleTail) in
+       let (ps2,cs2,as2) = splitTail (r2 ^. ruleTail) in
        let hps2 = map show ps2 in
        let has2 = map show as2 in
        let hcs2 = map show cs2 in
@@ -201,8 +202,10 @@ mergeTwoMatchingRules r1 r2 =
            let as_from1  = map fst . filter (\(_,hx) -> not (S.member hx has)) $ zip as1 has1 in
            let as_from2  = map fst . filter (\(_,hx) -> not (S.member hx has)) $ zip as2 has2 in
 
-           let asgnVars1 = (ordNub . map (\(Is _ (Var _ x) _) -> x)) as1 in
-           let asgnVars2 = (ordNub . map (\(Is _ (Var _ x) _) -> x)) as2 in
+           -- assumption: in all Un and Is expressions, LHS is a free variable
+           -- this is achieved by application of simplifyRules
+           let asgnVars1 = (ordNub . map (\a -> case a of {Is _ (Var _ x) _ -> x; Un _ (Var _ x) _ -> x; _ -> error $ show a})) as1 in
+           let asgnVars2 = (ordNub . map (\a -> case a of {Is _ (Var _ x) _ -> x; Un _ (Var _ x) _ -> x; _ -> error $ show a})) as2 in
            let asgnVars  = ordNub (asgnVars1 <> asgnVars2) in
 
            -- if the set of assigned variables is different in the rules, do not merge them

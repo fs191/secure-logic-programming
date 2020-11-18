@@ -11,15 +11,23 @@ import table_database;
 domain pd_shared3p shared3p;
 
 //the core rearrangement function
-template <domain D, type T, type S, dim M, dim N>
-D T [[N]] partialRearrange(D T [[M]] a, D T [[N]] b, S [[1]] source, S [[1]] target){
+template <type T, type S, dim M, dim N>
+pd_shared3p T [[N]] partialRearrange(pd_shared3p T [[M]] a, pd_shared3p T [[N]] b, S [[1]] source, S [[1]] target){
     assert(size(source) == size(target));
-    D T [[1]] temp (size(source));
-    __syscall("shared3p::gather_$T\_vec",  __domainid(D), a, temp, __cref (uint)source);
-    __syscall("shared3p::scatter_$T\_vec", __domainid(D), temp, b, __cref (uint)target);
+    pd_shared3p T [[1]] temp (size(source));
+    __syscall("shared3p::gather_$T\_vec",  __domainid(pd_shared3p), a, temp, __cref (uint)source);
+    __syscall("shared3p::scatter_$T\_vec", __domainid(pd_shared3p), temp, b, __cref (uint)target);
     return b;
 }
 
+template <type T, type S, dim M, dim N>
+public T [[N]] partialRearrange(public T [[M]] a, public T [[N]] b, S [[1]] source, S [[1]] target){
+    assert(size(source) == size(target));
+    for (uint i = 0; i < size(source); i++){
+        b[target[i]] = a[source[i]];
+    }
+    return b;
+}
 
 //generalize indices to a second dimension
 uint [[1]] widen_indices (uint [[1]] indices, uint m){
@@ -33,6 +41,23 @@ uint [[1]] widen_indices (uint [[1]] indices, uint m){
         }
     }
     return result;
+}
+
+//sublist (of a list) by a bitmask
+template <domain D, type T>
+D T [[1]] filter(D T [[1]] a, bool [[1]] bitmask){
+    uint32 n = sum(bitmask);
+    uint32 [[1]] src (n);
+    uint j = 0;
+    for (uint i = 0; i < size(bitmask); i++){
+        if (bitmask[i]){
+            src[j] = (uint32)i;
+            j = j + 1;
+        }
+    }
+    D T [[1]] b (n);
+    uint32 [[1]] tgt = iota(n);
+    return partialRearrange(a, b, src, tgt);
 }
 
 //replicates each variable in a block n times
@@ -1842,18 +1867,12 @@ D bool [[1]] apply_bop(string s, D xor_uint32 [[1]] x, uint32 [[1]] y){
     return b;
 }
 
-template<domain D>
-D bool [[1]] apply_bop(string s, bool [[1]] x, D bool [[1]] y){
+template<domain D, domain D0, domain D1>
+D bool [[1]] apply_bop(string s, D0 bool [[1]] x, D1 bool [[1]] y){
     D bool [[1]] b;
     if (s == "==") b = (y == x);
-    else assert(false);
-    return b;
-}
-
-template<domain D>
-D bool [[1]] apply_bop(string s, D bool [[1]] x, bool [[1]] y){
-    D bool [[1]] b;
-    if (s == "==") b = (x == y);
+    if (s == "&")  b = (y & x);
+    if (s == "|")  b = (y | x);
     else assert(false);
     return b;
 }
@@ -1894,77 +1913,65 @@ D bool [[1]] apply_bop(string s, D0 T [[1]] x, D1 T [[1]] y){
     return b;
 }
 
-template<type T0, type S0, type T1, type S1>
-pd_shared3p bool [[1]] bop(string s, relColumn<pd_shared3p, T0, S0> x, relColumn<public, T1, S1> y){
-    assert(sum((uint)x.fv) == 0);
-    assert(sum((uint)y.fv) == 0);
-    pd_shared3p bool [[1]] b = apply_bop(s, x.val, y.val);
-    return b;
+//TODO the following block is going to be deprecated
+template<type T1, type T2, type S1, type S2>
+pd_shared3p bool [[1]] bop(string s, relColumn<pd_shared3p, T1, S1> x, relColumn<public, T2, S2> y){
+    return apply_bop(s, x.val, y.val);
 }
 
-template<type T0, type S0, type T1, type S1>
-pd_shared3p bool [[1]] bop(string s, relColumn<public, T0, S0> x, relColumn<pd_shared3p, T1, S1> y){
-    assert(sum((uint)x.fv) == 0);
-    assert(sum((uint)y.fv) == 0);
-    pd_shared3p bool [[1]] b = apply_bop(s, x.val, y.val);
-    return b;
+template<type T1, type T2, type S1, type S2>
+pd_shared3p bool [[1]] bop(string s, relColumn<public, T1, S1> x, relColumn<pd_shared3p, T2, S2> y){
+    return apply_bop(s, x.val, y.val);
 }
 
-template<type T0, type S0, type T1, type S1>
-pd_shared3p bool [[1]] bop(string s, relColumn<public, T0, S0> x, relColumn<public, T1, S1> y){
-    assert(sum((uint)x.fv) == 0);
-    assert(sum((uint)y.fv) == 0);
-    pd_shared3p bool [[1]] b = apply_bop(s, x.val, y.val);
-    return b;
+template<domain D, type T1, type T2, type S1, type S2>
+D bool [[1]] bop(string s, relColumn<D, T1, S1> x, relColumn<D, T2, S2> y){
+    return apply_bop(s, x.val, y.val);
 }
 
-template<domain D, type T0, type S0, type T1, type S1>
-D bool [[1]] bop(string s, relColumn<D, T0, S0> x, relColumn<D, T1, S1> y){
-    assert(sum((uint)x.fv) == 0);
-    assert(sum((uint)y.fv) == 0);
-    D bool [[1]] b = apply_bop(s, x.val, y.val);
-    return b;
+//boolean operation on data
+template<type T1, type T2, type S1, type S2>
+pd_shared3p bool [[1]] bop(string s, relColumn<pd_shared3p, T1, S1> x, relColumn<public, T2, S2> y, bool [[1]] b){
+    return _bop(s, x, y, b);
 }
 
-
-/*
-template<domain D, domain D0, domain D1, type T0, type S0, type T1, type S1>
-D bool [[1]] bop(string s, relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y){
-    assert(sum((uint)x.fv) == 0);
-    assert(sum((uint)y.fv) == 0);
-    D bool [[1]] b = apply_bop(s, x.val, y.val);
-    return b;
-}
-*/
-
-template<domain D, type T1, type S1>
-D bool [[1]] bop(string s, T1 x, relColumn<D, T1, S1> y){
-    assert(sum((uint)y.fv) == 0);
-    D T1 [[1]] xval = reshape(x, size(y.val));
-    D bool [[1]] b = apply_bop(s, xval, y.val);
-    return b;
+template<type T1, type T2, type S1, type S2>
+pd_shared3p bool [[1]] bop(string s, relColumn<public, T1, S1> x, relColumn<pd_shared3p, T2, S2> y, bool [[1]] b){
+    return _bop(s, x, y, b);
 }
 
-template<domain D, domain D0, type T0, domain D1, type T1, type S1>
-D bool [[1]] bop(string s, D0 T0 [[1]] x, relColumn<D1, T1, S1> y){
-    assert(sum((uint)y.fv) == 0);
-    D bool [[1]] b = apply_bop(s, x, y.val);
-    return b;
+template<domain D, type T1, type T2, type S1, type S2>
+D bool [[1]] bop(string s, relColumn<D, T1, S1> x, relColumn<D, T2, S2> y, bool [[1]] b){
+    return _bop(s, x, y, b);
 }
 
-template<domain D, type T1, type S1>
-D bool [[1]] bop(string s, relColumn<D, T1, S1> x, T1 y){
-    assert(sum((uint)x.fv) == 0);
-    D T1 [[1]] yval = reshape(y, size(x.val));
-    D bool [[1]] b = apply_bop(s, x.val, yval);
-    return b;
+template<domain D, domain D1, domain D2, type T1, type T2, type S1, type S2>
+D bool [[1]] _bop(string s, relColumn<D1, T1, S1> x, relColumn<D2, T2, S2> y, bool [[1]] b){
+    uint [[1]] src = filterToIndices(b);
+    uint n = size(src);
+    uint m = size(b);
+    uint [[1]] tgt = iota(n);
+
+    D1 T1 [[1]] x0 (n); x0 = partialRearrange(x.val, x0, src, tgt);
+    D2 T2 [[1]] y0 (n); y0 = partialRearrange(y.val, y0, src, tgt);
+    D bool [[1]] z0 = apply_bop(s, x0, y0);
+    D bool [[1]] z (m);
+
+    return partialRearrange(z0, z, tgt, src);
+
 }
 
-template<domain D, domain D0, type T0, domain D1, type T1, type S1>
-D bool [[1]] bop(string s, relColumn<D1, T1, S1> x, D0 T0 [[1]] y){
-    assert(sum((uint)x.fv) == 0);
-    D bool [[1]] b = apply_bop(s, x.val, y);
-    return b;
+uint [[1]] filterToIndices(bool [[1]] bitmask){
+    uint n = sum((uint)bitmask);
+    uint [[1]] indices (n);
+    uint j = 0;
+    for (uint i = 0; i < size(bitmask); i++){
+        if (bitmask[i]){
+            indices[j] = (uint)i;
+            j = j + 1;
+        }
+    }
+    return indices;
 }
 
 //integer division that rounds the result down to the nearest integer
@@ -2060,7 +2067,7 @@ relColumn<D, float32, float32> apply_sqrt(relColumn<D, T, T> x){
     return z;
 }
 
-//---
+//join of aop domains
 template<type T, type S>
 relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, relColumn<public, T, S> y){
     assert(sum((uint)x.fv) == 0);
@@ -2097,146 +2104,6 @@ relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, relColumn<D, T, S> y){
     return z;
 }
 
-//---
-template<type T, type S>
-relColumn<pd_shared3p, T, S> aop(string s, public T x, relColumn<pd_shared3p, T, S> y){
-    assert(sum((uint)y.fv) == 0);
-    public T [[1]] xval = reshape(x, size(y.val));
-
-    relColumn<pd_shared3p, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, xval, y.val);
-    z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
-    return z;
-}
-
-template<type T, type S>
-relColumn<pd_shared3p, T, S> aop(string s, pd_shared3p T x, relColumn<public, T, S> y){
-    assert(sum((uint)y.fv) == 0);
-    pd_shared3p T [[1]] xval = reshape(x, size(y.val));
-
-    relColumn<pd_shared3p, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, xval, y.val);
-    z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
-    return z;
-}
-
-template<domain D, type T, type S>
-relColumn<D, T, S> aop(string s, D T x, relColumn<D, T, S> y){
-    assert(sum((uint)y.fv) == 0);
-    D T [[1]] xval = reshape(x, size(y.val));
-
-    relColumn<D, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, xval, y.val);
-    z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
-    return z;
-}
-
-//---
-template<type T, type S>
-relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, pd_shared3p T y){
-    assert(sum((uint)x.fv) == 0);
-    pd_shared3p T [[1]] yval = reshape(y, size(x.val));
-
-    relColumn<pd_shared3p, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, x.val, yval);
-    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
-    return z;
-}
-
-template<type T, type S>
-relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, public T y){
-    assert(sum((uint)x.fv) == 0);
-    public T [[1]] yval = reshape(y, size(x.val));
-
-    relColumn<pd_shared3p, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, x.val, yval);
-    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
-    return z;
-}
-
-template<domain D, type T, type S>
-relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, D T y){
-    assert(sum((uint)x.fv) == 0);
-    D T [[1]] yval = reshape(y, size(x.val));
-
-    relColumn<D, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, x.val, yval);
-    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
-    return z;
-}
-//---
-template<type T, type S>
-relColumn<pd_shared3p, T, S> aop(string s, pd_shared3p T [[1]] x, relColumn<public, T, S> y){
-    assert(sum((uint)y.fv) == 0);
-
-    relColumn<pd_shared3p, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, x, y.val);
-    z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
-    return z;
-}
-
-template<type T, type S>
-relColumn<pd_shared3p, T, S> aop(string s, public T [[1]] x, relColumn<pd_shared3p, T, S> y){
-    assert(sum((uint)y.fv) == 0);
-
-    relColumn<pd_shared3p, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, x, y.val);
-    z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
-    return z;
-}
-
-template<domain D, type T, type S>
-relColumn<D, T, S> aop(string s, D T [[1]] x, relColumn<D, T, S> y){
-    assert(sum((uint)y.fv) == 0);
-
-    relColumn<D, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, x, y.val);
-    z.str = reshape((S)0,shape(y.str)[0], shape(y.str)[1]);
-    return z;
-}
-
-//---
-template<type T, type S>
-relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, pd_shared3p T [[1]] y){
-    assert(sum((uint)x.fv) == 0);
-
-    relColumn<pd_shared3p, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, x.val, y);
-    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
-    return z;
-}
-
-template<type T, type S>
-relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, public T [[1]] y){
-    assert(sum((uint)x.fv) == 0);
-
-    relColumn<pd_shared3p, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, x.val, y);
-    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
-    return z;
-}
-
-template<domain D, type T, type S>
-relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, D T [[1]] y){
-    assert(sum((uint)x.fv) == 0);
-
-    relColumn<D, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, x.val, y);
-    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
-    return z;
-}
 
 //aggregations
 template<domain D0, domain D, type T, type S>

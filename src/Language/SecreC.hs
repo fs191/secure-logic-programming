@@ -1091,6 +1091,7 @@ bexprToSC e =
     Le   _ e1 e2 -> funBoolOp [SCConstStr "<=", exprToSC e1, exprToSC e2, SCVarName nameBP]
     Eq   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameBP]
     Un   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Is   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameBP]
     Gt   _ e1 e2 -> funBoolOp [SCConstStr ">", exprToSC e1, exprToSC e2, SCVarName nameBP]
     Ge   _ e1 e2 -> funBoolOp [SCConstStr ">=", exprToSC e1, exprToSC e2, SCVarName nameBP]
 

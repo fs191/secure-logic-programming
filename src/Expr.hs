@@ -70,6 +70,7 @@ module Expr
   , applyAnnotation
   , toDNF
   , toCNF
+  , groundTerm
   ) where
 
 ---------------------------------------------------------
@@ -171,22 +172,11 @@ instance PrologSource Expr where
   prolog (Sub _ x y)         = "(" <> prolog x <+> "-"    <+> prolog y <> ")"
   prolog (Lt _ x y)          = "(" <> prolog x <+> "<"    <+> prolog y <> ")"
   prolog (Le _ x y)          = "(" <> prolog x <+> "=<"   <+> prolog y <> ")"
-  prolog (Eq _ x y)          = let op = case y ^.annotation ^. annType of
-                                            PPStr   -> "="
-                                            _       -> "=:="
-                               in
-                               "(" <> prolog x <+> op     <+> prolog y <> ")"
+  prolog (Eq _ x y)          = "(" <> prolog x <+> "=:=" <+> prolog y <> ")"
   prolog (Is _ x (Choose _ (List _ xs) (List _ bs))) =
-                               let op = case x ^.annotation ^. annType of
-                                            PPStr   -> "="
-                                            _       -> "is"
-                               in
-                               encloseSep "(" ")" ";" $ zipWith (\b x' -> "(" <> prolog b <> "," <> prolog x <+> op <+> prolog x' <> ")") bs xs
-  prolog (Is _ x y)          = let op = case y ^.annotation ^. annType of
-                                            PPStr   -> "="
-                                            _       -> "is"
-                               in
-                               "(" <> prolog x <+> op     <+> prolog y <> ")"
+                               -- we assume that the argumens xs are already evaluated for integers, so "=" is fine for both Int and Str types
+                               encloseSep "(" ")" ";" $ zipWith (\b x' -> "(" <> prolog b <> "," <> prolog x <+> "=" <+> prolog x' <> ")") bs xs
+  prolog (Is _ x y)          = "(" <> prolog x <+> "is"   <+> prolog y <> ")"
   prolog (Un _ x y)          = "(" <> prolog x <+> "="    <+> prolog y <> ")"
   prolog (Neq _ x y)         = "(" <> prolog x <+> "=\\=" <+> prolog y <> ")"
   prolog (Gt _ x y)          = "(" <> prolog x <+> ">"    <+> prolog y <> ")"
