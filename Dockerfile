@@ -41,10 +41,16 @@ RUN sudo apt-get install swi-prolog -y
 
 # Build lpsec
 FROM environment AS build
-WORKDIR /opt/build
-COPY stack.yaml package.yaml stack.yaml.lock /opt/build/
-RUN stack build --system-ghc --dependencies-only
 WORKDIR /root/lpsec
-ADD . .
+ADD stack.yaml .
+ADD package.yaml .
+ADD stack.yaml.lock .
+RUN stack install --only-dependencies
+ADD src src
+ADD app app
+ADD test test
+ADD README.md .
 RUN stack install
 CMD stack test
+ADD examples examples
+ADD SecreC SecreC

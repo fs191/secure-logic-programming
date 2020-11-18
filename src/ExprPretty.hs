@@ -117,6 +117,12 @@ prettyEx (Mod e x y) =
     e' <- prettyExAnn e
     return $ "mod(" <> x' <> ", " <> y' <> ")" <+> e'
 
+prettyEx (Choose e x y) =   do
+    x' <- prettyEx x
+    y' <- prettyEx y
+    e' <- prettyExAnn e
+    return $ "choose(" <> x' <> "," <> y' <> ")" <+> e'
+
 prettyExBin :: Ann -> Expr -> Expr -> Doc ann -> Reader PrettyConfig (Doc ann)
 prettyExBin e x y op = 
   do

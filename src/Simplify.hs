@@ -9,7 +9,10 @@ import Relude
 import Data.Generics.Uniplate.Data
 import Data.Generics.Uniplate.Operations as U
 import qualified Data.Map as M
-import Data.List (union, intersect, (\\))
+import qualified Data.List as L
+import Data.Text.Prettyprint.Doc
+
+import Debug.Trace
 
 import Expr
 import Substitution
@@ -61,7 +64,7 @@ m_lookup expr m =
 -- | Note that bounded vars are united with free vars (and the other way around) on purpose
 simplify :: [Expr] -> Head -> [Expr]
 simplify es (b, o) =
-     let res = simplify' es (b `union` predFreeVars es, o `union` predBoundedVars es) in
+     let res = simplify' es (b `L.union` predFreeVars es, o `L.union` predBoundedVars es) in
      case res of
        Just x  -> x
        Nothing -> [eFalse]
@@ -88,9 +91,9 @@ transformExprs ((Un _ l r):es) h =
   case unify l r of
     Nothing -> Nothing
     Just th ->
-      if t /= Nothing
+      if isJust t
         then t <> transformExprs es h
-      else Nothing
+        else Nothing
       where
         t = uns (zipWith eUn (keys th) (elems th)) h
 transformExprs (e@(Is a l r):es) h@(b, o)
@@ -99,17 +102,22 @@ transformExprs (e@(Is a l r):es) h@(b, o)
     if simplifyConst e == eTrue
       then transformExprs es h
       else Nothing
-  | isConstExpr r = Just [Un a l (simplifyConst r)] <> transformExprs es h
-  | unknowns r b == 0 = Just [e] <> transformExprs es h'
-  | otherwise = Just [e] <> transformExprs es h
-    where h' = if isConstExpr l then h else (_varName l : b, o)
-transformExprs (e:es) h 
-  | isComparison e = comparison (e:|es) h
-  | otherwise      = Just [e] <> transformExprs es h
+  | isConstExpr r = (Un a l (simplifyConst r):) <$> transformExprs es h
+  | unknowns r b == 0 = (e:) <$> transformExprs es head'
+  | otherwise = (e:) <$> transformExprs es h
+    where head' = if isConstExpr l then h else (_varName l : b, o)
+transformExprs e@(Lt {}:es) h = comparison e h
+transformExprs e@(Le {}:es) h = comparison e h
+transformExprs e@(Eq {}:es) h = comparison e h
+transformExprs e@(Neq {}:es) h = comparison e h
+transformExprs e@(Or {}:es) h = comparison e h
+transformExprs e@(Gt {}:es) h = comparison e h
+transformExprs e@(Ge {}:es) h = comparison e h
+transformExprs (e:es) h = (e:) <$> transformExprs es h
 transformExprs [] _ = Just []
 
-comparison :: NonEmpty Expr -> Head -> Maybe [Expr]
-comparison (e:|es) h
+comparison :: [Expr] -> Head -> Maybe [Expr]
+comparison (e:es) h
   | isConstExpr e =
     if simplifyConst e == eTrue
       then transformExprs es h
@@ -135,14 +143,14 @@ substitute' :: Int -> [Expr] -> Head -> [Expr]
 substitute' i es h =
   if substituted == es && i /= 8
     then substitute' (i + 1) es h
-  else substituted
+    else substituted
   where
     (s, es') = getSubst' i es h
     substituted = substitute'' es' s h
 
 substitute'' :: [Expr] -> Subst' -> Head -> [Expr]
 substitute'' (e@(Un a l r):es) subst@(_, m) (b, o) =
-  (case intersect (varNames l) (b ++ o) of
+  (case L.intersect (varNames l) (b ++ o) of
     [] | m_member l m && (m `m_get` l) == r -> e
        | otherwise -> replace m b e
     _ -> Un a l (replace m b r))
@@ -178,18 +186,19 @@ replace m b = transform f
 getSubst' :: Int -> [Expr] -> Head -> (Subst', [Expr])
 getSubst' i es (b, o)
   | null substList && i /= 8 = getSubst' (i + 1) es (b, o)
-  | otherwise = (subst, es \\ redundant)
+  | otherwise = (subst, es L.\\ redundant)
   where
     substList =
       case i of
         1 -> [e | e@(Un _ _ y) <- es, isConstExpr y]
         2 -> [e | e@(Un _ _ y) <- es, unknowns y b == 0]
-        3 -> [e | e@(Un _ _ y) <- es, null $ intersect (varNames y) b]
+        3 -> [e | e@(Un _ _ y) <- es, null $ L.intersect (varNames y) b]
         4 -> [e | e@Un {} <- es]
-        5 -> [e | e@(Eq _ (Var _ x) y) <- es, not (elem x b), unknowns y b == 0]
+        5 -> [e | e@(Eq _ (Var _ x) y) <- es, notElem x b, unknowns y b == 0]
         6 -> [e | e@(Is _ (Var _ _) y) <- es, unknowns y b == 0]
-        7 -> [e | e@(Is _ (Var _ _) y) <- es, null $ intersect (varNames y) b]
-        _ -> [e | e@(Is _ (Var _ _) _) <- es]
+        7 -> [e | e@(Is _ (Var _ _) y) <- es, null $ L.intersect (varNames y) b]
+        8 -> [e | e@(Is _ (Var _ _) _) <- es]
+        _ -> error "Unexpected case"
     (substMap, redundant) = makeSubst substList (b ++ o) M.empty []
     subst = (if i < 5 then "un" else "is", substMap)
 
