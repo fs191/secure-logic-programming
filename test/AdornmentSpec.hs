@@ -6,8 +6,9 @@ import Data.Either
 
 import Test.Hspec
 
+import Translator.Adornment
+
 import Swipl
-import Adornment
 import TestResults
 import DatalogProgram
 

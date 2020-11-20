@@ -1,4 +1,4 @@
-module Simplify (simplify) where
+module Translator.Simplify (simplify) where
 
 ---------------------------------------------------------
 ---- Simplifications for arithmetic/boolean expressions

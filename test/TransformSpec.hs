@@ -6,11 +6,12 @@ import Test.Hspec
 
 import Parser.DatalogParser
 
-import Transform
 import Swipl
 import Expr
 import DatalogProgram
 import TestResults
+
+import Translator.Transform
 
 spec :: Spec
 spec =

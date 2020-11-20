@@ -1,4 +1,4 @@
-module MagicSets 
+module Translator.MagicSets 
   ( magicSets
   ) where
 

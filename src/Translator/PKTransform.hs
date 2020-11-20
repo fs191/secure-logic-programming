@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GADTs #-}
 
-module PKTransform (pkTransform) where
+module Translator.PKTransform (pkTransform) where
 
 import Relude
 

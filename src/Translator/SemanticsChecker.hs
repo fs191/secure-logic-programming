@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module SemanticsChecker (checkSemantics) where
+module Translator.SemanticsChecker (checkSemantics) where
 
 import Relude
 
@@ -15,7 +15,7 @@ import Expr
 import DatalogProgram
 import ErrorMsg
 import Rule
-import Adornment
+import Translator.Adornment
 
 -- | Checks the code for errors that can be blamed on the user.
 checkSemantics 
@@ -65,19 +65,6 @@ checkDuplicates exprs = andM $
                             else do
                               return True
       _                -> return True
-
-checkTyping 
-  :: (MonadWriter [CompilerException] m) 
-  => Expr 
-  -> m Bool
-checkTyping And{} = return True
-checkTyping Or{} = return True
-checkTyping e =
-  if e ^. annotation . typing . to isTyped
-    then return True
-    else do
-      tell [TypeInferenceFailed e]
-      return False
 
 -- | Check whether each predicate can be found in either EDB or IDB.
 -- Only the name and number of arguments are considered.

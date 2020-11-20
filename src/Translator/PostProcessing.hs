@@ -2,7 +2,7 @@
 -- | Post-processing for privalog programs. Meant to be used after
 -- transformation. The result of post-processing is a program that is more
 -- similar to the final SecreC code.
-module PostProcessing (postProcess) where
+module Translator.PostProcessing (postProcess) where
 
 import Relude
 
@@ -15,16 +15,15 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import Adornment
+import Translator.Adornment
 import DatalogProgram
 import Expr
 import ErrorMsg
 import Rule
 import Annotation
-import Simplify
+import Translator.Simplify
 import Substitution
 
-import Data.Text.Prettyprint.Doc
 -- | Removes all rules that are not called by the goal clause and also removes
 -- rules that contain calls to other rules that are not facts.
 postProcess 
@@ -117,17 +116,6 @@ reorderTail ttl = assert (null $ exprs L.\\ (ps <> cs <> as)) $
   where
     exprs = andsToList ttl
     (ps,cs,as) = splitTail ttl
-
-isGroundPredicate :: Expr -> Bool
-isGroundPredicate Eq{}  = True
-isGroundPredicate Neq{} = True
-isGroundPredicate Le{} = True
-isGroundPredicate Lt{} = True
-isGroundPredicate Ge{} = True
-isGroundPredicate Gt{} = True
-isGroundPredicate Or{} = True
-isGroundPredicate ConstBool{} = True
-isGroundPredicate _    = False
 
 -- split the tail expressions to Predicates - Comparisons - Assignments
 splitTail :: Expr -> ([Expr], [Expr], [Expr])

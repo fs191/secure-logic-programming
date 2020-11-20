@@ -9,12 +9,13 @@ import Control.Lens
 import Data.Generics.Uniplate.Data as U
 import Data.Text.Prettyprint.Doc
 
-import Adornment
+import Translator.TypeInference
+import Translator.Adornment
+
 import Annotation
 import Expr
 import Rule
 import Swipl
-import TypeInference
 import DatalogProgram
 import TestResults
 

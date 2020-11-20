@@ -22,7 +22,6 @@ import Language.Privalog.Types
 import Expr
 import ExprPretty
 import Annotation
-import Adornment
 import Text.Megaparsec
 
 class HasSeverity a where
@@ -180,7 +179,10 @@ prettyPosContext pos src = srcDoc
 
 prettyAdornment :: Text -> (Text, [Bool], Expr) -> Doc ann
 prettyAdornment src (_, bp, pr) = vsep
-  [ "with binding pattern `" <> pretty (showBindings bp) <> "` at"
+  [ "with binding pattern " <> (tupled $ showBind <$> bp) <> " at"
   , prettyPosContext (pr ^. annotation . srcPos) src
   ]
+  where
+    showBind True  = "bound"
+    showBind False = "free"
 

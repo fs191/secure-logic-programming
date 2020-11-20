@@ -1,5 +1,5 @@
 -- | Type and privacy domain inference for privalog programs. 
-module TypeInference 
+module Translator.TypeInference 
   ( typeInference
   ) where
 
@@ -169,7 +169,7 @@ inferBinRet :: Expr -> Expr -> Expr -> Expr
 
 -- TODO this is a workaround for 'choose' operator
 -- TODO we also need to infer the boolean domain
-inferBinRet e@Choose{} (Expr.List _ xs) (Expr.List _ ys) =
+inferBinRet e@Choose{} (Expr.List _ xs) (Expr.List _ _) =
     e & annotation . annType %~ fromMaybe err2 . unifyTypes t
       & annotation . domain  .~ d
     where

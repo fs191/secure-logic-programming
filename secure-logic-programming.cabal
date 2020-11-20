@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ae4433db4086ae3e8e47bb61ecf36674b0f35ca4a66a849400f426d0f17034f4
+-- hash: 82b988f1a39c45a6846cc502884f51eb2bd23da2e11d5416e498df3e7ee721b9
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -26,7 +26,6 @@ source-repository head
 
 library
   exposed-modules:
-      Adornment
       Annotation
       DatalogProgram
       ErrorMsg
@@ -40,23 +39,24 @@ library
       Language.SecreC.SCExpr
       Language.SecreC.SCProgram
       Logger
-      MagicSets
       Parser.DatalogParser
       Parser.DatalogParser.Expr
       Parser.DatalogParser.Lexer
-      PKTransform
-      PostProcessing
-      PreProcessing
       ProgramOptions
       Rule
-      SemanticsChecker
-      Simplify
-      Solve
       Substitution
       Table
-      Transform
       Translator
-      TypeInference
+      Translator.Adornment
+      Translator.MagicSets
+      Translator.PKTransform
+      Translator.PostProcessing
+      Translator.PreProcessing
+      Translator.SemanticsChecker
+      Translator.Simplify
+      Translator.Solve
+      Translator.Transform
+      Translator.TypeInference
   other-modules:
       Paths_secure_logic_programming
   hs-source-dirs:

@@ -19,7 +19,6 @@ import qualified Data.Set as S
 
 import qualified Data.Text as T
 import Data.Text.Prettyprint.Doc
-import Debug.Trace
 
 import Annotation
 import qualified DatalogProgram as DP
@@ -296,35 +295,55 @@ program :: [TopStatement] -> SCProgram
 program = SCProgram
 
 -- some variable/function names that are used multiple times
+nameInTableStruct :: (Semigroup a, IsString a) => a -> a
 nameInTableStruct p    = "in_" <> p
+nameOutTableStruct :: (Semigroup a, IsString a) => a -> a
 nameOutTableStruct p   = "out_" <> p
+nameGetTableStruct :: (Semigroup a, IsString a) => a -> a
 nameGetTableStruct p = "getTable_" <> p
+nameDedup :: (Semigroup a, IsString a) => a -> a
 nameDedup p          = "deduplicate_" <> p
+nameTableCat :: (Semigroup a, IsString a) => a -> a
 nameTableCat p       = "cat_" <> p
+nameTablePermute :: (Semigroup a, IsString a) => a -> a
 nameTablePermute p   = "permute_" <> p
+nameTableExt :: (Semigroup a, IsString a) => a -> a
 nameTableExt p       = "extend_" <> p
+nameGoalComp :: (Semigroup a1, IsString a1, Show a2) => a1 -> a2 -> a1
 nameGoalComp p l     = "goal_" <> p <> "_" <> show l
 
 -- fixed names that are used globally in different components
+nameArg :: (Semigroup a1, IsString a1, Show a2) => a2 -> a1
 nameArg  i = "arg" <> show i
+nameMM :: Text
 nameMM     = "m"
 -- private component of the filter
+nameBB :: Text
 nameBB     = "b"
 -- public component of the filter
+nameBP :: Text
 nameBP     = "bp"
 
+nameTableBB :: Text -> Text
 nameTableBB  t   = t <> "." <> nameBB
+nameTableArg :: (Semigroup a, IsString a) => a -> Int -> a
 nameTableArg t i = t <> "." <> (nameArg i)
+nameIndex :: (Semigroup a1, IsString a1) => a1 -> Int -> a1
 nameIndex t i    = t <> show i
 
+nameM :: (Semigroup a1, IsString a1) => Int -> a1
 nameM    i = "m" <> show i
+nameN :: (Semigroup a1, IsString a1) => Int -> a1
 nameN    i = "n" <> show i
+nameB :: (Semigroup a1, IsString a1) => Int -> a1
 nameB    i = "b" <> show i
-nameB0   i = "b0" <> show i
+nameArgs :: (Semigroup a1, IsString a1) => Int -> a1
 nameArgs i = "args" <> show i
+nameRes :: (Semigroup a1, IsString a1) => Int -> a1
 nameRes  i = "res" <> show i
+nameResUn :: (Semigroup a1, IsString a1) => Int -> a1
 nameResUn i = "resUnique" <> show i
-nameTheta i = "theta" <> show i
+nameTable :: (Semigroup a1, IsString a1) => Int -> a1
 nameTable i = "table" <> show i
 
 -- some functions that are already defined in SecreC
@@ -794,7 +813,7 @@ ruleBodyToSC ann argTableType ds input p xs ys q =
     qs' = andsToList q
     qs  = mergeChoose qs'
 
-    ts = map (\(qj,j) -> (qj ^. predName, j)) $ filter (\(qj,j) -> case qj of {Pred _ _ _ -> True; _ -> False}) $ zip qs [1..]
+    ts = map (\(qj,j) -> (qj ^. predName, j)) $ filter (has _Pred . fst) $ zip qs [1..]
     ks = 0 : (map snd ts)
 
     getRowCounts = map (\(tk,k) -> VarInit (variable SCPublic SCUInt (nameM k)) (funTdbGetRowCount [SCVarName ds, SCConstStr tk])) ts
@@ -826,7 +845,7 @@ intPredToSC isSetSemantics ds (Pred ptype p zs) j =
       -- all bounded variables will be inputs
       -- all free variables will be assigned in this execution
       let (setX,setY) = L.partition (\(z,i) -> case z of
-                                                 Var _ _ -> fromMaybe undefined $ dv !!? i
+                                                 Var _ _ -> dv L.!! i
                                                  _       -> False) $ setZ
       in
 
@@ -905,7 +924,7 @@ aggrToSC ds (Aggr _ f pr@(Pred _ _ zs) e1 e2) j =
                           in
                           -- extract the type of x
                           let aggrAnns = filter (\z -> case z of {Var _ zn -> zn == x; _ -> False}) zs in
-                          let ann = if length aggrAnns > 0 then (head . fromMaybe undefined $ nonEmpty aggrAnns) ^. annotation
+                          let ann = if length aggrAnns > 0 then (L.head aggrAnns) ^. annotation
                                     else error $ "aggregation variable not found among goal arguments" in
 
                           --extract aggregation result variable name
@@ -923,7 +942,7 @@ aggrToSC ds (Aggr _ f pr@(Pred _ _ zs) e1 e2) j =
 
                           -- extract the index of aggregation input variable
                           let aggrInputIndices = filter snd $ zipWith (\z i -> (i, case z of {Var _ zn -> zn == x; _ -> False})) zs is in
-                          let xi = if length aggrInputIndices > 0 then fst $ head . fromMaybe undefined $ nonEmpty aggrInputIndices
+                          let xi = if length aggrInputIndices > 0 then fst $ L.head aggrInputIndices
                                    else error $ "aggregation variable " <> show x <> " not found in aggregation predicate " <> show pr
                           in
 
@@ -960,9 +979,7 @@ formulaToSC ds q j =
     formulaToSC_case q' = case q' of
         ConstBool _ b -> [addB (funReshape [SCConstBool b, SCVarName nameMM])]
 
-        Pred _ p zs   -> --add database attributes to the set of declared variables
-                            let predArgNames = S.fromList $ map (nameTableArg (nameTable j)) [0..length zs - 1] in
-
+        Pred _ _ zs   -> --add database attributes to the set of declared variables
                             -- TODO it would be nice to have access to data types of extensional predicates here
                             let stmts = zipWith (\z i -> formulaToSC ds (Un ann z (Var (z ^. annotation) (nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
                             let (comps', asgns') = L.partition snd $ zipWith (\s z -> (s, z ^. annotation ^. annBound)) stmts zs in
@@ -972,7 +989,7 @@ formulaToSC ds q j =
                             let bb = if length comps > 0 then [addB $ SCAnds comps] else [] in
                             asgns <> bb
 
-        Not _ (Pred _ p zs) ->
+        Not _ (Pred _ _ zs) ->
             [initBj $ SCNot (SCAnds $ zipWith (\z i -> SCEq (exprToSC z) (SCVarName (nameTableArg (nameTable j) i))) zs [0..]), addB bj]
 
         Not _ e ->

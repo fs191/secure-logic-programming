@@ -1,10 +1,9 @@
-module Solve (checkSat, extractSatSolution) where
+module Translator.Solve (checkSat, extractSatSolution) where
 
 import Relude
 
 import qualified SimpleSMT as SMT
 import Data.List
-import qualified Data.Map as M
 import Data.Maybe
 import Data.Generics.Uniplate.Data
 
@@ -27,7 +26,7 @@ checkSat es = do
                _         -> True
 
 extractSatSolution :: [Expr] -> [Expr] -> IO [Expr]
-extractSatSolution _    [] = do return []
+extractSatSolution _    [] = return []
 extractSatSolution args es = do
 
   s <- SMT.newSolver "z3" ["-in"] Nothing
@@ -39,8 +38,8 @@ extractSatSolution args es = do
   -- if we could not handle at least one expression, then the SAT model is overapproximated
   -- in Prolog, we assume that all "suitable" expressions are ground and can be pushed into the end
   -- in Datalog, the order is not important anyway (although it affects the efficiency)
-  let (goodZ3, badZ3) = partition (\(e,x) -> case x of Nothing -> False; _ -> True) $ zip es (exprToSExpr <$> es)
-  let sExprs = map (fromJust . snd) goodZ3
+  let (goodZ3, badZ3) = partition (isNothing . snd) $ zip es (exprToSExpr <$> es)
+  let sExprs = catMaybes $ map snd goodZ3
   let rest   = map fst badZ3
 
   --putStrLn $ "====="
@@ -61,7 +60,7 @@ extractSatSolution args es = do
                    --putStrLn $ show values
 
                    -- try to negate the solution and see if there exist more solutions
-                   let neg = if values == [] then [] else [foldr1 SMT.or $ map (\(x,val) -> Solve.neq x (SMT.value val)) (zip exprs values)]
+                   let neg = if values == [] then [] else [foldr1 SMT.or $ map (\(x,val) -> neq x (SMT.value val)) (zip exprs values)]
                    void $ traverse (SMT.assert s) neg
 
                    result <- SMT.check s
@@ -85,13 +84,13 @@ exprToSExpr (ConstInt _ x) = return $ SMT.Atom (show x)
 exprToSExpr (Var _ x)      = return $ SMT.Atom (toString x)
 exprToSExpr (Not _ x)   = SMT.not <$> exprToSExpr x
 exprToSExpr (Neg _ x)   = SMT.neg <$> exprToSExpr x
-exprToSExpr (Inv _ x)   = Solve.inv <$> exprToSExpr x
+exprToSExpr (Inv _ x)   = inv <$> exprToSExpr x
 exprToSExpr (Div _ x y) = SMT.div <$> exprToSExpr x <*> exprToSExpr y
 exprToSExpr (Sub _ x y) = SMT.sub <$> exprToSExpr x <*> exprToSExpr y
 exprToSExpr (Lt _ x y)  = SMT.lt <$> exprToSExpr x <*> exprToSExpr y
 exprToSExpr (Le _ x y)  = SMT.leq <$> exprToSExpr x <*> exprToSExpr y
 exprToSExpr (Eq _ x y)  = SMT.eq <$> exprToSExpr x <*> exprToSExpr y
-exprToSExpr (Neq _ x y) = Solve.neq <$> exprToSExpr x <*> exprToSExpr y
+exprToSExpr (Neq _ x y) = neq <$> exprToSExpr x <*> exprToSExpr y
 exprToSExpr (Un _ x y)  = SMT.eq <$> exprToSExpr x <*> exprToSExpr y
 exprToSExpr (Is _ x y)  = SMT.eq <$> exprToSExpr x <*> exprToSExpr y
 exprToSExpr (Gt _ x y)  = SMT.gt <$> exprToSExpr x <*> exprToSExpr y

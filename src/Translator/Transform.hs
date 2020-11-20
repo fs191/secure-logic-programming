@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Transform
+module Translator.Transform
   ( deriveAllGroundRules
   ) where
 
@@ -12,7 +12,6 @@ module Transform
 import Relude
 
 import Data.Generics.Uniplate.Operations as U
-import Data.Text.Prettyprint.Doc
 
 import qualified Data.List as L
 
@@ -20,8 +19,8 @@ import Control.Lens
 
 import Rule
 import Expr
-import Simplify
-import Solve
+import Translator.Simplify
+import Translator.Solve as Solve
 import Substitution
 import DatalogProgram
 import Annotation
@@ -89,47 +88,6 @@ inlineOnceBFS dp =
                   maybeToList $ subster <$> subst
       res
 
--- | Tries to unify the first predicate in each rule body with an appropriate rule using full-ground strategy
-inlineOnceGr :: DatalogProgram -> DatalogProgram
-inlineOnceGr dp = 
-  --trace "====" $
-  --trace (show (length rs)) $
-  --trace (show (pretty potentialSrc)) $
-  --trace (show (pretty inlined)) $
-  --trace (show (length potentialTgt)) $
-  dp & dpRules .~ rs'
-
-
-  where
-    rs' = potentialSrc <> inlined <> potentialTgt
-    rs  = dp ^. dpRules
-    (potentialSrc, potentialTgt) = L.partition (isGround dp) rs
-
-    fil (x,_) = isPredicate x && isIDBFact dp x
-
-    inlined = do
-      tgt <- potentialTgt
-      substututeAllIDB tgt
-
-    substututeAllIDB :: Rule -> [Rule]
-    substututeAllIDB tgt' =
-        let tgt = refreshRule "T_" tgt' in
-        let ttl = tgt ^. ruleTail in
-        let tlPreds = filter fil $ U.contexts ttl in
-        if length tlPreds == 0 then [tgt]
-        else
-            let (p,mut) = fromMaybe undefined $ viaNonEmpty head tlPreds in
-            let tgts = do                
-                     src <- filter (isGround dp) $ findRules dp $ p ^. predName
-                     let shd = src ^. ruleHead
-                     let stl = src ^. ruleTail
-                     let subst = unify shd p
-                     let subster x = applySubst x (tgt & ruleTail .~ mut stl)
-                     maybeToList $ subster <$> subst
-            in
-            --trace ("\n" ++ show (pretty p) ++ "\n" ++ show (pretty tgt) ++ "\n" ++ show (pretty tgts)) $
-            concat $ map substututeAllIDB tgts
-
 -- Removes duplicate terms from AND operations at the root expression
 simplifyAnds :: Expr -> Expr
 simplifyAnds x = foldl' eAnd h t
@@ -150,9 +108,6 @@ isPredicate _      = False
 
 isGround :: DatalogProgram -> Rule -> Bool
 isGround dp r = all (not . isIDBFact dp) . U.universe $ r ^. ruleTail
-
-uncertaintyDegree :: DatalogProgram -> Rule -> Int
-uncertaintyDegree dp r = length $ filter (isIDBFact dp) . U.universe $ r ^. ruleTail
 
 -- rewrite the assignments and look for contradictions
 checkConsistency :: Rule -> IO Bool
@@ -183,8 +138,8 @@ simplifyRule r =
     let freeVarNames = concat $ map varNames freeVars in
     let newRuleBody = simplify rBody (boundedVarNames, freeVarNames) in
 
-    let newRuleTail  = fromMaybe undefined . nonEmpty . ordNub . filter (not . isAnd) $ newRuleBody in
-    let newRuleTail' = L.foldl eAnd (head newRuleTail) (tail newRuleTail) in
+    let newRuleTail  = ordNub . filter (not . isAnd) $ newRuleBody in
+    let newRuleTail' = L.foldl eAnd (L.head newRuleTail) (L.tail newRuleTail) in
     --trace ("before: " ++ show (pretty r)) $
     --trace ("after: " ++ show (pretty (rule rName rArgs newRuleTail))) $
     --trace "=====" $

@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Adornment 
+module Translator.Adornment 
   ( Adornable(..)
   , suffixPredicate
   , adornProgram
@@ -22,7 +22,7 @@ import Rule
 import Control.Lens
 
 import Data.Generics.Uniplate.Data as U
-import Data.Set as S
+import qualified Data.Set as S
 import qualified Data.List as L hiding (nub)
 import qualified Data.Text as T
 
@@ -191,7 +191,7 @@ predPattern :: Set Text -> Expr -> [Bool]
 predPattern bound (Pred _ _ as) = f <$> as
   where
     f :: Expr -> Bool
-    f (Var _ n) | n `member` bound = True
+    f (Var _ n) | n `S.member` bound = True
                 | otherwise      = False
     -- Holes are treated as fresh variables, hence unbound
     f (Hole _) = False
@@ -243,9 +243,9 @@ paramBindings :: Lens' Expr [Bool]
 paramBindings = partsOf $ _Pred . _3 . traversed . annotation . annBound
 
 showBindings :: [Bool] -> Text
-showBindings [] = ""
-showBindings (True:bt)  = "b" <> showBindings bt
-showBindings (False:bt) = "f" <> showBindings bt
+showBindings = toText . map f
+  where f True  = 'b'
+        f False = 'f'
 
 allAdornables :: DatalogProgram -> [Adornable]
 allAdornables p = ordNub . runAdornM $

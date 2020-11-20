@@ -8,12 +8,13 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.Except
 
-import Adornment
-import PreProcessing
+import Translator.Adornment
+import Translator.PreProcessing
+import Translator.PostProcessing
+import Translator.PKTransform
+import Translator.Transform
+
 import Swipl
-import PostProcessing
-import PKTransform
-import Transform
 import Expr
 import TestResults
 

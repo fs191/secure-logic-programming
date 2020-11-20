@@ -13,13 +13,13 @@ import Control.Monad.Except
 import Data.Text.Prettyprint.Doc
 
 import Parser.DatalogParser
-import Transform
-import SemanticsChecker
-import PreProcessing
-import PostProcessing
-import TypeInference
-import Adornment
-import PKTransform
+import Translator.Transform
+import Translator.SemanticsChecker
+import Translator.PreProcessing
+import Translator.PostProcessing
+import Translator.TypeInference
+import Translator.Adornment
+import Translator.PKTransform
 import DatalogProgram
 import ErrorMsg
 

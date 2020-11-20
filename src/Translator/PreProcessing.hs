@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-module PreProcessing 
+module Translator.PreProcessing 
   ( preProcess
   ) where
 
