@@ -21,6 +21,7 @@ import Translator.PreProcessing
 import Translator.SemanticsChecker
 import Translator.Transform
 import Translator.TypeInference
+import Translator.PubPriv
 
 import DatalogProgram
 import ErrorMsg
@@ -76,7 +77,11 @@ process conf path =
 
     let ti = typeInference ad
     printDebug debug "TypeInference" ti
-    return ti
+
+    let pubPriv = pubPrivTransform ti
+    printDebug debug "PubPriv Reorder" pubPriv
+
+    return pubPriv
 
 printDebug 
   :: (Pretty a, MonadIO m) 

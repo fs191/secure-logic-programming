@@ -5,6 +5,7 @@ f(X, Z, Q) :-
   ex(Y),
   ex(P),
   X = Y,
+  Q = P,
   S is Z,
   X = P,
   X = Q,

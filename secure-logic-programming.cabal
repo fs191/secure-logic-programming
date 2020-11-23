@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 82b988f1a39c45a6846cc502884f51eb2bd23da2e11d5416e498df3e7ee721b9
+-- hash: 0f8573ff77c0ca8e276186c87b62e6d499083be17ded5d446039a401326d5ba0
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -52,6 +52,7 @@ library
       Translator.PKTransform
       Translator.PostProcessing
       Translator.PreProcessing
+      Translator.PubPriv
       Translator.SemanticsChecker
       Translator.Simplify
       Translator.Solve

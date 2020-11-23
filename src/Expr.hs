@@ -15,6 +15,7 @@ module Expr
   , varName
   , predName
   , predArgs
+  , leftHand, rightHand
   , constStr
   , constInt
   , constFloat
@@ -52,8 +53,8 @@ module Expr
   , applyTyping
   , _Var
   , _ConstStr
-  , andsToList
-  , orsToList
+  , andsToList, orsToList
+  , listToAnds
   , foldWithAnds
   , predicateVarNames
   , predicateBoundedVarNames
@@ -84,7 +85,7 @@ import Control.Lens hiding (transform, children, List)
 import Data.Data
 import Data.Generics.Uniplate.Data as U
 import Data.List as L hiding (head)
-import Data.Set as S hiding (empty)
+import qualified Data.Set as S hiding (empty)
 import Data.Text.Prettyprint.Doc
 
 import Language.Privalog.Types
@@ -411,6 +412,10 @@ andsToList x = [x]
 orsToList :: Expr -> [Expr]
 orsToList (Or _ l r) = orsToList l <> orsToList r
 orsToList x = [x]
+
+listToAnds :: [Expr] -> Expr
+listToAnds (h:t) = foldl eAnd h t
+listToAnds [] = eTrue
 
 -- | Gets predicate arguments as expressions
 predicateVars :: Expr -> [Expr]
