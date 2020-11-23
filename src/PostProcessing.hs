@@ -202,7 +202,7 @@ mergeTwoMatchingRules r1 r2 =
            let as_from1  = map fst . filter (\(_,hx) -> not (S.member hx has)) $ zip as1 has1 in
            let as_from2  = map fst . filter (\(_,hx) -> not (S.member hx has)) $ zip as2 has2 in
 
-           -- assumption: in all Un and Is expressions, LHS is a free variable
+           -- assumption: in all non-ground Un and Is expressions, LHS is a free variable
            -- this is achieved by application of simplifyRules
            let asgnVars1 = (ordNub . map (\a -> case a of {Is _ (Var _ x) _ -> x; Un _ (Var _ x) _ -> x; _ -> error $ show a})) as1 in
            let asgnVars2 = (ordNub . map (\a -> case a of {Is _ (Var _ x) _ -> x; Un _ (Var _ x) _ -> x; _ -> error $ show a})) as2 in
@@ -221,7 +221,7 @@ mergeTwoMatchingRules r1 r2 =
            else if (length as_from1 == 0) && (length as_from2 == 0) then
 
                let rHead = r1 ^. ruleHead in
-               let rTail = L.foldr1 eAnd $ ps <> cs_common <> [eOr (foldr eAnd eTrue cs_from1) (foldr eAnd eTrue cs_from2)] <> as_common in
+               let rTail = L.foldr1 eAnd $ ps <> as_common <> [eOr (foldr eAnd eTrue cs_from1) (foldr eAnd eTrue cs_from2)] <> cs_common in
                [Rule rHead rTail]
 
            -- if the assignments are different, then we are dealing with non-determinism
@@ -240,19 +240,13 @@ mergeTwoMatchingRules r1 r2 =
                -- TODO for better efficiency, use a different function if cs1' and cs2' are mutually exclusive
                -- this could be checked e.g. using smt-solver, but we would then need an IO here
 
-               -- TODO it can be better to put all vars into a single choose
-               -- we need to link them anyway when converting to prolog
                let cats = map (\x -> eIs (var x) $ eChoose (eList [getValue subst1 x, getValue subst2 x]) (eList [cs1', cs2'])) asgnVars in
 
                let rHead = r1 ^. ruleHead in
-               let rTail = L.foldr1 eAnd $ ps <> cs_common <> as1' <> as2' <> cats in
-               --trace (show (pretty (r1 ^. ruleTail))) $
-               --trace (show (pretty (r2 ^. ruleTail))) $
-               --trace (show asgnVars) $
-               --trace (show (pretty rTail)) $
+               let rTail = L.foldr1 eAnd $ ps <> as1' <> as2' <> cats <> cs_common in
 
-               -- apply 'simplify' to get rid of intermediate variables
-               [simplifyRule $ Rule rHead rTail]
+               -- TODO apply 'simplify' to get rid of intermediate variables?
+               [Rule rHead rTail]
 
 foldChoose :: Expr -> Expr
 foldChoose (Is ann x y) =
