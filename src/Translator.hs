@@ -13,13 +13,15 @@ import Control.Monad.Except
 import Data.Text.Prettyprint.Doc
 
 import Parser.DatalogParser
-import Translator.Transform
-import Translator.SemanticsChecker
-import Translator.PreProcessing
-import Translator.PostProcessing
-import Translator.TypeInference
+
 import Translator.Adornment
 import Translator.PKTransform
+import Translator.PostProcessing
+import Translator.PreProcessing
+import Translator.SemanticsChecker
+import Translator.Transform
+import Translator.TypeInference
+
 import DatalogProgram
 import ErrorMsg
 
@@ -42,9 +44,9 @@ process conf path =
         putTextLn . show $ errorMsg "" ex 
         exitFailure
     let debug = _debug conf
-    let skipSem = _skipSem conf
     printDebug debug "Original" dp
-    --printDebug (debug && not skipSem) "SemTyped" . typeInference $ adornProgram dp
+    
+    let skipSem = _skipSem conf
     unless skipSem $ do
       let (ex, success) = checkSemantics dp
       forM_ ex $ putTextLn . show . errorMsg src
@@ -52,20 +54,26 @@ process conf path =
     liftIO . when debug $ putTextLn "Semantics check succeeded"
     let adp = adornProgram dp
     printDebug debug "Adornment" adp
+
     pp <- withExceptT return $ preProcess adp
     printDebug debug "PreProcessing" pp
+
     --let mag  = magicSets ap
     let ite   = _tcIterations conf
     tf <- liftIO $ deriveAllGroundRules ite pp
     printDebug debug "Transform" tf
+
     let pk    = pkTransform tf
     printDebug debug "PKTransform" pk
+
     post' <- withExceptT return $ postProcess pk
     printDebug debug "PostProcess" post'
     when (null $ post' ^. dpRules) $ throwError [DoesNotConverge]
+
     -- currently, simplifyRule may break some annotation, so we need to derive it again
     let ad = post' & dpRules . traversed %~ adornRule
     printDebug debug "AdornRules" ad
+
     let ti = typeInference ad
     printDebug debug "TypeInference" ti
     return ti
@@ -77,10 +85,10 @@ printDebug
   -> a 
   -> m ()
 printDebug debug component prog = 
-    liftIO . when debug $ do
-      putTextLn $ "[" <> component <> "]"
-      putTextLn "=========="
-      putTextLn . show $ pretty prog
-      putTextLn "=========="
-      putTextLn ""
+  liftIO . when debug $ do
+    putTextLn $ "[" <> component <> "]"
+    putTextLn "=========="
+    putTextLn . show $ pretty prog
+    putTextLn "=========="
+    putTextLn ""
 
