@@ -722,8 +722,6 @@ concreteGoal dp = mainFun $
                        , (funFilterTrue [SCVarName pi_, SCVarName n, SCVarName y])
                        ]
 
-  -- TODO this is for testing aggregations, remove after we implement parsing aggregations
-  -- ) ["Y"] [0]
   ) ynames [0..length ynames-1]
 
   where
@@ -1018,12 +1016,14 @@ formulaToSC ds q j =
         Eq _ _ _ -> [initBj $ exprToSC q', addB bj]
 
         -- TODO this is a workaround for choose construction
-        Is _ (Expr.List _ xs) (Choose _ (Expr.List _ zs) (Expr.List _ bs)) ->
+        Un _ (Expr.List _ xs) (Choose _ (Expr.List _ zs) (Expr.List _ bs)) ->
             let n = length bs in
             let zss = chunksOf n zs in
             [ VarAsgn nameBB $ L.foldr1 (\x y -> funCat [x,y]) $ map (SCAnd (SCVarName nameBB) . bexprToSC) bs
             , VarAsgn nameBP $ L.foldr1 (\x y -> funCat [x,y]) $ map (const $ SCVarName nameBP) bs] <>
             zipWith (\(Var annx x) zs -> VarInit (variable SCPublic (scColType annx) x) $ L.foldr1 (\x y -> funCat [x,y]) $ map exprToSC zs) xs zss
+
+        Un _ e1 e2@(Choose _ _ _) -> formulaToSC_case $ Un ann (eList [e1]) e2
 
         -- unification may be a comparison as well as initialization (for strings)
         Un _ e1 e2 ->  ex
@@ -1044,7 +1044,6 @@ formulaToSC ds q j =
                           -- if both x and y are not fresh, then compare
                           ez = [initBj $ exprToSC (Eq ann e1 e2), addB bj]
 
-        -- TODO actually, we only have the initialization case due to previos processing
         Is _ e1 e2 -> formulaToSC_case (Un ann e1 e2)
 
         Aggr _ _ _ _ _ -> aggrToSC ds q' j
