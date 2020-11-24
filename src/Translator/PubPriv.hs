@@ -4,7 +4,6 @@ import Relude
 
 import Control.Exception
 import Control.Lens
-import qualified Data.Generics.Uniplate.Data as U
 
 import qualified Data.List as L
 
@@ -33,10 +32,6 @@ bothPublic :: Expr -> Bool
 bothPublic e = Just True == e ^? leftHand . isPub
             && Just True == e ^? rightHand . isPub
   where isPub = annotation . domain . to (==Public)
-
-privateCount' :: Expr -> Int
-privateCount' e = length $
-  [e' | e' <- U.universe e] ^.. folded . annotation . annBound . to (==True)
 
 isAsgn :: Expr -> Bool
 isAsgn Is{} = True
