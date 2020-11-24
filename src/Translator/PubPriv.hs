@@ -26,13 +26,13 @@ transformRuleTail r = assert assertion $ r & ruleTail .~ newTail
         idx = fromMaybe (length tailList) $ L.findIndex isAsgn tailList
         otherExprs = take idx tailList
         asgns = drop idx tailList
-        (a, b) = L.partition bothPublic asgns
-        newTail = (listToAnds $ otherExprs <> a <> b)
+        (a, b) = traceShowId $ L.partition bothPublic asgns
+        newTail = listToAnds $ otherExprs <> a <> b
 
 bothPublic :: Expr -> Bool
-bothPublic e = Just True == f
-  where f = [e ^? leftHand, e ^? rightHand] 
-              ^? folded . _Just . annotation . domain . to (==Public)
+bothPublic e = Just True == e ^? leftHand . isPub
+            && Just True == e ^? rightHand . isPub
+  where isPub = annotation . domain . to (==Public)
 
 privateCount' :: Expr -> Int
 privateCount' e = length $
