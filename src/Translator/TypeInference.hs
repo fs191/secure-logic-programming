@@ -1,11 +1,14 @@
+{-# LANGUAGE FlexibleContexts #-}
 -- | Type and privacy domain inference for privalog programs. 
 module Translator.TypeInference 
   ( typeInference
+  , clearTypings
   ) where
 
 import Relude
 
 import Control.Lens
+import Control.Monad.Except
 
 import qualified Data.Map.Strict as M
 import qualified Data.List as L
@@ -39,7 +42,9 @@ instance Monoid TypeSubstitution where
 
 -- | Infers data types and privacy domains for most expressions in the program.
 -- Assumes that the program has been post-processed.
-typeInference :: DatalogProgram -> DatalogProgram
+typeInference 
+  :: DatalogProgram 
+  -> DatalogProgram
 typeInference dp = dp
      -- Infer typings for all constants
      & dpRules . traversed . ruleHead %~ U.transform inferConstants
@@ -166,7 +171,6 @@ inferBuiltins r = r & ruleTail %~ U.transform ret
     rewr x = x
 
 inferBinRet :: Expr -> Expr -> Expr -> Expr
-
 -- TODO this is a workaround for 'choose' operator
 -- TODO we also need to infer the boolean domain
 inferBinRet e@Choose{} (Expr.List _ xs) (Expr.List _ _) =
@@ -181,7 +185,6 @@ inferBinRet e@Choose{} (Expr.List _ xs) (Expr.List _ _) =
 
       err t1 t2  = error $ "Failed to unify expressions " <> show t1 <> " and " <> show t2
       err2       = error $ "Failed to apply typing " <> show t <> " to " <> show e
-
 inferBinRet e x y
   -- If both are bound then it is a comparison and privacy depends on subterms
   | xb && yb  = e & annotation . annType %~ fromMaybe err2 . unifyTypes ut
@@ -204,15 +207,13 @@ inferBinRet e x y
     yt = y ^. annotation . annType
 
   -- TODO we need to handle Choose in a nicer way
-    yc = case y of {Choose{} -> True; _ -> False}
-    xc = case x of {Choose{} -> True; _ -> False}
-    d  = if xc then
+    d  = if has _Choose x then
              case x of
                  Choose _ _ (Expr.List _ bs) -> 
                      let ds = map (\b -> b ^. annotation . domain) bs in
                      L.foldr1 (\d1 d2 -> safelyUnifyDomains d1 d2) ds
                  _ -> Public
-         else if yc then
+         else if has _Choose y then
              case y of
                  Choose _ _ (Expr.List _ bs) -> 
                      let ds = map (\b -> b ^. annotation . domain) bs in
@@ -343,4 +344,14 @@ converge :: (Eq a) => (a -> a) -> a -> a
 converge f a
   | f a == a  = a
   | otherwise = converge f $ f a
+
+clearTypings :: DatalogProgram -> DatalogProgram
+clearTypings dp = dp & dpRules %~ U.transformBi clearTypings'
+                     & dpGoal  %~ U.transform clearTypings'
+                     & outputs  %~ U.transform clearTypings'
+
+clearTypings' :: Expr -> Expr
+clearTypings' e = U.transform f e
+  where
+    f = annotation . typing .~ emptyTyping
 
