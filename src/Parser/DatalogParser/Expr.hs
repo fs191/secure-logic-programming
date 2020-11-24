@@ -242,7 +242,6 @@ typable e =
     let f = case t of
           Just p  -> p
           Nothing -> A.empty
-    pos <- getSourcePos
     let err = customFailure $ TypeApplicationFailed (f ^. annType) e'
     maybe err return $ applyAnnotation f e'
 

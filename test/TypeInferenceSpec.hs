@@ -4,17 +4,13 @@ import Relude
 
 import Test.Hspec
 
-import Control.Lens
 
-import Data.Generics.Uniplate.Data as U
 import Data.Text.Prettyprint.Doc
 
 import Translator.TypeInference
 import Translator.Adornment
 
-import Annotation
 import Expr
-import Rule
 import Swipl
 import DatalogProgram
 import TestResults
@@ -27,7 +23,7 @@ newtype TextWrapper = TextWrapper Text
   deriving(Eq)
 
 instance Show TextWrapper where
-  show (TextWrapper x) = show x <> "\n\n"
+  show (TextWrapper x) = toString $ x <> "\n\n"
 
 wrap :: DatalogProgram -> TextWrapper
 wrap = TextWrapper . show . pretty
@@ -54,16 +50,7 @@ infersTypes :: Text -> Spec
 infersTypes n = it (toString desc) $
   do
     f <- adornProgram <$> parseDatalogFromFile_ n
-    let g = f & dpRules . traversed . ruleHead %~ clearTypings
-              & dpRules . traversed . ruleTail %~ clearTypings
-              & outputs %~ clearTypings
-              & dpGoal %~ clearTypings
-    (wrap $ typeInference g) `shouldBe` 
+    (wrap . typeInference $ clearTypings f) `shouldBe` 
       (wrap f)
   where desc = "infers types properly for " <> n
-
-clearTypings :: Expr -> Expr
-clearTypings e = U.transform f e
-  where
-    f = annotation . typing .~ emptyTyping
 

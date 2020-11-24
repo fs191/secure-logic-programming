@@ -11,7 +11,7 @@ module Expr
   , Ann
   , isLeaf
   , isVar
-  , _Pred, _Is
+  , _Pred, _Is, _Choose
   , varName
   , predName
   , predArgs
@@ -358,6 +358,7 @@ eInv = Inv empty
 eAnd :: Expr -> Expr -> Expr
 eAnd = And e
   where e = empty & annType .~ PPBool
+                  & annBound .~ True
 
 -- | Creates a new boolean or expression
 eOr :: Expr -> Expr -> Expr

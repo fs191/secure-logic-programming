@@ -26,8 +26,7 @@ transformRuleTail r = assert assertion $ r & ruleTail .~ newTail
         idx = fromMaybe (length tailList) $ L.findIndex isAsgn tailList
         otherExprs = take idx tailList
         asgns = drop idx tailList
-        unboundAsgns = asgns ^.. folded . to (U.transformBi (annBound .~ False))
-        reorderedAsgns = sortOn privateCount unboundAsgns
+        reorderedAsgns = sortOn privateCount asgns
         newTail = (listToAnds $ otherExprs <> reorderedAsgns)
 
 privateCount :: Expr -> Int

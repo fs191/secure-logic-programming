@@ -9,6 +9,7 @@ import Relude
 
 import Control.Lens
 import Control.Monad.Except
+import qualified Data.Generics.Uniplate.Data as U
 
 import Data.Text.Prettyprint.Doc
 
@@ -81,7 +82,16 @@ process conf path =
     let pubPriv = pubPrivTransform ti
     printDebug debug "PubPriv Reorder" pubPriv
 
-    return pubPriv
+    let ad2 = pubPriv & dpRules . traversed %~ adornRule
+    printDebug debug "AdornRules2" ad2
+
+    let cleared = clearTypings ad2
+    printDebug debug "ClearTypings" cleared
+
+    let ti2 = typeInference cleared
+    printDebug debug "TypeInference2" ti2
+
+    return ti2
 
 printDebug 
   :: (Pretty a, MonadIO m) 
