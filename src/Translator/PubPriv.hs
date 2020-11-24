@@ -26,7 +26,7 @@ transformRuleTail r = assert assertion $ r & ruleTail .~ newTail
         idx = fromMaybe (length tailList) $ L.findIndex isAsgn tailList
         otherExprs = take idx tailList
         asgns = drop idx tailList
-        (a, b) = traceShowId $ L.partition bothPublic asgns
+        (a, b) = L.partition bothPublic asgns
         newTail = listToAnds $ otherExprs <> a <> b
 
 bothPublic :: Expr -> Bool
