@@ -45,7 +45,6 @@ module Expr
   , isConstExpr
   , varNames
   , annotation
-  , leftHand, rightHand
   , vals
   , aggr, aggrPred, sourceExpr, targetExpr
   , arg
@@ -55,6 +54,7 @@ module Expr
   , _ConstStr
   , andsToList, orsToList
   , listToAnds
+  , withAndList
   , foldWithAnds
   , predicateVarNames
   , predicateBoundedVarNames
@@ -609,4 +609,7 @@ toDNF = toDNF' . toNNF
 foldWithAnds :: [Expr] -> Expr
 foldWithAnds [] = constTrue
 foldWithAnds es = foldr1 eAnd es
+
+withAndList :: ([Expr] -> [Expr]) -> Expr -> Expr
+withAndList f = listToAnds . f . andsToList
 

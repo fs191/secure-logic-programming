@@ -55,6 +55,7 @@ data CompilerException
   | UndefinedPredicate Expr
   | MultipleBindingPatterns (Text, [Bool], Expr) (Text, [Bool], Expr)
   | DBNameClash Expr Expr
+  | DuplicateArguments Expr
   deriving (Typeable, Eq, Ord, Exception)
 
 instance Pretty Severity where
@@ -139,6 +140,10 @@ errorMsg' s (DBNameClash a b) = vsep
   , prettyPosContext (a ^. annotation . srcPos) s
   , "and EDB fact"
   , prettyPosContext (b ^. annotation . srcPos) s
+  ]
+errorMsg' s (DuplicateArguments p) = vsep
+  [ "Duplicate arguments in"
+  , prettyPosContext (p ^. annotation . srcPos) s
   ]
 
 -- Utilities
