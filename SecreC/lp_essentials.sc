@@ -44,20 +44,68 @@ uint [[1]] widen_indices (uint [[1]] indices, uint m){
 }
 
 //sublist (of a list) by a bitmask
-template <domain D, type T>
-D T [[1]] filter(D T [[1]] a, bool [[1]] bitmask){
-    uint32 n = sum(bitmask);
-    uint32 [[1]] src (n);
+template <type T>
+T [[1]] filter(T [[1]] a, bool [[1]] bitmask){
+    uint m = size(bitmask);
+    uint n = sum((uint)bitmask);
+    T [[1]] b (n);
     uint j = 0;
-    for (uint i = 0; i < size(bitmask); i++){
+    for (uint i = 0; i < m; i++){
         if (bitmask[i]){
-            src[j] = (uint32)i;
+            b[j] = a[i];
             j = j + 1;
         }
     }
+    return b;
+}
+
+template <type T>
+T [[2]] filter(T [[2]] a, bool [[1]] bitmask){
+    uint m0 = shape(a)[0];
+    uint m1 = shape(a)[1];
+    uint n0 = sum((uint)bitmask);
+    T [[2]] b (n0,m1);
+    uint j = 0;
+    for (uint i = 0; i < m0; i++){
+        if (bitmask[i]){
+            for (uint k = 0; k < m1; k++){
+                b[j,k] = a[i,k];
+            }
+            j = j + 1;
+        }
+    }
+    return b;
+}
+
+template <domain D, type T>
+D T [[1]] filter(D T [[1]] a, bool [[1]] bitmask){
+    uint m = size(bitmask);
+    uint n = sum((uint)bitmask);
+    uint [[1]] src = iota(m);
+    src = filter(src, bitmask);
+    uint [[1]] tgt = iota(n);
     D T [[1]] b (n);
-    uint32 [[1]] tgt = iota(n);
     return partialRearrange(a, b, src, tgt);
+}
+
+template <domain D, type T>
+D T [[2]] filter(D T [[2]] a, bool [[1]] bitmask){
+    uint m0 = shape(a)[0];
+    uint m1 = shape(a)[1];
+    uint n0 = sum((uint)bitmask);
+    uint [[1]] src = iota(m0);
+    src = widen_indices(filter(src, bitmask), m1);
+    uint [[1]] tgt = iota(n0*m1);
+    D T [[2]] b (n0,m1);
+    return partialRearrange(a, b, src, tgt);
+}
+
+template <domain D, type T, type S>
+relColumn<D,T,S> filter(relColumn<D,T,S> a, bool [[1]] bitmask){
+    a.fv  = filter(a.fv,  bitmask);
+    a.val = filter(a.val, bitmask);
+    a.str = filter(a.str, bitmask);
+    return a;
 }
 
 //replicates each variable in a block n times
