@@ -391,6 +391,8 @@ funCountSort :: [SCExpr] -> SCExpr
 funCountSort = SCFunCall "countSortPermutation"
 funQuickSort :: [SCExpr] -> SCExpr
 funQuickSort = SCFunCall "quickSortPermutation"
+funFilter :: [SCExpr] -> SCExpr
+funFilter = SCFunCall "filter"
 
 funAggr :: Text -> [SCExpr] -> SCExpr
 funAggr s         = SCFunCall $ s <> "_filter"
@@ -793,7 +795,7 @@ ruleBodyToSC ann argTableType ds input p xs ys q =
   , VarDecl (variable SCPublic (SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([scDomainFromAnn ann], map (\(y,i) -> scColTypeI i (y ^. annotation)) ys))) result)
   --
 
-  , VarAsgn (nameTableBB result) (SCAnd (SCVarName nameBB) (SCVarName nameBP))
+  , VarAsgn (nameTableBB result) (funFilter [SCVarName nameBB, SCVarName nameBP])
   ] <> asgnOutputArgs <>
   [Return (SCVarName result)]
 
@@ -802,7 +804,7 @@ ruleBodyToSC ann argTableType ds input p xs ys q =
     result   = "result"
 
     asgnInputArgs  = map (\((Var xtype x),i) -> VarInit (variable SCPublic (scColType xtype) x) (SCVarName $ nameTableArg inputTable i)) xs
-    asgnOutputArgs = map (\(z,i) -> VarAsgn (nameTableArg result i) (exprToSC z)) ys
+    asgnOutputArgs = map (\(z,i) -> VarAsgn (nameTableArg result i) (funFilter [exprToSC z, SCVarName nameBP])) ys
 
     initFilter = [ VarInit (variable (scDomainFromAnn ann) (SCArray 1 SCBool) nameBB) (SCVarName (nameTableBB inputTable))
                  , VarInit (variable SCPublic (SCArray 1 SCBool) nameBP) (funReshape [SCConstBool True, SCVarName nameMM])
