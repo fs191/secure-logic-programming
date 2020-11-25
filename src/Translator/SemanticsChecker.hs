@@ -10,7 +10,6 @@ import Control.Monad.Writer
 import qualified Data.Generics.Uniplate.Data as U
 import qualified Data.List as L
 
-import Annotation
 import Expr
 import DatalogProgram
 import ErrorMsg
@@ -33,6 +32,7 @@ checkSemantics dp =
       , checkDuplicates attrs
       , checkPredicates dp
       , checkSinglePattern dp
+      , checkDuplicateArgs dp
       ]
 
 checkDBDuplicates 
@@ -111,4 +111,22 @@ checkSinglePattern p =
         let err = error "This should never happen"
         return . fromMaybe err $ f <$> (as !!? i) <*> (as !!? j)
     return True
+
+checkDuplicateArgs 
+  :: (MonadWriter [CompilerException] m)
+  => DatalogProgram 
+  -> m Bool
+checkDuplicateArgs dp =
+  do
+    let checkPred p@Pred{} = 
+          if as /= ordNub as
+            then do
+              tell [DuplicateArguments p]
+              return False
+            else return True
+          where as = p ^.. predArgs . folded . varName
+        checkPred _ = return True
+        preds :: [Expr]
+        preds = dp ^.. dpRules . folded . ruleTail . to andsToList . folded
+    andM $ checkPred <$> preds
 
