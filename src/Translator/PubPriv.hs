@@ -4,6 +4,7 @@ import Relude
 
 import Control.Exception
 import Control.Lens
+import qualified Data.Generics.Uniplate.Data as U
 
 import qualified Data.List as L
 
@@ -15,27 +16,16 @@ import Expr
 import Rule
 
 pubPrivTransform :: DatalogProgram -> DatalogProgram
-pubPrivTransform = dpRules . traversed %~ transformRuleTail
+pubPrivTransform = dpRules . traversed . ruleTail %~ U.rewrite reorderAnds
 
-transformRuleTail :: Rule -> Rule
-transformRuleTail r = assert assertion $ r & ruleTail .~ newTail
-                                           & id %~ adornRule
-  where tailList = r ^. ruleTail . to andsToList
-        assertion = all isAsgn $ drop idx tailList
-        idx = fromMaybe (length tailList) $ L.findIndex isAsgn tailList
-        otherExprs = take idx tailList
-        asgns = drop idx tailList
-        (a, b) = L.partition bothPublic asgns
-        newTail = listToAnds $ otherExprs <> a <> b
+reorderAnds :: Expr -> Maybe Expr
+reorderAnds (And a x y)
+  | bothPublic y && (not $ bothPublic x) = Just $ And a y x
+  | otherwise = Nothing
+reorderAnds _ = Nothing
 
 bothPublic :: Expr -> Bool
 bothPublic e = Just True == e ^? leftHand . isPub
             && Just True == e ^? rightHand . isPub
   where isPub = annotation . domain . to (==Public)
-
-isAsgn :: Expr -> Bool
-isAsgn Is{} = True
-isAsgn Un{} = True
-isAsgn Eq{} = True
-isAsgn _    = False
 
