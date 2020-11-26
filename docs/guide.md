@@ -54,7 +54,7 @@ Now that the program is complete we can run `lpsec input.pl -o output.sc`, where
 succeeds, we will have a SecreC program that can be further compiled to a 
 Sharemind binary.
 
-# External database facts (EDB facts)
+# Working with private data
 
 Now let's look at a case where the parental relationships are stored in a private 
 database. To access data from the database, we use *type clauses*:
@@ -62,4 +62,13 @@ database. To access data from the database, we use *type clauses*:
 ```
 :-type(parent(X : private string, Y : private string)).
 ```
+
+When using type clauses, we need to explicitly write whether the column is
+public or private, as well as the type of the column. After this
+we can use the `parent` predicate to query the database. In most cases the compiler
+will be able to derive the rest of the types automatically. If type inference
+fails to derive some types, the user can specify them manually by appending a colon
+followed by type information just like in the type clause.
+
+# Inputs and outputs
 
