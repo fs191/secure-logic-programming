@@ -64,8 +64,9 @@ programArgs = ProgramOptions
         , value "out"
         ])
   <*> (switch $ mconcat
-        [ long "debug"
-        , help "Prints all intermediate results. WARNING: Will produce a lot of output."
+        [ short 'd'
+        , long "debug"
+        , help "Prints debug information."
         , hidden
         ])
   <*> (strArgument $ mconcat

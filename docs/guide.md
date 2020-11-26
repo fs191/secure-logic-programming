@@ -47,9 +47,9 @@ are from the same generation. Then we would write
 ?-same_generation(mari, ella).
 ```
 
-There must be exactly one goal clause in each PrivaLog program.
+Note that there must be exactly one goal clause in each PrivaLog program.
 
-Now the program is complete and we can run `lpsec input.pl -o output.sc`, where
+Now that the program is complete we can run `lpsec input.pl -o output.sc`, where
 `input.pl` is the file containing the PrivaLog program. After the compilation 
 succeeds, we will have a SecreC program that can be further compiled to a 
 Sharemind binary.
