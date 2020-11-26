@@ -892,7 +892,9 @@ predToSC isSetSemantics extPreds (Pred ann p zs') j =
   else
 
       -- for IDB predicates, we always return the private bool
-      let addB = VarAsgn nameBB . SCAnd (SCVarName nameBB) in
+      -- since BB is passed as an input, we modify BB, and do not need to AND the result
+      -- TODO since BB is always private, it may be more efficient NOT to pass it
+      let addB = VarAsgn nameBB in
 
       -- link inputs, outputs, and constants to indices of zs
       let is = [0..length zs - 1] in
