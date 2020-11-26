@@ -2,13 +2,8 @@ module Translator.PubPriv (pubPrivTransform) where
 
 import Relude
 
-import Control.Exception
 import Control.Lens
 import qualified Data.Generics.Uniplate.Data as U
-
-import qualified Data.List as L
-
-import Translator.Adornment
 
 import Annotation
 import DatalogProgram
