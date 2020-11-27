@@ -142,7 +142,7 @@ PrivaLog has the following operators, grouped by precedence (low to high):
 
 Following is a list of built-in functions
 
-|----------+-------------|
++----------+-------------+
 | Function | Description |
 +:=========+:============+
 | sqrt(x)  | Square root |
