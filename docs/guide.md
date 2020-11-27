@@ -101,28 +101,54 @@ from the same generation as Mari.
 # Types
 
 PrivaLog supports the following types:
-+ `bool`
-+ `int8`, `int16`, `int32` (alias `int`), `int64`
-+ `uint8`, `uint16`, `uint32`, `uint64`
-+ `xor_uint8`, `xor_uint16`, `xor_uint32`, `xor_uint64`
-+ `string`
-+ `float32` (alias `float`), `float64`
+
+* `bool`
+* `int8`, `int16`, `int32` (alias `int`), `int64`
+* `uint8`, `uint16`, `uint32`, `uint64`
+* `xor_uint8`, `xor_uint16`, `xor_uint32`, `xor_uint64`
+* `string`
+* `float32` (alias `float`), `float64`
 
 # Built-ins
+
 PrivaLog has the following operators, grouped by precedence (low to high):
-+ `;`
-+ `,`
-+ `>=`, `=<`, `>`, `<`, `=:=`, `=/=`, `=`, `is`
-+ `+`, `-`
-+ `*`, `/`
-+ `^`
-+ `\\+`
 
-PrivaLog has the following built-in functions:
-+ `sqrt`
-+ `mod`
++----------+----------------------------+
+| Operator | Description                |
++:=========+:===========================+
+| ,   <br> | Logical AND <br>           |
++----------+----------------------------+
+| ;   <br> | Logical OR <br>            |
++----------+----------------------------+
+| \>= <br> | Greater than or equal <br> |
+| =<  <br> | Less than or equal <br>    |
+| \>  <br> | Strictly greater <br>      |
+| <   <br> | Strictly less <br>         |
+| =:= <br> | Expression equality <br>   |
+| =/= <br> | Expression inequality <br> |
+| =   <br> | Unification <br>           |
+| is  <br> | Bind variable <br>         |
++----------+----------------------------+
+| \+  <br> | Addition <br>              |
+| \-  <br> | Subtraction <br>           |
++----------+----------------------------+
+| \*  <br> | Multiplication <br>        |
+| /   <br> | Division <br>              |
++----------+----------------------------+
+| ^   <br> | Exponentiation <br>        |
++----------+----------------------------+
+| \\+ <br> | Logical negation <br>      |
++----------+----------------------------+
 
-The operators work similarly to Prolog.
+Following is a list of built-in functions
+
+|----------+-------------|
+| Function | Description |
++:=========+:============+
+| sqrt(x)  | Square root |
++----------+-------------+
+| mod(p,q) | Modulo      |
++----------+-------------+
 
 # Aggregations
 
