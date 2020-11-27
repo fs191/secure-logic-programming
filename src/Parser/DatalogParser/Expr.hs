@@ -71,14 +71,11 @@ aExpr2 = binary ops aExpr2 aExpr3
       ]
 
 aExpr3 :: Parser Expr
-aExpr3 = binaryFuns funs aExpr <|> binary ops aExpr3 aExpr4
+aExpr3 = binary ops aExpr3 aExpr4
   where 
     ops =
       [ Operator "*" eMul
       , Operator "/" eFDiv
-      ]
-    funs =
-      [ Operator "mod" eMod
       ]
 
 aExpr4 :: Parser Expr
@@ -90,12 +87,20 @@ aExpr4 = binary ops aExpr4 aExpr5
       ]
 
 aExpr5 :: Parser Expr
-aExpr5 = unary ops aExpr <|> aTerm <|> par
+aExpr5 = choice
+  [ unary ops aExpr 
+  , binaryFuns binOps aExpr 
+  , aTerm 
+  , par
+  ]
   where
     par = typable $ parens aExpr
     ops =
       [ Operator "sqrt" eSqrt
       , Operator "\\+"  eNot
+      ]
+    binOps =
+      [ Operator "mod" eMod
       ]
 
 unary 
