@@ -35,7 +35,9 @@ from the same generation in relation to themselves.
 same_generation(X, X).
 ```
 
-Here the `X` token is treated as a variable, since it is capitalized.
+Here the `X` token is treated as a variable, since it is capitalized. If we are
+not interested in the value of a variable, then a hole token (`_`) can be used
+instead.
 
 We can also say that two people are from the same generation if their parents are
 from the same generation:
@@ -92,7 +94,7 @@ Now when we use the variable `X` in our goal clause, the compiler will know,
 that we want to find all the possible values for it.
 
 ```
-:-goal(same_generation(mari, X)).
+?-same_generation(mari, X).
 ```
 
 With this goal, the program will output the list with all the people that are
@@ -151,6 +153,32 @@ Following is a list of built-in functions
 +----------+-------------+
 
 # Aggregations
+
+PrivaLog has support for certain aggregations. Aggregations can only be done in
+the goal clause. For example, let us be given the following facts:
+
+```
+age(mari, 30).
+age(ants, 15).
+age(muki, 7).
+age(sass, 3).
+```
+
+If we want to know the average of all the ages, we can write the goal as follows:
+
+```
+:-outputs([Y]).
+?-avg(age(_, X), X, Y).
+```
+
+Aggregation functions generally take three arguments. The first argument is a
+metavariable that tells the function, which predicate to use for generating the
+values. The predicate must have at least one named unbound variable. The second
+argument of the function is the variable in the predicate that retrieves the value
+from the predicate. In the above example we are interested in the second argument
+of the predicate, so we marked that argument with variable `X` and gave the same 
+variable as the second argument of the aggregation. The last argument is a variable 
+that will contain the result of the aggregation.
 
 # Nondeterminism
 
