@@ -118,11 +118,13 @@ PrivaLog has the following operators, grouped by precedence (low to high):
 | Operator | Description                |
 |:---------|:---------------------------|
 | ,        | Logical AND                |
+
 |          |                            |
-|          |                            |
+|:---------|:---------------------------|
 | ;        | Logical OR                 |
+
 |          |                            |
-|          |                            |
+|:---------|:---------------------------|
 | \>=      | Greater than or equal      |
 | =<       | Less than or equal         |
 | \>       | Strictly greater           |
@@ -131,18 +133,23 @@ PrivaLog has the following operators, grouped by precedence (low to high):
 | =/=      | Expression inequality      |
 | =        | Unification                |
 | is       | Bind variable              |
+
 |          |                            |
-|          |                            |
+|:---------|:---------------------------|
 | \+       | Addition                   |
 | \-       | Subtraction                |
+
 |          |                            |
+|:---------|:---------------------------|
 | \*       | Multiplication             |
 | /        | Division                   |
+
 |          |                            |
-|          |                            |
+|:---------|:---------------------------|
 | ^        | Exponentiation             |
+
 |          |                            |
-|          |                            |
+|:---------|:---------------------------|
 | \\+      | Logical negation           |
 
 Following is a list of built-in functions
