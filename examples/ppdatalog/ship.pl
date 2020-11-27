@@ -1,21 +1,21 @@
 % TODO this program is not parsed by PrivaLog yet
-:-type(ship(@shipname:primary public string,
+:-type(ship(Shipname:primary public string,
             %we do not have a float type yet
-            @latitude:private float,
-            @longitude:private float,
-            @speed:public int,
-            @cargotype:private string,
-            @cargoamount:private int)).
+            Latitude:private float,
+            Longitude:private float,
+            Speed:public int,
+            Cargotype:private string,
+            Cargoamount:private int)).
 % the "primary key" constraint gives us a hint that we e.g. can substitute
 %"ship(Ship,X,Y,_,_,_)" and "ship(Ship,X,Y,Speed,_,_)" with "ship(Ship,X,Y,Speed,_,_)"
 % we will do this merge step e.g. after "postProcess" and before "typeInference"
 
-:-type(port(@name:primary public string,
-            @port_latitude:public float,
-            @port_longitude:public float,
-            @offloadcapacity:public int,
+:-type(port(Name:primary public string,
+            Port_latitude:public float,
+            Port_longitude:public float,
+            Offloadcapacity:public int,
             %we do not have a boolean type yet
-            @available:private bool)).
+            Available:private bool)).
 
 % the placeholder "_" denotes an unnamed variable
 % we need use a special data construction for this
@@ -73,8 +73,8 @@ arrival(Ship,Port,CargoType,Time) :-
     feasible_port(Ship,Port),
     reachability_time(Ship,Port,Time).
 
-%not sure if it is a good idea to use repeating name "@cargotype" in the table and for the inputs
-:-inputs([@portname_in:private string, @cargotype_in:private string]).
+%not sure if it is a good idea to use repeating name "Cargotype" in the table and for the inputs
+:-inputs([Portname_in:private string, Cargotype_in:private string]).
 :-outputs([MinTime]).
-?-min(arrival(Ship,@portname_in,@cargotype_in,Time),Time,MinTime).
+?-min(arrival(Ship,Portname_in,Cargotype_in,Time),Time,MinTime).
 

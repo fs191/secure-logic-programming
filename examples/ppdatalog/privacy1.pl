@@ -1,9 +1,9 @@
-:-type(db(@a:private string, @b:private string)).
+:-type(db(A:private string, B:private string)).
 
 :-outputs([A]).
-:-inputs([@b:public string]).
+:-inputs([B:public string]).
 
 f(X, Y) :-
   db(X, Y).
 
-?-f(A, @b).
+?-f(A, B).

@@ -1,4 +1,4 @@
-:-type(cat(@name:public string, @gender:public string, @color:public string, @age:private int)).
+:-type(cat(Name:public string, Gender:public string, Color:public string, Age:private int)).
 
 %OR is applied to two ground terms and is just an OR
 friendly_female(Cat) :-

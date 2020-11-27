@@ -29,7 +29,7 @@ checkSemantics dp =
     -- Ensure that there are no duplicate attributes
     andM
       [ checkDBDuplicates dp
-      , checkDuplicates attrs
+      -- , checkDuplicates attrs
       , checkPredicates dp
       , checkSinglePattern dp
       , checkDuplicateArgs dp
@@ -58,7 +58,7 @@ checkDuplicates exprs = andM $
     i <- [0..length exprs - 1]
     j <- [i+1..length exprs - 1]
     return $ case (exprs !!? i, exprs !!? j) of
-      (Just x, Just y) -> if _attrName x == _attrName y
+      (Just x, Just y) -> if _varName x == _varName y
                             then do
                               tell [MultipleAttributeDeclarations x y]
                               return False

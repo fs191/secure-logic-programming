@@ -1,16 +1,16 @@
-:-type(ship(@name : public string,
-            @latitude : private float,
-            @longitude : private float,
-            @speed : public int,
-            @cargotype : private string,
-            @cargoamount : private int)).
+:-type(ship(Name : public string,
+            Latitude : private float,
+            Longitude : private float,
+            Speed : public int,
+            Cargotype : private string,
+            Cargoamount : private int)).
 
-:-type(port(@name : public string,
-            @latitude : public float,
-            @longitude : public float,
-            @offloadcapacity : public int)).
+:-type(port(Name : public string,
+            Latitude : public float,
+            Longitude : public float,
+            Offloadcapacity : public int)).
 
-:-inputs([@portname : private string, @cargotype : private string]).
+:-inputs([Portname : private string, Cargotype : private string]).
 
 :-outputs([Time : private float]).
 
@@ -53,6 +53,6 @@ arrival_fbbf( X_0 : public string
 
 
 ?- arrival_fbbf( __HOLE_14 : public string
-, portname : private string
-, cargotype : private string
+, Portname : private string
+, Cargotype : private string
 , Time : private float ) : private bool.

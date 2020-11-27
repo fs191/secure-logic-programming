@@ -1,5 +1,5 @@
 % Program for testing the public private reordering optimization
-:-type(ex(@x: private int)).
+:-type(ex(X: private int)).
 
 f(X, Z, Q) :-
   ex(Y),

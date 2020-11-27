@@ -1,5 +1,5 @@
-:-type(sells(@seller:private string, @item_seller:private string, @price_seller:private int)).
-:-type(buys(@buyer :private string, @item_buyer:private string, @price_buyer:private int)).
+:-type(sells(Seller:private string, Item_seller:private string, Price_seller:private int)).
+:-type(buys(Buyer :private string, Item_buyer:private string, Price_buyer:private int)).
 
 bargain(X,Y,Z) :-
     sells(Y,Z,P1),

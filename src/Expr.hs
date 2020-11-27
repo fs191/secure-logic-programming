@@ -23,7 +23,6 @@ module Expr
   , constTrue, constFalse
   , var
   , predicate
-  , attribute
   , less, lessEqual
   , greater, greaterEqual
   , equal
@@ -121,7 +120,6 @@ data Expr
   | ConstFloat {_annotation :: !Ann, _floatVal :: !Float}
   | ConstStr   {_annotation :: !Ann, _strVal :: !Text}
   | ConstBool  {_annotation :: !Ann, _boolVal :: !Bool}
-  | Attribute  {_annotation :: !Ann, _attrName :: !Text}
   | Var  {_annotation :: !Ann, _varName :: !Text}
   | Not  {_annotation :: !Ann, _arg :: !Expr}
   | Neg  {_annotation :: !Ann, _arg :: !Expr}
@@ -160,7 +158,6 @@ instance PrologSource Expr where
   prolog (ConstBool _ True)  = "true"
   prolog (ConstBool _ False) = "false"
   prolog (ConstFloat _ x)    = pretty x
-  prolog (Attribute _ x)     = pretty x
   prolog (Hole _)            = "_"
   prolog (Pred _ n args)     = pretty n <> tupled (prolog <$> args) -- <+> (prolog $ show e)
   prolog (Not _ e)           = "(\\+" <> prolog e <> ")"
@@ -468,14 +465,8 @@ identifier :: Expr -> Maybe Text
 identifier (Var _ n)       = Just n
 identifier (ConstStr _ n)  = Just n
 identifier (Pred _ n _)    = Just n
-identifier (Attribute _ n) = Just n
 identifier (ConstBool _ b) = Just $ show b
 identifier _ = Nothing
-
--- | Creates a new attribute 
--- It is essentially a constant, whose value comes from an external database
-attribute :: Text -> Expr
-attribute = Attribute empty
 
 hole :: Expr
 hole = Hole empty

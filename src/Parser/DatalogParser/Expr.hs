@@ -3,7 +3,6 @@ module Parser.DatalogParser.Expr
   , aTerm
   , rule
   , list
-  , attributeParse
   , predParse
   , varParse
   , aggregation
@@ -34,7 +33,6 @@ aTerm = (withSrcPos $ asum
   , predParse
   , boolParse
   , strParse
-  , attributeParse
   , try floatParse
   , intParse
   , list
@@ -211,18 +209,6 @@ rule =
     psym <- identifier
     terms <- option [] . parens $ sepBy1 aTerm comma
     return $ R.fact psym terms
-
-attributeParse :: Parser Expr
-attributeParse = withSrcPos $
-  do
-    s <- attributeIdentifier <|> commonMistake
-    typable . return $ E.attribute s
-  where
-    commonMistake = 
-      do
-        void . try $ identifier
-        fail "Expected an attribute, got a constant instead. \n\
-             \Add an '@' symbol in front of the atom."
 
 boolParse :: Parser Expr
 boolParse = choice

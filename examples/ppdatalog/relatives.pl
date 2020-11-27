@@ -1,4 +1,4 @@
-:-type(par(@child:private string, @parent:private string)).
+:-type(par(Child:private string, Parent:private string)).
 
 %we do not handle repeating variables in pattern matching yet
 sg(X,Y) :- X = Y.

@@ -481,7 +481,6 @@ scConstType (ConstInt   _ c) = SCConstInt c
 scConstType (ConstFloat _ c) = SCConstFloat c
 scConstType (ConstBool  _ c) = SCConstBool c
 scConstType (ConstStr   _ c) = SCConstStr c
-scConstType (Attribute  _ c) = SCConstStr c
 scConstType e                 = error $ "Expecting a constant, not " <> show e
 
 dynamicColT :: Int -> SCType
@@ -554,7 +553,7 @@ extPredDecl dbc = struct (SCTemplateDecl Nothing) (nameOutTableStruct p) (y:ys)
     xs = view predArgs dbc
     y  = variable SCPublic (SCArray 1 SCBool) nameBB
     is = [0..length xs - 1]
-    ys = zipWith (\x i -> case x of {(Attribute pptype _) -> variable SCPublic (scColTypeI i pptype) (nameArg i) ; _ -> error $ "Expected an attribute, but got " <> show x}) xs is
+    ys = zipWith (\x i -> case x of {(Var pptype _) -> variable SCPublic (scColTypeI i pptype) (nameArg i) ; _ -> error $ "Expected a variable, but got " <> show x}) xs is
 
 extPredGet :: Expr -> FunctionDecl
 extPredGet dbc = function (SCTemplateDecl Nothing) returnType fname fargs fbody
@@ -727,7 +726,7 @@ concreteGoal dp = mainFun $
   ) ynames [0..length ynames-1]
 
   where
-    xs       = dp ^.. DP.inputs
+    xs       = dp ^.. DP.inputs . folded
     ys       = dp ^.. DP.outputs
     fullGoal = dp ^.  DP.dpFullGoal
     ds       = "ds"
@@ -839,8 +838,8 @@ intPredToSC isSetSemantics ds (Pred ptype p zs) j =
       let is = [0..length zs - 1] in
 
       -- separate constants and variables
-      let (setZ',setC) = L.partition (\(zi,_) -> case zi of {Var _ _ -> True; Attribute _ _ -> True; Hole _ -> True; _ -> False}) (zip zs is) in
-      let setZ = map (\(z,i) -> case z of {Attribute zann zval -> (Var zann zval,i); _ -> (z,i)}) setZ' in
+      let (setZ',setC) = L.partition (\(zi,_) -> case zi of {Var _ _ -> True; Var _ _ -> True; Hole _ -> True; _ -> False}) (zip zs is) in
+      let setZ = map (\(z,i) -> case z of {Var zann zval -> (Var zann zval,i); _ -> (z,i)}) setZ' in
 
       -- all bounded variables will be inputs
       -- all free variables will be assigned in this execution

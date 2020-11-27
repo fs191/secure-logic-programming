@@ -1,4 +1,4 @@
-:-type(par(@child:private string, @parent:private string)).
+:-type(par(Child:private string, Parent:private string)).
 
 %we do not handle repeating variables in pattern matching yet
 sg(X,Y) :-
@@ -25,6 +25,6 @@ sg(X,Y) :-
   par(YY1,YYY1),
   XXX1 = YYY1.
 
-:- inputs([@x : public string]).
+:- inputs([X : public string]).
 :- outputs([Y]).
-?-sg(@x,Y).
+?-sg(X,Y).

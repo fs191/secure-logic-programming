@@ -10,7 +10,7 @@ import Control.Lens hiding (universe)
 import Control.Monad.Except
 import Control.Exception (assert)
 
-import Data.Generics.Uniplate.Data
+import qualified Data.Generics.Uniplate.Data as U
 import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -56,7 +56,7 @@ filterGroundRules dp = dp & dpRules %~ filter fil
     _facts = _name . view ruleHead <$> extensionalFacts dp
     _name (Pred _ n _) = n
     _name _ = error "Expected a predicate"
-    fil x = all (`elem` _facts) [n | (Pred _ n _) <- universe $ x ^. ruleTail]
+    fil x = all (`elem` _facts) [n | (Pred _ n _) <- U.universe $ x ^. ruleTail]
 
 -- | Removes all rules that do not get called directly by the goal clause
 filterGoalRules :: DatalogProgram -> DatalogProgram
@@ -246,13 +246,13 @@ foldChoose :: Expr -> Expr
 foldChoose (Is ann x y) =
     Is ann x (foldChoose y)
 foldChoose (Choose ann (Expr.List _ xs) (Expr.List _ bs)) =
-    let ys = map foldChoose xs in
-    let xs' = concat $ zipWith (\b y -> case y of {(Choose _ (Expr.List _ xs0) (Expr.List _ bs0)) -> xs0              ; _ -> [y]}) bs ys in
-    let bs' = concat $ zipWith (\b y -> case y of {(Choose _ (Expr.List _ xs0) (Expr.List _ bs0)) -> map (eAnd b) bs0 ; _ -> [b]}) bs ys in
-    (Choose ann (eList xs') (eList bs'))
+  let 
+    ys = map foldChoose xs
+    xs' = concatMap (\y -> case y of {(Choose _ (Expr.List _ xs0) (Expr.List{})) -> xs0 ; _ -> [y]}) ys
+    bs' = concat $ zipWith (\b y -> case y of {(Choose _ (Expr.List{}) (Expr.List _ bs0)) -> map (eAnd b) bs0 ; _ -> [b]}) bs ys 
+  in Choose ann (eList xs') (eList bs')
 foldChoose e = e
-    --trace (show e) $ e
 
 foldChooseDP :: DatalogProgram -> DatalogProgram
-foldChooseDP dp = dp & dpRules . traversed . ruleTail %~ (\ttl -> L.foldr1 eAnd $ map foldChoose (simplifyAnds' ttl))
+foldChooseDP dp = dp & dpRules . traversed . ruleTail %~ L.foldr1 eAnd . fmap foldChoose . simplifyAnds'
 

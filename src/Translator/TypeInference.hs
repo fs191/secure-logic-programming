@@ -292,7 +292,7 @@ unifyWithError f x y = fromMaybe err $ f x (y ^. annotation . typing)
 inferFromInputs :: DatalogProgram -> DatalogProgram
 inferFromInputs dp = dp & dpGoal %~ applyTypeSubstToExpr (mconcat inps)
   where
-    inps = dp ^.. inputs . to(\v -> (fromJust $ identifier v) |-> (v ^. annotation . typing))
+    inps = dp ^.. inputs . folded . to(\v -> (fromJust $ identifier v) |-> (v ^. annotation . typing))
 
 -- | Decides the return type of a rule by looking at the return types of the
 -- predicates in its body

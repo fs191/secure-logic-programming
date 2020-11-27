@@ -1,5 +1,5 @@
-:-type(sells(@seller:private string, @item_seller:private string, @price_seller:private int)).
-:-type(buys(@buyer :private string, @item_buyer:private string, @price_buyer:private int)).
+:-type(sells(Seller:private string, Item_seller:private string, Price_seller:private int)).
+:-type(buys(Buyer :private string, Item_buyer:private string, Price_buyer:private int)).
 
 findPotentialBargain(Buyer,Seller,Product,Price1,Price2) :-
     buys(Buyer,Product,Price1),
@@ -9,6 +9,6 @@ bargain(Buyer,Seller,Product) :-
     findPotentialBargain(Buyer,Seller,Product,Price1,Price2),
     Price1 >= Price2.
 
-:-inputs([@x1:public string]).
+:-inputs([X1:public string]).
 :-outputs([Y]).
-?-bargain(@x1, Y, X2).
+?-bargain(X1, Y, X2).

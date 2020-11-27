@@ -75,7 +75,7 @@ inputDir =
   do
     try . void $ symbol "inputs"
     _ins <- parens . brackets $ do
-      sepBy attributeParse comma
+      sepBy varParse comma
     return . DP.inputDirective $ _ins
 
 outputDir :: Parser DP.Directive
@@ -91,8 +91,8 @@ dbDir =
   do
     try . void $ symbol "type"
     parens $ do
-      pred <- predParse
-      return $ DP.dbDirective pred
+      p <- predParse
+      return $ DP.dbDirective p
 
 body :: Parser [Expr]
 body = sepBy1 aExpr comma

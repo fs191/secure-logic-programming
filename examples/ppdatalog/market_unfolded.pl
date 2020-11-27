@@ -1,5 +1,5 @@
-:-type(sells(@seller:private string, @item:private string, @price:private int)).
-:-type(buys (@buyer :private string, @item:private string, @price:private int)).
+:-type(sells(Seller:private string, Item:private string, Price:private int)).
+:-type(buys (Buyer :private string, Item:private string, Price:private int)).
 
 bargain(X0,X1,X2) :-
     buys(X0, X2, X3),
@@ -8,6 +8,6 @@ bargain(X0,X1,X2) :-
 
 ?-% question: what Alice can buy for her money.
 % the seller's name is a free variable
-:-input([@x : private string]).
+:-input([X : private string]).
 :-output([Y]).
-?-bargain(@x, Y, Z).
+?-bargain(X, Y, Z).

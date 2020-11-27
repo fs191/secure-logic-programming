@@ -23,7 +23,7 @@ import Control.Lens
 
 import Data.Generics.Uniplate.Data as U
 import qualified Data.Set as S
-import qualified Data.List as L hiding (nub)
+import qualified Data.List as L
 import qualified Data.Text as T
 
 data Adornable = Adornable 
@@ -59,7 +59,7 @@ initialize p =
     -- Initialize the state
     gsRules .= p ^. dpRules
     gsRules %= L.insert _gRule
-    gsQueue .= [allBound _gRule (p ^. dpGoal)]
+    gsQueue .= [inputsBound p _gRule (p ^. dpGoal)]
     gsDBClauses .= p ^.. dpDBClauses 
 
 -- | Assigns correct bindings to variables. Creates new rules based on
@@ -101,8 +101,8 @@ popQueue =
   do
     _queue <- use gsQueue
     when (L.null _queue) $ error "trying to pop an empty queue"
-    modify $ gsQueue %~ tail . fromMaybe undefined . nonEmpty
-    return $ head . fromMaybe undefined $ nonEmpty _queue
+    modify $ gsQueue %~ L.tail
+    return $ L.head _queue
 
 adornRule :: Rule -> Rule
 adornRule r = runAdornM $
@@ -217,8 +217,11 @@ bindTerms l  =
     _t <- bindTerms $ L.tail l
     return $ _ad:_t
 
-allBound :: Rule -> Expr -> Adornable
-allBound r e = Adornable r (True <$ args r) e
+inputsBound :: DatalogProgram -> Rule -> Expr -> Adornable
+inputsBound dp r = Adornable r binds
+  where
+    ins = traceShowId $ dp ^.. inputs . folded . varName
+    binds = r ^.. to args . folded . varName . to (`elem` ins)
 
 -- | Suffixes the predicate based on its annotations
 suffixExpr :: Expr -> Expr

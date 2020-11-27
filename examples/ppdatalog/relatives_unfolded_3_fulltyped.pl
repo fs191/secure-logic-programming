@@ -1,4 +1,4 @@
-:-type(par(@child:private string, @parent:private string)).
+:-type(par(Child:private string, Parent:private string)).
 
 % type of X is public since it is goal's input
 % in this case, we could actually deduce that Y should also be a public string
@@ -37,6 +37,6 @@ sg(X:public string,Y:private string) : private bool :-
   par(YY1:private string,YYY1:private string) : private bool,
   XXX1:private string = YYY1:private string   : private bool.
 
-:- inputs([@x1 : public string]).
+:- inputs([X1 : public string]).
 :- outputs([Y : private string]).
-?-sg(@x1:public string, Y:private string) : private bool.
+?-sg(X1:public string, Y:private string) : private bool.

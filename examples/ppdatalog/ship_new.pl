@@ -78,8 +78,8 @@ arrival(Ship,Port,CargoType,Time) :-
     feasible_port(Ship,Port),
     reachability_time(Ship,Port,Time).
 
-%not sure if it is a good idea to use repeating name "@cargotype" in the table and for the inputs
-:-inputs([@portname:private string, @cargotype:private string]).
+%not sure if it is a good idea to use repeating name "Cargotype" in the table and for the inputs
+:-inputs([Portname:private string, Cargotype:private string]).
 :-outputs([MinTime]).
-?-min(arrival(_, @portname, @cargotype, Time), Time, MinTime).
+?-min(arrival(_, Portname, Cargotype, Time), Time, MinTime).
 

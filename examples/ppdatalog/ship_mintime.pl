@@ -1,14 +1,14 @@
-:-type(ship, [@name:primary public string,
-              @latitude:private float,
-              @longitude:private float,
-              @speed:public int,
-              @cargotype:private string,
-              @cargoamount:private int]).
+:-type(ship, [Name:primary public string,
+              Latitude:private float,
+              Longitude:private float,
+              Speed:public int,
+              Cargotype:private string,
+              Cargoamount:private int]).
 
-:-type(port, [@name:primary public string,
-              @latitude:public float,
-              @longitude:public float,
-              @offloadcapacity:public int]).
+:-type(port, [Name:primary public string,
+              Latitude:public float,
+              Longitude:public float,
+              Offloadcapacity:public int]).
 
 %how much Time it takes for Ship to reach the Port?
 reachability_time(Ship,Port,Time) :-
@@ -29,7 +29,7 @@ arrival(Ship,Port,CargoType,Time) :-
     reachability_time(Ship,Port,Time).
 
 %the goal: how fast will the cargo of certain type arrive at a certain port?
-:-inputs([@portname:private string, @cargotype:private string]).
+:-inputs([Portname:private string, Cargotype:private string]).
 :-outputs([MinTime]).
-?-min(arrival(_,@portname,@cargotype,Time), Time, MinTime).
+?-min(arrival(_,Portname,Cargotype,Time), Time, MinTime).
 

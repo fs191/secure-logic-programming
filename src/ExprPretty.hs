@@ -37,8 +37,6 @@ prettyEx (ConstBool e x) =
     (pretty x <>) <$> prettyExAnn e
 prettyEx (ConstFloat e x) =
     (pretty x <>) <$> prettyExAnn e
-prettyEx (Attribute e x) =
-    (pretty x <>) <$> prettyExAnn e
 prettyEx (Hole e) = 
     ("_" <>) <$> prettyExAnn e
 prettyEx (Pred e n args)  =

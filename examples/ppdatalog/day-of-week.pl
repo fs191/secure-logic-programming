@@ -1,5 +1,5 @@
 % Day of week
-:-type(day(@day: private int, @month: private string, @year: private int)).
+:-type(day(Day: private int, Month: private string, Year: private int)).
 
 is_century(Year) :-
   mod(Year, 100) = 0.

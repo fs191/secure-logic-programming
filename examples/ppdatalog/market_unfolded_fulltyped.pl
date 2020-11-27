@@ -1,5 +1,5 @@
-:-type(sells(@seller:private string, @item_seller:private string, @price_seller:private int)).
-:-type(buys(@buyer :private string, @item_buyer:private string, @price_buyer:private int)).
+:-type(sells(Seller:private string, Item_seller:private string, Price_seller:private int)).
+:-type(buys(Buyer :private string, Item_buyer:private string, Price_buyer:private int)).
 
 % combining domain(x) and domain(y) into domain(f(x,y)):
 % public & private -> private
@@ -31,6 +31,6 @@ bargain(X0 : private string,X1 : private string,X2 : private string)  : private 
 % the type of 'x' is private as was assigned by the user
 % the type of Y is private string, matched against 2nd arg of the bargain rule
 % the type of Z is private string, matched against 3rd arg of the bargain rule
-:-inputs([@x : private string]).
+:-inputs([X : private string]).
 :-outputs([Y : private string]).
-?-bargain(@x : private string, Y : private string, Z : private string) : private bool.
+?-bargain(X : private string, Y : private string, Z : private string) : private bool.

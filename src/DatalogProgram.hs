@@ -75,7 +75,7 @@ instance Pretty DatalogProgram where
 instance PrologSource DatalogProgram where
   prolog dp = vsep
     [ vsep $ prolog <$> dp ^. dpRules
-    , prologGoal (dp ^. dpGoal) (dp ^.. inputs) $ dp ^.. outputs
+    , prologGoal (dp ^. dpGoal) (dp ^.. inputs . traversed) $ dp ^.. outputs
     ]
 
 instance PrologSource Directive where
@@ -98,16 +98,12 @@ dirToDBC (DBDirective p@Pred{}) = Just p
 dirToDBC _ = Nothing
 
 -- | Traverse all input directives for input variables
-inputs :: Traversal' DatalogProgram Expr
-inputs = dpDirectives . traversed . _InputDirective . traversed . attrToVar
+inputs :: Traversal' DatalogProgram [Expr]
+inputs = dpDirectives . traversed . _InputDirective
 
 -- | Traverse all output directives for output variables
 outputs :: Traversal' DatalogProgram Expr
 outputs = dpDirectives . traversed . _OutputDirective . traversed
-
--- | Isomorphism between variables and attributes
-attrToVar :: Iso' Expr Expr
-attrToVar = iso (\(Attribute e x) -> Var e x) (\(Var e x) -> Attribute e x)
 
 -- | Prettyprints a goal so that it can be used for testing with swipl
 prologGoal :: Expr -> [Expr] -> [Expr] -> Doc ann
@@ -117,7 +113,7 @@ prologGoal formula ins outs = hcat
   , "],["
   , cat . punctuate ", " $ prolog <$> outs
   , "]) :- "
-  , prolog . variablizeInputs (catMaybes $ identifier <$> ins) $ formula
+  , prolog formula
   , "."
   ]
 
@@ -161,17 +157,6 @@ findRules dp n = dp ^.. dpRules . folded . filtered f
 variablize :: Expr -> Expr
 variablize (Var e n) = Var e $ "IN" <> n
 variablize x = error $ "Attempting to variablize " <> show x
-
--- | Changes the names of all attributes in the goal expression so that they
--- are valid Prolog variables.
-variablizeInputs :: [Text] -> Expr -> Expr
-variablizeInputs ins (Pred e n xs) = Pred e n $ f <$> xs
-  where 
-    f v@(Attribute a n') 
-      | elem n' ins = Attribute a $ "IN" <> n'
-      | otherwise  = v
-    f x = x
-variablizeInputs _ x = error $ "Attempting to variablize " <> show x
 
 -- | Finds an extensional fact with the name `n` from the program
 findDBFact :: DatalogProgram -> Text -> Maybe Rule

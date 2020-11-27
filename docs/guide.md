@@ -3,6 +3,7 @@ title: lpsec
 description: a compiler for the privacy-preserving logic programming language PrivaLog
 ---
 
+# Running lpsec
 # Syntax
 
 PrivaLog has a very similar syntax to Datalog. For this example let's write a program
