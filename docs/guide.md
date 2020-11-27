@@ -192,17 +192,11 @@ Below is a list of all the supported aggregations
 | Aggregation | Description            |
 |:------------|:-----------------------|
 | min         | Minimum value          |
-|             |                        |
 | max         | Maximum value          |
-|             |                        |
 | sum         | Sum of values          |
-|             |                        |
 | count       | Number of results      |
-|             |                        |
 | avg         | Average of the results |
-|             |                        |
 | prod        | Product of the results |
-|             |                        |
 
 # Nondeterminism
 
