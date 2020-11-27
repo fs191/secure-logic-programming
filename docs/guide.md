@@ -180,5 +180,23 @@ of the predicate, so we marked that argument with variable `X` and gave the same
 variable as the second argument of the aggregation. The last argument is a variable 
 that will contain the result of the aggregation.
 
+Below is a list of all the supported aggregations
+
++-------------+------------------------+
+| Aggregation | Description            |
++:============+:=======================+
+| min         | Minimum value          |
++-------------+------------------------+
+| max         | Maximum value          |
++-------------+------------------------+
+| sum         | Sum of values          |
++-------------+------------------------+
+| count       | Number of results      |
++-------------+------------------------+
+| avg         | Average of the results |
++-------------+------------------------+
+| prod        | Product of the results |
++-------------+------------------------+
+
 # Nondeterminism
 
