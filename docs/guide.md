@@ -118,9 +118,9 @@ PrivaLog has the following operators, grouped by precedence (low to high):
 | Operator | Description                |
 |:---------|:---------------------------|
 | ,   <br> | Logical AND <br>           |
-|----------|----------------------------|
+|          |                            |
 | ;   <br> | Logical OR <br>            |
-|----------|----------------------------|
+|          |                            |
 | \>= <br> | Greater than or equal <br> |
 | =<  <br> | Less than or equal <br>    |
 | \>  <br> | Strictly greater <br>      |
@@ -129,27 +129,26 @@ PrivaLog has the following operators, grouped by precedence (low to high):
 | =/= <br> | Expression inequality <br> |
 | =   <br> | Unification <br>           |
 | is  <br> | Bind variable <br>         |
-|----------|----------------------------|
+|          |                            |
 | \+  <br> | Addition <br>              |
 | \-  <br> | Subtraction <br>           |
-|----------|----------------------------|
+|          |                            |
 | \*  <br> | Multiplication <br>        |
 | /   <br> | Division <br>              |
-|----------|----------------------------|
+|          |                            |
 | ^   <br> | Exponentiation <br>        |
-|----------|----------------------------|
+|          |                            |
 | \\+ <br> | Logical negation <br>      |
-|----------|----------------------------|
+|          |                            |
 
 Following is a list of built-in functions
 
-|----------|-------------|
 | Function | Description |
 |:---------|:------------|
 | sqrt(x)  | Square root |
-|----------|-------------|
+|          |             |
 | mod(p,q) | Modulo      |
-|----------|-------------|
+|          |             |
 
 # Aggregations
 
@@ -181,21 +180,20 @@ that will contain the result of the aggregation.
 
 Below is a list of all the supported aggregations
 
-|-------------|------------------------|
 | Aggregation | Description            |
 |:------------|:-----------------------|
 | min         | Minimum value          |
-|-------------|------------------------|
+|             |                        |
 | max         | Maximum value          |
-|-------------|------------------------|
+|             |                        |
 | sum         | Sum of values          |
-|-------------|------------------------|
+|             |                        |
 | count       | Number of results      |
-|-------------|------------------------|
+|             |                        |
 | avg         | Average of the results |
-|-------------|------------------------|
+|             |                        |
 | prod        | Product of the results |
-|-------------|------------------------|
+|             |                        |
 
 # Nondeterminism
 
