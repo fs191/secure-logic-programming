@@ -117,47 +117,47 @@ PrivaLog has the following operators, grouped by precedence (low to high):
 
 | Operator | Description                |
 |:---------|:---------------------------|
-| ,        | Logical AND                |
+| `,`      | Logical AND                |
 
-|          |                            |
+| Operator | Description                |
 |:---------|:---------------------------|
-| ;        | Logical OR                 |
+| `;`      | Logical OR                 |
 
-|          |                            |
+| Operator | Description                |
 |:---------|:---------------------------|
-| \>=      | Greater than or equal      |
-| =<       | Less than or equal         |
-| \>       | Strictly greater           |
-| <        | Strictly less              |
-| =:=      | Expression equality        |
-| =/=      | Expression inequality      |
-| =        | Unification                |
-| is       | Bind variable              |
+| `\>=`    | Greater than or equal      |
+| `=<`     | Less than or equal         |
+| `\>`     | Strictly greater           |
+| `<`      | Strictly less              |
+| `=:=`    | Expression equality        |
+| `=/=`    | Expression inequality      |
+| `=`      | Unification                |
+| `is`     | Bind variable              |
 
-|          |                            |
+| Operator | Description                |
 |:---------|:---------------------------|
-| \+       | Addition                   |
-| \-       | Subtraction                |
+| `\+`     | Addition                   |
+| `\-`     | Subtraction                |
 
-|          |                            |
+| Operator | Description                |
 |:---------|:---------------------------|
 | \*       | Multiplication             |
-| /        | Division                   |
+| `/`      | Division                   |
 
-|          |                            |
+| Operator | Description                |
 |:---------|:---------------------------|
 | ^        | Exponentiation             |
 
-|          |                            |
+| Operator | Description                |
 |:---------|:---------------------------|
-| \\+      | Logical negation           |
+| `\\+`    | Logical negation           |
 
 Following is a list of built-in functions
 
-| Function | Description |
-|:---------|:------------|
-| sqrt(x)  | Square root |
-| mod(p,q) | Modulo      |
+| Function   | Description |
+|:-----------|:------------|
+| `sqrt(x)`  | Square root |
+| `mod(p,q)` | Modulo      |
 
 # Aggregations
 
@@ -191,12 +191,12 @@ Below is a list of all the supported aggregations
 
 | Aggregation | Description            |
 |:------------|:-----------------------|
-| min         | Minimum value          |
-| max         | Maximum value          |
-| sum         | Sum of values          |
-| count       | Number of results      |
-| avg         | Average of the results |
-| prod        | Product of the results |
+| `min`       | Minimum value          |
+| `max`       | Maximum value          |
+| `sum`       | Sum of values          |
+| `count`     | Number of results      |
+| `avg`       | Average of the results |
+| `prod`      | Product of the results |
 
 # Nondeterminism
 
