@@ -115,9 +115,8 @@ PrivaLog supports the following types:
 
 PrivaLog has the following operators, grouped by precedence (low to high):
 
-|----------|----------------------------|
 | Operator | Description                |
-|:=========|:===========================|
+|:---------|:---------------------------|
 | ,   <br> | Logical AND <br>           |
 |----------|----------------------------|
 | ;   <br> | Logical OR <br>            |
@@ -146,7 +145,7 @@ Following is a list of built-in functions
 
 |----------|-------------|
 | Function | Description |
-|:=========|:============|
+|:---------|:------------|
 | sqrt(x)  | Square root |
 |----------|-------------|
 | mod(p,q) | Modulo      |
@@ -184,7 +183,7 @@ Below is a list of all the supported aggregations
 
 |-------------|------------------------|
 | Aggregation | Description            |
-|:============|:=======================|
+|:------------|:-----------------------|
 | min         | Minimum value          |
 |-------------|------------------------|
 | max         | Maximum value          |
