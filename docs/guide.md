@@ -117,38 +117,40 @@ PrivaLog has the following operators, grouped by precedence (low to high):
 
 | Operator | Description                |
 |:---------|:---------------------------|
-| ,   <br> | Logical AND <br>           |
+| ,        | Logical AND                |
 |          |                            |
-| ;   <br> | Logical OR <br>            |
 |          |                            |
-| \>= <br> | Greater than or equal <br> |
-| =<  <br> | Less than or equal <br>    |
-| \>  <br> | Strictly greater <br>      |
-| <   <br> | Strictly less <br>         |
-| =:= <br> | Expression equality <br>   |
-| =/= <br> | Expression inequality <br> |
-| =   <br> | Unification <br>           |
-| is  <br> | Bind variable <br>         |
+| ;        | Logical OR                 |
 |          |                            |
-| \+  <br> | Addition <br>              |
-| \-  <br> | Subtraction <br>           |
 |          |                            |
-| \*  <br> | Multiplication <br>        |
-| /   <br> | Division <br>              |
+| \>=      | Greater than or equal      |
+| =<       | Less than or equal         |
+| \>       | Strictly greater           |
+| <        | Strictly less              |
+| =:=      | Expression equality        |
+| =/=      | Expression inequality      |
+| =        | Unification                |
+| is       | Bind variable              |
 |          |                            |
-| ^   <br> | Exponentiation <br>        |
 |          |                            |
-| \\+ <br> | Logical negation <br>      |
+| \+       | Addition                   |
+| \-       | Subtraction                |
 |          |                            |
+| \*       | Multiplication             |
+| /        | Division                   |
+|          |                            |
+|          |                            |
+| ^        | Exponentiation             |
+|          |                            |
+|          |                            |
+| \\+      | Logical negation           |
 
 Following is a list of built-in functions
 
 | Function | Description |
 |:---------|:------------|
 | sqrt(x)  | Square root |
-|          |             |
 | mod(p,q) | Modulo      |
-|          |             |
 
 # Aggregations
 
