@@ -82,3 +82,7 @@ For example
     swipl -s test_script.pl relatives
     swipl -s test_script.pl fib
     swipl -s test_script.pl market alice garlic
+
+# Documentation
+
+The guide is available [here](https://github.com/fs191/secure-logic-programming/blob/master/docs/guide.md).
