@@ -22,9 +22,11 @@ import Translator.PreProcessing
 import Translator.SemanticsChecker
 import Translator.Transform
 import Translator.TypeInference
+import Translator.Distribute
 import Translator.PubPriv
 
 import DatalogProgram
+import Rule
 import ErrorMsg
 
 data TranslatorConfig = TranslatorConfig
@@ -91,7 +93,10 @@ process conf path =
     let ti2 = typeInference cleared
     printDebug debug "TypeInference2" ti2
 
-    return ti2
+    let dist = ti2 & dpRules . traversed . ruleTail %~ distribute
+    printDebug debug "Distribute" dist
+
+    return dist
 
 printDebug 
   :: (Pretty a, MonadIO m) 

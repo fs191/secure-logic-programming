@@ -53,7 +53,7 @@ module Expr
   , _Var
   , _ConstStr
   , andsToList, orsToList
-  , listToAnds
+  , listToAnds, listToOrs
   , withAndList
   , foldWithAnds
   , predicateVarNames
@@ -72,6 +72,7 @@ module Expr
   , toDNF
   , toCNF
   , groundTerm
+  , exprEq
   ) where
 
 ---------------------------------------------------------
@@ -418,6 +419,10 @@ listToAnds :: [Expr] -> Expr
 listToAnds (h:t) = foldl eAnd h t
 listToAnds [] = eTrue
 
+listToOrs :: [Expr] -> Expr
+listToOrs (h:t) = foldl eOr h t
+listToOrs [] = eFalse
+
 -- | Gets predicate arguments as expressions
 predicateVars :: Expr -> [Expr]
 predicateVars (Pred _ _ vs) = vs
@@ -612,4 +617,9 @@ foldWithAnds es = foldr1 eAnd es
 
 withAndList :: ([Expr] -> [Expr]) -> Expr -> Expr
 withAndList f = listToAnds . f . andsToList
+
+exprEq :: Expr -> Expr -> Bool
+exprEq x y = f x == f y
+  where
+    f = annotation . srcPos .~ Nothing
 
