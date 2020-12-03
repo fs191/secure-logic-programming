@@ -23,6 +23,7 @@ import Translator.SemanticsChecker
 import Translator.Transform
 import Translator.TypeInference
 import Translator.Distribute
+import Translator.Simplify
 import Translator.PubPriv
 
 import DatalogProgram
@@ -96,7 +97,16 @@ process conf path =
     let dist = ti2 & dpRules . traversed . ruleTail %~ distribute
     printDebug debug "Distribute" dist
 
-    return dist
+    post2 <- withExceptT return $ postProcess dist
+    printDebug debug "PostProcess2" post2
+
+    let ad3 = post2 & dpRules . traversed %~ adornRule
+    printDebug debug "AdornRules2" ad3
+
+    let ti3 = typeInference ad3
+    printDebug debug "TypeInference3" ti3
+
+    return ti3
 
 printDebug 
   :: (Pretty a, MonadIO m) 
