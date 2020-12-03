@@ -27,7 +27,7 @@ module Expr
   , less, lessEqual
   , greater, greaterEqual
   , equal
-  , eChoose
+  , eChoose, eMember
   , eIs, eUn
   , eNeg
   , eNot
@@ -386,6 +386,12 @@ eNeq = Neq e
 -- | Creates a new choice expression
 eChoose :: Expr -> Expr -> Expr
 eChoose = Choose empty
+
+eMember :: Expr -> Expr -> Expr
+eMember x l@(List _ y) = eIs (eList [x]) (eChoose l trues)
+  where
+    trues = eList . take (length y) $ repeat eTrue
+eMember _ x = error $ "Expected list, got " <> (show x)
 
 eTrue :: Expr
 eTrue = constBool True

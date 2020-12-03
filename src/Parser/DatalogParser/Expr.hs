@@ -90,6 +90,7 @@ aExpr5 :: Parser Expr
 aExpr5 = choice
   [ unary ops aExpr 
   , binaryFuns binOps aExpr 
+  , member
   , aTerm 
   , par
   ]
@@ -102,6 +103,9 @@ aExpr5 = choice
     binOps =
       [ Operator "mod" eMod
       ]
+
+member :: Parser Expr
+member = binary [(Operator "member" eMember)] aExpr list
 
 unary 
   :: [Operator (Expr -> Expr)] 
