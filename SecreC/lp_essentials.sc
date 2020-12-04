@@ -114,6 +114,7 @@ uint [[1]] widen_indices (uint [[1]] indices, uint m){
 //sublist (of a list) by indices
 template <domain D, type T>
 D T [[1]] select(D T [[1]] a, uint [[1]] src){
+
     uint n = size(src);
     uint [[1]] tgt = iota(n);
     D T [[1]] b (n);
@@ -208,6 +209,25 @@ relColumn<D,T,S> filter(relColumn<D,T,S> a, bool [[1]] bitmask){
     a.val = filter(a.val, bitmask);
     a.str = filter(a.str, bitmask);
     return a;
+}
+
+template <type T>
+T [[2]] filterIndices(T [[2]] a, bool [[1]] bitmask){
+    uint m0 = shape(a)[0];
+    uint m1 = shape(a)[1];
+    uint n1 = sum((uint)bitmask);
+    T [[2]] b (m0,n1);
+
+    for (uint k = 0; k < m0; k++){
+        uint j = 0;
+        for (uint i = 0; i < m1; i++){
+            if (bitmask[i]){
+                b[k,j] = a[k,i];
+                j = j + 1;
+            }
+        }
+    }
+    return b;
 }
 
 //joins two tables by indices
@@ -1799,6 +1819,12 @@ pd_shared3p T [[N]] myCat(public T [[N]] x, pd_shared3p T [[N]] y){
     return myCat(x_pr, y);
 }
 
+template<domain D, type T, type S, domain D0, type T0, type S0, domain D1, type T1, type S1>
+relColumn<D, T, S> myCat(relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y, uint index){
+    relColumn<D, T, S> z = myCat(x,y);
+    z.tableRef = index;
+    return z;
+}
 //postprocessing
 template<domain D>
 D uint32 [[1]] lpShuffle(D bool [[1]] b){

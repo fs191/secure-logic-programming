@@ -412,7 +412,7 @@ funCountSort = SCFunCall "countSortPermutation"
 funQuickSort :: [SCExpr] -> SCExpr
 funQuickSort = SCFunCall "quickSortPermutation"
 funFilter :: [SCExpr] -> SCExpr
-funFilter = SCFunCall "filter"
+funFilter = SCFunCall "filterIndices"
 funMergeIndices :: [SCExpr] -> SCExpr
 funMergeIndices = SCFunCall "mergeTableIndices"
 funCloneIndices :: [SCExpr] -> SCExpr
@@ -836,7 +836,7 @@ ruleBodyToSC extPreds ann argTableType input p xs ys q =
   , VarDecl (variable SCPublic (SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([SCShared3p], map (\(y,i) -> scColTypeI i (y ^. annotation)) ys))) result)
   --
 
-  , VarAsgn (nameTableBB result) (SCVarName nameBB)
+  , VarAsgn (nameTableBB result) (funSelect [SCVarName nameBB, SCVarName nameIS])
   , VarAsgn (nameTableIS result) (SCVarName (nameIS_at 0))
   ] <> asgnOutputArgs <>
   [Return (SCVarName result)]
@@ -862,7 +862,7 @@ ruleBodyToSC extPreds ann argTableType input p xs ys q =
     getIndexDecl = map (\k -> VarAsgn (nameIS_at k) (funExtCol [SCVarName nameMM, SCVarName (nameM k), SCVarName (nameN k)])) ks
                    ++ [VarAsgn (nameIS_at (length ks)) (funIota [SCVarName nameMM])]
 
-    evalBody = concat $ zipWith (\qj j -> formulaToSC extPreds qj j) qs [1..]
+    evalBody = concat $ zipWith (\qj j -> formulaToSC extPreds True qj j) qs [1..]
 
 
 ---------------------------------------------------------------------
@@ -881,19 +881,20 @@ predToSC isSetSemantics extPreds (Pred ann p zs') j =
       
       -- for EDB predicates, the bool type depends on the schema
       let dom  = scDomainFromAnn ann in
-      let addB = case dom of
-                 SCPublic -> (\x -> VarAsgn nameIS $ funFilter [SCVarName nameIS, x])
-                 _        -> (\x -> VarAsgn nameBB $ SCAnd (SCVarName nameBB) x)
+      let updateFilter = if isSetSemantics then const SCEmpty
+                         else case dom of
+                             SCPublic -> (\x -> VarAsgn nameIS $ funFilter [SCVarName nameIS, x])
+                             _        -> (\x -> VarAsgn nameBB $ SCAnd (SCVarName nameBB) x)
       in
 
       -- TODO we would get more optimal privacy types having access to types of extensional predicates
-      let stmts = zipWith (\z i -> formulaToSC extPreds (Un ann z (Var (z ^. annotation) (nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
+      let stmts = zipWith (\z i -> formulaToSC extPreds True (Un ann z (Var (z ^. annotation) (nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
 
       let (comps', asgns') = L.partition snd $ zipWith (\s z -> (s, z ^. annotation ^. annBound)) stmts zs in
       let comps = concat $ map (map (\(VarInit _ bexpr) -> bexpr) . fst) comps' in
       let asgns = concat $ map fst asgns' in
 
-      let bb = if length comps > 0 then [addB $ SCAnds comps] else [] in
+      let bb = if length comps > 0 then [updateFilter $ SCAnds comps] else [] in
       asgns <> bb
 
   else
@@ -1021,57 +1022,62 @@ prepareGoal extPreds goalPred j =
 
 --------------------------------------------------
 -- convert a formula to SecreC (transformation S^F)
-formulaToSC :: S.Set Text -> Expr -> Int -> [Statement]
-formulaToSC extPreds q j =
+formulaToSC :: S.Set Text -> Bool -> Expr -> Int -> [Statement]
+formulaToSC extPreds upd q j =
   [SCEmpty, Comment ("q" <> show j)] <> formulaToSC_case q
   where
     ann = q ^. annotation
     dom = scDomainFromAnn ann
-    addB   = case dom of
-                 SCPublic -> (\x -> VarAsgn nameIS $ funFilter [SCVarName nameIS, x])
-                 _        -> (\x -> VarAsgn nameBB $ SCAnd (SCVarName nameBB) x)
+    updateFilter = if not upd then const SCEmpty
+                   else case dom of
+                       SCPublic -> (\x -> VarAsgn nameIS $ funFilter [SCVarName nameIS, x])
+                       _        -> (\x -> VarAsgn nameBB $ SCAnd (SCVarName nameBB) x)
     bj     = SCVarName (nameB j)
     initBj = VarInit (variable dom (SCArray 1 SCBool) (nameB j))
     formulaToSC_case q' = case q' of
-        ConstBool _ b -> [addB (funReshape [SCConstBool b, SCVarName nameMM])]
+
+        ConstBool _ b -> [initBj $ funReshape [SCConstBool b, SCVarName nameMM], updateFilter bj]
 
         Pred _ p zs   -> predToSC False extPreds q' j
 
         Not _ (Pred _ _ zs) ->
-            [initBj $ SCNot (SCAnds $ zipWith (\z i -> SCEq (exprToSC z) (SCVarName (nameTableArg (nameTable j) i))) zs [0..]), addB bj]
+            [initBj $ SCNot (SCAnds $ zipWith (\z i -> SCEq (exprToSC z) (SCVarName (nameTableArg (nameTable j) i))) zs [0..]), updateFilter bj]
 
+        -- TODO we could put everything into a single expression using bexprToSC
+        -- however, we get problems in the cases where SecreC derives 'pubic x public -> private' type of bop
         Not _ e ->
             let b1 = nameB (ind j 1) in
-            let s1 = formulaToSC extPreds e (ind j 1) in
-            s1 <> [initBj $ SCNot (SCVarName b1), addB bj]
+            let s1 = formulaToSC extPreds False e (ind j 1) in
+            s1 <> [initBj $ SCNot (SCVarName b1), updateFilter bj]
 
         Or _ e1 e2 ->
             let b1 = nameB (ind j 1) in
             let b2 = nameB (ind j 2) in
-            let s1 = formulaToSC extPreds e1 (ind j 1) in
-            let s2 = formulaToSC extPreds e2 (ind j 2) in
-            s1 <> s2 <> [initBj $ SCOr (SCVarName b1) (SCVarName b2), addB bj]
+            let s1 = formulaToSC extPreds False e1 (ind j 1) in
+            let s2 = formulaToSC extPreds False e2 (ind j 2) in
+            s1 <> s2 <> [initBj $ SCOr (SCVarName b1) (SCVarName b2), updateFilter bj]
 
         And _ e1 e2 ->
             let b1 = nameB (ind j 1) in
             let b2 = nameB (ind j 2) in
-            let s1 = formulaToSC extPreds e1 (ind j 1) in
-            let s2 = formulaToSC extPreds e2 (ind j 2) in
-            s1 <> s2 <> [initBj $ SCAnd (SCVarName b1) (SCVarName b2), addB bj]
+            let s1 = formulaToSC extPreds False e1 (ind j 1) in
+            let s2 = formulaToSC extPreds False e2 (ind j 2) in
+            s1 <> s2 <> [initBj $ SCAnd (SCVarName b1) (SCVarName b2), updateFilter bj]
 
-        Lt _ _ _ -> [initBj $ exprToSC q', addB bj]
-        Le _ _ _ -> [initBj $ exprToSC q', addB bj]
-        Gt _ _ _ -> [initBj $ exprToSC q', addB bj]
-        Ge _ _ _ -> [initBj $ exprToSC q', addB bj]
-        Eq _ _ _ -> [initBj $ exprToSC q', addB bj]
+        Lt _ _ _ -> [initBj $ exprToSC q', updateFilter bj]
+        Le _ _ _ -> [initBj $ exprToSC q', updateFilter bj]
+        Gt _ _ _ -> [initBj $ exprToSC q', updateFilter bj]
+        Ge _ _ _ -> [initBj $ exprToSC q', updateFilter bj]
+        Eq _ _ _ -> [initBj $ exprToSC q', updateFilter bj]
 
-        -- TODO this is a workaround for choose construction
+        -- TODO we could make the choose construction more compact
         Un _ (Expr.List _ xs) (Choose _ (Expr.List _ zs) (Expr.List _ bs)) ->
             let n = length bs in
             let zss = chunksOf n zs in
-            [ VarAsgn nameBB $ L.foldr1 (\x y -> funCat [x,y]) $ map (SCAnd (SCVarName nameBB) . bexprToSC) bs
-            , VarAsgn nameIS $ funCloneIndices [SCVarName nameIS, SCConstInt (length bs)]] <>
-            zipWith (\(Var annx x) zs -> VarInit (variable SCPublic (scColType annx) x) $ L.foldr1 (\x y -> funCat [x,y]) $ map exprToSC zs) xs zss
+            [VarAsgn nameBB $ L.foldr1 (\x y -> funCat [x,y]) $ map (SCAnd (funSelect [SCVarName nameBB, SCVarName nameIS]) . bexprToSC) bs] <>
+            (zipWith (\(Var annx x) zs -> VarInit (variable SCPublic (scColType annx) x) $ L.foldr1 (\x y -> funCat [funSelect [x, SCVarName nameIS], funSelect [y, SCVarName nameIS], funDims [SCVarName nameIS]]) $ map exprToSC zs) xs zss)
+            <> 
+            [ VarAsgn nameIS $ funCloneIndices [SCVarName nameIS, SCConstInt (length bs)]]
 
         Un _ e1 e2@(Choose _ _ _) -> formulaToSC_case $ Un ann (eList [e1]) e2
 
@@ -1092,7 +1098,7 @@ formulaToSC extPreds q j =
                                                    else ez
                                    _            -> ez
                           -- if both x and y are not fresh, then compare
-                          ez = [initBj $ exprToSC (Eq ann e1 e2), addB bj]
+                          ez = [initBj $ exprToSC (Eq ann e1 e2), updateFilter bj]
 
         Is _ e1 e2 -> formulaToSC_case (Un ann e1 e2)
 
