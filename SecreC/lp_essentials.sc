@@ -1819,12 +1819,27 @@ pd_shared3p T [[N]] myCat(public T [[N]] x, pd_shared3p T [[N]] y){
     return myCat(x_pr, y);
 }
 
-template<domain D, type T, type S, domain D0, type T0, type S0, domain D1, type T1, type S1>
-relColumn<D, T, S> myCat(relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y, uint index){
+template<domain D, type T0, type S0, type T1, type S1>
+relColumn<D, T0, S0> myCat(relColumn<D, T0, S0> x, relColumn<public, T1, S1> y, uint index){
+    relColumn<D, T0, S0> z = myCat(x,y);
+    z.tableRef = index;
+    return z;
+}
+
+template<domain D, type T, type S>
+relColumn<D, T, S> myCat(relColumn<D, T, S> x, relColumn<D, T, S> y, uint index){
     relColumn<D, T, S> z = myCat(x,y);
     z.tableRef = index;
     return z;
 }
+
+template<domain D, type T0, type S0, type T1, type S1>
+relColumn<D, T1, S1> myCat(relColumn<public, T0, S0> x, relColumn<D, T1, S1> y, uint index){
+    relColumn<D, T1, S1> z = myCat(x,y);
+    z.tableRef = index;
+    return z;
+}
+
 //postprocessing
 template<domain D>
 D uint32 [[1]] lpShuffle(D bool [[1]] b){
