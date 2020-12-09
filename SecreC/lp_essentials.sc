@@ -10,6 +10,62 @@ import table_database;
 
 domain pd_shared3p shared3p;
 
+// the main data structure of LP, one column of a relation
+// we work with transposed relations to support different column types
+template<domain D, type T, type S>
+struct relColumn{
+    uint tableRef;   //reference to the parent table
+    D T [[1]] val;   //column as a value  (used in computation and comparison, e.g. string hash)
+    D S [[2]] str;   //column as a string (used in printing and returning the final result e.g. string itself)
+}
+
+template<domain D, type T>
+relColumn<D,T,T> copyColumn(relColumn<D,T,T> a){
+    relColumn<D,T,T> b;
+    b.tableRef = a.tableRef;
+    b.str = a.str;
+    b.val = a.val;
+    return b;
+}
+
+template<domain D, type T>
+relColumn<D,T,T> copyColumn(relColumn<public,T,T> a){
+    relColumn<D,T,T> b;
+    b.tableRef = a.tableRef;
+    b.str = a.str;
+    b.val = a.val;
+    return b;
+}
+
+relColumn<pd_shared3p,xor_uint32,xor_uint8> copyColumn(relColumn<pd_shared3p,xor_uint32,xor_uint8> a){
+    relColumn<pd_shared3p,xor_uint32,xor_uint8> b;
+    b.tableRef = a.tableRef;
+    b.str = a.str;
+    b.val = a.val;
+    return b;
+}
+
+relColumn<public,uint32,uint8> copyColumn(relColumn<public,uint32,uint8> a){
+    relColumn<public,uint32,uint8> b;
+    b.tableRef = a.tableRef;
+    b.str = a.str;
+    b.val = a.val;
+    return b;
+}
+
+relColumn<pd_shared3p,xor_uint32,xor_uint8> copyColumn(relColumn<public,uint32,uint8> a){
+    relColumn<pd_shared3p,xor_uint32,xor_uint8> b;
+    b.tableRef = a.tableRef;
+    b.str = a.str;
+    b.val = a.val;
+    return b;
+}
+
+template <domain D, type T, type S>
+uint colSize(relColumn<D,T,S> x){
+    return size(x.val);
+}
+
 //the core rearrangement function
 template <type T, type S, dim M, dim N>
 pd_shared3p T [[N]] partialRearrange(pd_shared3p T [[M]] a, pd_shared3p T [[N]] b, S [[1]] source, S [[1]] target){
@@ -20,13 +76,24 @@ pd_shared3p T [[N]] partialRearrange(pd_shared3p T [[M]] a, pd_shared3p T [[N]] 
     return b;
 }
 
-template <type T, type S, dim M, dim N>
-public T [[N]] partialRearrange(public T [[M]] a, public T [[N]] b, S [[1]] source, S [[1]] target){
+template <type T, type S>
+public T [[1]] partialRearrange(public T [[1]] a, public T [[1]] b, S [[1]] source, S [[1]] target){
     assert(size(source) == size(target));
     for (uint i = 0; i < size(source); i++){
         b[target[i]] = a[source[i]];
     }
     return b;
+}
+
+template <type T, type S>
+public T [[2]] partialRearrange(public T [[2]] a, public T [[2]] b, S [[1]] source, S [[1]] target){
+    assert(size(source) == size(target));
+    T [[1]] a_flat = reshape(a,size(a));
+    T [[1]] b_flat = reshape(b,size(b));
+    for (uint i = 0; i < size(source); i++){
+        b_flat[target[i]] = a_flat[source[i]];
+    }
+    return reshape(b_flat, shape(b)[0], shape(b)[1]);
 }
 
 //generalize indices to a second dimension
@@ -43,21 +110,174 @@ uint [[1]] widen_indices (uint [[1]] indices, uint m){
     return result;
 }
 
-//sublist (of a list) by a bitmask
+
+//sublist (of a list) by indices
 template <domain D, type T>
-D T [[1]] filter(D T [[1]] a, bool [[1]] bitmask){
-    uint32 n = sum(bitmask);
-    uint32 [[1]] src (n);
+D T [[1]] select(D T [[1]] a, uint [[1]] src){
+
+    uint n = size(src);
+    uint [[1]] tgt = iota(n);
+    D T [[1]] b (n);
+    return partialRearrange(a, b, src, tgt);
+}
+
+template <domain D, type T>
+D T [[2]] select(D T [[2]] a, uint [[1]] src){
+
+    uint m0 = shape(a)[0];
+    uint m1 = shape(a)[1];
+    uint n = size(src);
+
+    uint [[1]] srcw = widen_indices(src, m1);
+    uint [[1]] tgtw = iota(n*m1);
+
+    D T [[2]] b (n, m1);
+    return partialRearrange(a, b, srcw, tgtw);
+}
+
+template <domain D>
+D bool [[1]] select(D bool [[1]] b, uint [[2]] is){
+    return select(b, is[shape(is)[0] - 1, :]);
+}
+
+template <domain D, type T, type S>
+relColumn<D,T,S> select(relColumn<D,T,S> a, uint [[2]] is){
+    a.val = select(a.val, is[a.tableRef,:]);
+    a.str = select(a.str, is[a.tableRef,:]);
+    return a;
+}
+
+//sublist (of a list) by a bitmask
+template <type T>
+T [[1]] filter(T [[1]] a, bool [[1]] bitmask){
+    uint m = size(bitmask);
+    uint n = sum((uint)bitmask);
+    T [[1]] b (n);
     uint j = 0;
-    for (uint i = 0; i < size(bitmask); i++){
+    for (uint i = 0; i < m; i++){
         if (bitmask[i]){
-            src[j] = (uint32)i;
+            b[j] = a[i];
             j = j + 1;
         }
     }
+    return b;
+}
+
+template <type T>
+T [[2]] filter(T [[2]] a, bool [[1]] bitmask){
+    uint m0 = shape(a)[0];
+    uint m1 = shape(a)[1];
+    uint n0 = sum((uint)bitmask);
+    T [[2]] b (n0,m1);
+    uint j = 0;
+    for (uint i = 0; i < m0; i++){
+        if (bitmask[i]){
+            for (uint k = 0; k < m1; k++){
+                b[j,k] = a[i,k];
+            }
+            j = j + 1;
+        }
+    }
+    return b;
+}
+
+template <domain D, type T>
+D T [[1]] filter(D T [[1]] a, bool [[1]] bitmask){
+    uint m = size(bitmask);
+    uint n = sum((uint)bitmask);
+    uint [[1]] src = iota(m);
+    src = filter(src, bitmask);
+    uint [[1]] tgt = iota(n);
     D T [[1]] b (n);
-    uint32 [[1]] tgt = iota(n);
     return partialRearrange(a, b, src, tgt);
+}
+
+template <domain D, type T>
+D T [[2]] filter(D T [[2]] a, bool [[1]] bitmask){
+    uint m0 = shape(a)[0];
+    uint m1 = shape(a)[1];
+    uint n0 = sum((uint)bitmask);
+    uint [[1]] src = iota(m0);
+    src = widen_indices(filter(src, bitmask), m1);
+    uint [[1]] tgt = iota(n0*m1);
+    D T [[2]] b (n0,m1);
+    return partialRearrange(a, b, src, tgt);
+}
+
+template <domain D, type T, type S>
+relColumn<D,T,S> filter(relColumn<D,T,S> a, bool [[1]] bitmask){
+    a.val = filter(a.val, bitmask);
+    a.str = filter(a.str, bitmask);
+    return a;
+}
+
+template <type T>
+T [[2]] filterIndices(T [[2]] a, bool [[1]] bitmask){
+    uint m0 = shape(a)[0];
+    uint m1 = shape(a)[1];
+    uint n1 = sum((uint)bitmask);
+    T [[2]] b (m0,n1);
+
+    for (uint k = 0; k < m0; k++){
+        uint j = 0;
+        for (uint i = 0; i < m1; i++){
+            if (bitmask[i]){
+                b[k,j] = a[k,i];
+                j = j + 1;
+            }
+        }
+    }
+    return b;
+}
+
+//joins two tables by indices
+//assuming that the first table rows are indexed 0...m, and the second table is a multiset of 0 ... m
+// e.g. join of {{0,1,2,3,4}} and {1,2,2,4,4,4} is {{1,2,2,4,4,4},{0,1,2,3,4,5}}
+//      join of {{1,2,2,4,4,4},{0,1,2,3,4,5}} and {0,0,3,5} is {{1,1,4,4},{0,0,3,5},{0,1,2,3}}
+template <type T>
+T [[2]] mergeTableIndices (T [[2]] iss, T [[1]] is){
+
+    uint n = shape(iss)[0];
+    uint m = shape(is)[0];
+
+    //we are left with as many rows as the new constraint sets
+    T [[2]] new_iss (n+1, m);
+
+    //update the first table
+    uint [[1]] tgt = iota(m);
+    for (uint i = 0; i < n; i++){
+        new_iss[0,:] = partialRearrange(iss[0,:], new_iss[0,:], is, tgt);
+    }
+    //add a new column that corresponds to the second table
+    new_iss[n,:] = tgt;
+    return new_iss;
+
+}
+
+//clones table indices to represent a non-deterministic choice
+//the "chosen" variable is assigned the last index
+template <type T>
+T [[2]] cloneTableIndices (T [[2]] iss, int _k){
+
+    uint k = (uint)_k;
+
+    uint m = shape(iss)[0];
+    uint n = shape(iss)[1];
+
+    uint [[2]] new_iss (m+1, k*n);
+
+    for(uint i = 0; i < k; i++){
+        new_iss[0:m,i*n:(i+1)*n] = iss;
+    }
+    new_iss[m,:] = iota(k*n);
+
+    return new_iss;
+
+}
+
+//measures dimensionality of indices
+uint dims(uint [[2]] is){
+    return shape(is)[0];
 }
 
 //replicates each variable in a block n times
@@ -415,7 +635,7 @@ D T [[2]] unapplyPermutation(D T [[2]] A, D U [[1]] pi){
 template <domain D, type T, type S, type U>
 relColumn<D,T,S> applyPermutation (relColumn<D,T,S> a, D U [[1]] pi){
     relColumn<D,T,S> b;
-    b.fv  = reshape(false, size(a.fv));
+    b.tableRef  = a.tableRef;
     b.str = applyPermutation(a.str, pi);
     b.val = applyPermutation(a.val, pi);
     return b;
@@ -424,7 +644,7 @@ relColumn<D,T,S> applyPermutation (relColumn<D,T,S> a, D U [[1]] pi){
 template <domain D, type T, type S, type U>
 relColumn<D,T,S> applyPermutation (relColumn<D,T,S> a, U [[1]] pi){
     relColumn<D,T,S> b;
-    b.fv  = reshape(false, size(a.fv));
+    b.tableRef = a.tableRef;
     b.str = applyPermutation(b.str, pi);
     b.val = applyPermutation(b.val, pi);
     return b;
@@ -433,7 +653,7 @@ relColumn<D,T,S> applyPermutation (relColumn<D,T,S> a, U [[1]] pi){
 template <domain D, type T, type S, type U>
 relColumn<D,T,S> applyPermutation (relColumn<public,T,S> a, D U [[1]] pi){
     relColumn<D,T,S> b;
-    b.fv  = reshape(false, size(a.fv));
+    b.tableRef = a.tableRef;
     b.str = applyPermutation(b.str, pi);
     b.val = applyPermutation(b.val, pi);
     return b;
@@ -931,69 +1151,7 @@ D uint32 [[1]] countSortPermutation(D T [[1]] key) {
     return pi;
 }
 
-/*
-template<domain D, type T1, type T2>
-struct strColumn{
-    D T1 [[1]] col;
-    D T2 [[2]] col_str;
-}
-*/
 
-//one column of a relation
-//we work with transposed relations to support different column types
-template<domain D, type T, type S>
-struct relColumn{
-    bool [[1]] fv;
-    D T [[1]] val;
-    D S [[2]] str;
-}
-
-template<domain D, type T>
-relColumn<D,T,T> copyColumn(relColumn<D,T,T> a){
-    relColumn<D,T,T> b;
-    b.fv = a.fv;
-    b.str = a.str;
-    b.val = a.val;
-    return b;
-}
-
-template<domain D, type T>
-relColumn<D,T,T> copyColumn(relColumn<public,T,T> a){
-    relColumn<D,T,T> b;
-    b.fv = a.fv;
-    b.str = a.str;
-    b.val = a.val;
-    return b;
-}
-
-relColumn<pd_shared3p,xor_uint32,xor_uint8> copyColumn(relColumn<pd_shared3p,xor_uint32,xor_uint8> a){
-    relColumn<pd_shared3p,xor_uint32,xor_uint8> b;
-    b.fv = a.fv;
-    b.str = a.str;
-    b.val = a.val;
-    return b;
-}
-
-relColumn<public,uint32,uint8> copyColumn(relColumn<public,uint32,uint8> a){
-    relColumn<public,uint32,uint8> b;
-    b.fv = a.fv;
-    b.str = a.str;
-    b.val = a.val;
-    return b;
-}
-
-relColumn<pd_shared3p,xor_uint32,xor_uint8> copyColumn(relColumn<public,uint32,uint8> a){
-    relColumn<pd_shared3p,xor_uint32,xor_uint8> b;
-    b.fv = a.fv;
-    b.str = a.str;
-    b.val = a.val;
-    return b;
-}
-
-template <domain D, type T, type S>
-uint colSize(relColumn<D,T,S> x){
-    return size(x.val);
-}
 
 template<domain D, type T1, type T2, dim N>
 T2 [[N]] declassifyIfNeed(D T1 [[N]] x){
@@ -1123,13 +1281,19 @@ D bool [[1]] extendColumn(D bool [[1]] x, uint m, uint mi, uint ni){
     return copyBlock(myReplicate(x,  ms, ns), {mi * ni}, {m / (mi * ni)});
 }
 
+uint [[1]] extendColumn(uint [[1]] x, uint m, uint mi, uint ni){
+    uint [[1]] ms (mi); ms = 1;
+    uint [[1]] ns (mi); ns = ni;
+    return copyBlock(myReplicate(x,  ms, ns), {mi * ni}, {m / (mi * ni)});
+}
+
 template<domain D, type T, type S>
 relColumn<D, T, S> extendColumn(relColumn<D, T, S> x, uint m, uint mi, uint ni){
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
 
     public relColumn<D, T, S> result;
-    result.fv  = copyBlock(myReplicate(x.fv,  ms, ns), {mi * ni}, {m / (mi * ni)});
+    result.tableRef = x.tableRef;
     result.val = copyBlock(myReplicate(x.val, ms, ns), {mi * ni}, {m / (mi * ni)});
     result.str = copyBlock(myReplicate(x.str, ms, ns), {mi * ni}, {m / (mi * ni)});
     return result;
@@ -1137,33 +1301,29 @@ relColumn<D, T, S> extendColumn(relColumn<D, T, S> x, uint m, uint mi, uint ni){
 }
 
 template<domain D, type T, type T0>
-relColumn<D, T, T> getDBColumn(string ds, string tableName, T0 _colIndex, uint m, uint mi, uint ni){
-
+relColumn<D, T, T> getDBColumn(string ds, string tableName, T0 _colIndex, uint m, uint mi, uint ni, T0 _tableIndex){
     uint colIndex = (uint)_colIndex;
+    uint tableIndex = (uint)_tableIndex;
+
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
 
     D T [[1]] col = tdbReadColumn(ds, tableName, colIndex);
     col = mySlice(col,0,min(size(col),mi));
 
-    //print("reportedNumRows:",mi);
-    //print("colSize:",        size(col));
-
     col = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
-    //print("colSizeRep:", size(col));
 
     public relColumn<D, T, T> result;
-    result.fv  = reshape(false, m);
+
+    result.tableRef = tableIndex;
     result.val = col;
     result.str = reshape((T)0, m, 0);
     return result;
 }
 
-//TODO check out why it does not work with polymorphic T (like public string column)
-//template< type T>
-relColumn<pd_shared3p, xor_uint32, xor_uint8> getDBColumn(string ds, string tableName, int64 _colIndex, uint m, uint mi, uint ni){
-    //print("start:",mi);
+relColumn<pd_shared3p, xor_uint32, xor_uint8> getDBColumn(string ds, string tableName, int64 _colIndex, uint m, uint mi, uint ni, int64 _tableIndex){
     uint colIndex = (uint)_colIndex;
+    uint tableIndex = (uint)_tableIndex;
     uint rv;
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
@@ -1187,17 +1347,18 @@ relColumn<pd_shared3p, xor_uint32, xor_uint8> getDBColumn(string ds, string tabl
     col_str = copyBlock(myReplicate(col_str, ms, ns), {mi * ni}, {m / (mi * ni)});
 
     public relColumn<pd_shared3p, xor_uint32, xor_uint8> result;
-    result.fv  = reshape(false, m);
+
+    result.tableRef = tableIndex;
     result.val = col;
     result.str = col_str;
-    //print("finish:",mi);
     return result;
 }
 
 template<type T>
-relColumn<public, uint32, uint8> getDBColumn(string ds, string tableName, T _colIndex, uint m, uint mi, uint ni){
-    //print("start:",mi);
+relColumn<public, uint32, uint8> getDBColumn(string ds, string tableName, T _colIndex, uint m, uint mi, uint ni, T _tableIndex){
+
     uint colIndex = (uint)_colIndex;
+    uint tableIndex = (uint)_tableIndex;
     uint rv;
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
@@ -1223,11 +1384,25 @@ relColumn<public, uint32, uint8> getDBColumn(string ds, string tableName, T _col
     col_str = copyBlock(myReplicate(col_str, ms, ns), {mi * ni}, {m / (mi * ni)});
 
     public relColumn<public, uint32, uint8> result;
-    result.fv  = reshape(false, m);
+
+    result.tableRef = tableIndex;
     result.val = col;
     result.str = col_str;
-    //print("finish:",mi);
     return result;
+}
+
+template<domain D, type T, type S, type T0>
+relColumn<D, T, S> getDBColumn(string ds, string tableName, T0 colIndex, uint mi, T0 tableIndex){
+    return getDBColumn(ds, tableName, colIndex, mi, mi, 1 :: uint, tableIndex);
+}
+
+uint [[1]] getExtensionIndices(uint m, uint mi, uint ni){
+
+    uint [[1]] ms (mi); ms = 1;
+    uint [[1]] ns (mi); ns = ni;
+
+    uint [[1]] col = iota(mi);
+    return copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
 }
 
 // write public data to secret-shared database (create table step)
@@ -1379,36 +1554,42 @@ void writePublicToTable(string ds, string tableName, T [[1]] _colDataType, T [[1
 //convert a string to uint32 hash
 
 //public->public
-relColumn<public, uint32, uint8> constStrColumn(string arg, uint m){
+relColumn<public, uint32, uint8> constStrColumn(string arg, uint m, uint n){
     pd_shared3p xor_uint8 [[1]] blstr = bl_str(arg);
     uint8 [[1]] str = declassify(blstr);
     uint32 val = declassify(CRC32(blstr));
     relColumn<public, uint32, uint8> result;
     result.val = reshape(val,m);
     result.str = reshape(copyBlock(str,{size(str)},{m}),m,size(str));
-    result.fv = reshape(false,m);
+
+    result.tableRef = n-1;
+
     return result;
 }
 
 //private->private
-relColumn<pd_shared3p, xor_uint32, xor_uint8> constStrColumn(pd_shared3p xor_uint8 [[1]] arg, uint m){
+relColumn<pd_shared3p, xor_uint32, xor_uint8> constStrColumn(pd_shared3p xor_uint8 [[1]] arg, uint m, uint n){
     pd_shared3p xor_uint32 val = CRC32(arg);
     relColumn<pd_shared3p, xor_uint32, xor_uint8> result;
     result.val = reshape(val,m);
     result.str = reshape(copyBlock(arg,{size(arg)},{m}),m,size(arg));
-    result.fv = reshape(false,m);
+
+    result.tableRef = n-1;
+
     return result;
 }
 
 /*
 //public->private
-relColumn<pd_shared3p, xor_uint32, xor_uint8> constStrColumn(string arg, uint m){
+relColumn<pd_shared3p, xor_uint32, xor_uint8> constStrColumn(string arg, uint m, uint n){
     pd_shared3p xor_uint8 [[1]] str = bl_str(arg);
     pd_shared3p xor_uint32 val = CRC32(str);
     relColumn<pd_shared3p, xor_uint32, xor_uint8> result;
     result.val = reshape(val,m);
     result.str = reshape(copyBlock(str,{size(str)},{m}),m,size(str));
-    result.fv = reshape(false,m);
+
+    result.tableRef = n-1;
+
     return result;
 }
 */
@@ -1418,23 +1599,27 @@ relColumn<pd_shared3p, xor_uint32, xor_uint8> constStrColumn(string arg, uint m)
 //public->public
 //private->private
 template <domain D, type T>
-relColumn<D, int32, int32> constIntColumn(D T arg0, uint m){
+relColumn<D, int32, int32> constIntColumn(D T arg0, uint m, uint n){
     D int32 arg = (int32)arg0;
     relColumn<D, int32, int32> result;
     result.val = reshape(arg,m);
     result.str = reshape(0,m,0);
-    result.fv = reshape(false,m);
+
+    result.tableRef = n-1;
+
     return result;
 }
 
 //public->private
 template <domain D, type T>
-relColumn<D, int32, int32> constIntColumn(T arg0, uint m){
+relColumn<D, int32, int32> constIntColumn(T arg0, uint m, uint n){
     D int32 arg = (int32)arg0;
     relColumn<D, int32, int32> result;
     result.val = reshape(arg,m);
     result.str = reshape(0,m,0);
-    result.fv = reshape(false,m);
+
+    result.tableRef = n-1;
+
     return result;
 }
 
@@ -1443,23 +1628,27 @@ relColumn<D, int32, int32> constIntColumn(T arg0, uint m){
 //public->public
 //private->private
 template <domain D, type T>
-relColumn<D, float32, float32> constFloatColumn(D T arg0, uint m){
+relColumn<D, float32, float32> constFloatColumn(D T arg0, uint m, uint n){
     D float32 arg = (float32)arg0;
     relColumn<D, float32, float32> result;
     result.val = reshape(arg,m);
     result.str = reshape(0,m,0);
-    result.fv = reshape(false,m);
+
+    result.tableRef = n-1;
+
     return result;
 }
 
 //public->private
 template <domain D, type T>
-relColumn<D, float32, float32> constFloatColumn(T arg0, uint m){
+relColumn<D, float32, float32> constFloatColumn(T arg0, uint m, uint n){
     D float32 arg = (float32)arg0;
     relColumn<D, float32, float32> result;
     result.val = reshape(arg,m);
     result.str = reshape(0,m,0);
-    result.fv = reshape(false,m);
+
+    result.tableRef = n-1;
+
     return result;
 }
 
@@ -1468,23 +1657,27 @@ relColumn<D, float32, float32> constFloatColumn(T arg0, uint m){
 //public->public
 //private->private
 template <domain D, type T>
-relColumn<D, bool, bool> constBoolColumn(D T arg0, uint m){
+relColumn<D, bool, bool> constBoolColumn(D T arg0, uint m, uint n){
     D bool arg = (bool)arg0;
     relColumn<D, bool, bool> result;
     result.val = reshape(arg,m);
     result.str = reshape(false,m,0);
-    result.fv = reshape(false,m);
+
+    result.tableRef = n-1;
+
     return result;
 }
 
 //public->private
 template <domain D, type T>
-relColumn<D, bool, bool> constBoolColumn(T arg0, uint m){
+relColumn<D, bool, bool> constBoolColumn(T arg0, uint m, uint n){
     D bool arg = (bool)arg0;
     relColumn<D, bool, bool> result;
     result.val = reshape(arg,m);
     result.str = reshape(false,m,0);
-    result.fv = reshape(false,m);
+
+    result.tableRef = n-1;
+
     return result;
 }
 
@@ -1493,21 +1686,23 @@ relColumn<D, bool, bool> constBoolColumn(T arg0, uint m){
 //public->public
 //private->private
 template <domain D, type T, type T0>
-relColumn<D, T, T> constColumn(D T0 arg0, uint m){
+relColumn<D, T, T> constColumn(D T0 arg0, uint m, uint n){
     D T arg = (T)arg0;
     relColumn<D, T, T> result;
     result.val = reshape(arg,m);
     result.str = reshape(0,m,0);
-    result.fv = reshape(false,m);
+
+    result.tableRef = n-1;
+
     return result;
 }
 
-relColumn<public, uint32, uint8> constColumn(string arg, uint m){
-    return constStrColumn(arg, m);
+relColumn<public, uint32, uint8> constColumn(string arg, uint m, uint n){
+    return constStrColumn(arg, m, n);
 }
 
-relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(pd_shared3p xor_uint8 [[1]] arg, uint m){
-    return constStrColumn(arg, m);
+relColumn<pd_shared3p, xor_uint32, xor_uint8> constColumn(pd_shared3p xor_uint8 [[1]] arg, uint m, uint n){
+    return constStrColumn(arg, m, n);
 }
 
 //public->private
@@ -1517,7 +1712,8 @@ relColumn<D, T, T> constColumn(float32 arg0){
     relColumn<D, T, T> result;
     result.val = reshape(arg,1);
     result.str = reshape((T)0,1,0);
-    result.fv = reshape(false,1);
+    result.tableRef = 0;
+
     return result;
 }
 
@@ -1527,7 +1723,8 @@ relColumn<D, T, T> constColumn(T0 arg0){
     relColumn<D, T, T> result;
     result.val = reshape(arg,1);
     result.str = reshape((T)0,1,0);
-    result.fv = reshape(false,1);
+    result.tableRef = 0;
+
     return result;
 }
 
@@ -1538,22 +1735,12 @@ relColumn<D, T, T> constColumn(T0 arg0){
 //if column size is not specified, we assume that it is 1
 template <domain D, type T0, type T, dim N>
 T0 constColumn(D T [[N]] arg){
-    return constColumn(arg, 1 :: uint);
+    return constColumn(arg, 1 :: uint, 1 :: uint);
 }
 
-//an empty column with all-free-variables
-template <domain D, type T, type S>
-relColumn<D, T, S> freeVarColumn(uint m){
-    relColumn<D, T, S> result;
-    result.val = reshape((T)0,m);
-    result.str = reshape((S)0,m,0);
-    result.fv  = reshape(true,m);
-    return result;
-}
-
-template <domain D, type T, type S>
-relColumn<D, T, S> freeVarColumn(){
-    return freeVarColumn(1 :: uint);
+template <domain D, type T0, type T, dim N>
+T0 constColumn(D T [[N]] arg, uint m){
+    return constColumn(arg, m, 1 :: uint);
 }
 
 //a column of booleans
@@ -1570,7 +1757,7 @@ D bool [[1]] trueColumn(){
 
 template<domain D, type T, type S>
 relColumn<D, T, S> myCat(relColumn<D, T, S> x, relColumn<D, T, S> y){
-    x.fv  = myCat(x.fv,  y.fv);
+
     x.val = myCat(x.val, y.val);
     if (shape(x.str)[0] == 0){
         x.str = y.str;
@@ -1587,7 +1774,9 @@ relColumn<D, T1, S1> myCat(relColumn<public, T0, S0> x, relColumn<D, T1, S1> y){
     D T1 [[1]] xval = x.val;
     D S1 [[2]] xstr = x.str;
     relColumn<D, T1, S1> z;
-    z.fv  = myCat(x.fv,  y.fv);
+
+    z.tableRef = x.tableRef;
+
     z.val = myCat(xval, y.val);
     if (shape(x.str)[0] == 0){
         z.str = y.str;
@@ -1604,7 +1793,9 @@ relColumn<D, T0, S0> myCat(relColumn<D, T0, S0> x, relColumn<public, T1, S1> y){
     D T0 [[1]] yval = y.val;
     D S0 [[2]] ystr = y.str;
     relColumn<D, T0, S0> z;
-    z.fv  = myCat(x.fv,  y.fv);
+
+    z.tableRef = x.tableRef;
+
     z.val = myCat(x.val, yval);
     if (shape(x.str)[0] == 0){
         z.str = ystr;
@@ -1628,89 +1819,12 @@ pd_shared3p T [[N]] myCat(public T [[N]] x, pd_shared3p T [[N]] y){
     return myCat(x_pr, y);
 }
 
-
-//simple unification (without comparing term structure which we delegate to preprocessing)
-// we return a bit denoting whether the terms were unifiable, and the result of unification
-template<domain D, type T>
-struct subst {
-    D bool [[1]] b;
-    T arg0;
-}
-
-template<domain D, type T, type S>
-subst<D, relColumn<D, T, S> > unify(relColumn<D, T, S> x, T y){
-
-    uint m = size(x.val);
-    relColumn<D, T, S> y_col;
-    y_col.val = reshape(y,m);
-    y_col.str = reshape((S)0,m,0);
-    y_col.fv  = reshape(false,m);
-    return unify(x, y_col);
-}
-
-template<domain D, type T, type S>
-subst<D, relColumn<D, T, S> > unify(relColumn<D, T, S> x, string y){
-
-    D S [[1]] y_str = bl_str(y);
-    D T y_val = CRC32(y);
-
-    uint m = size(x.b);
-    uint n = size(y_str);
-
-    uint [[1]] ms (m); ms = 1;
-    uint [[1]] ns (m); ns = n;
-
-    relColumn<D, T, S> y_col;
-    y_col.val = reshape(y_val,m);
-    y_col.str = reshape(copyBlock(y_str,ms,ns),m,n);
-    y_col.fv  = reshape(false,m);
-    return unify(x, y_col);
-}
-
 template<domain D, type T, type S, domain D0, type T0, type S0, domain D1, type T1, type S1>
-subst<D, relColumn<D, T, S> > unify(relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y){
-
-    assert(size(x.val) == size(y.val));
-    D bool [[1]] b = (x.val == y.val) | x.fv | y.fv;
-
-
-    bool [[1]] fv = x.fv & y.fv;
-
-    //need special treatment for strings
-    uint m = shape(x.str)[0];
-    uint n = max(shape(x.str)[1], shape(y.str)[1]);
-
-    D0 S0 [[2]] xstr = reshape((S0)0, shape(x.str)[0], max(shape(x.str)[1], n));
-    xstr = mySetSlice(x.str, xstr, 0, shape(x.str)[0], 0, shape(x.str)[1]);
-
-    D1 S1 [[2]] ystr = reshape((S1)0, shape(y.str)[0], max(shape(y.str)[1], n));
-    ystr = mySetSlice(y.str, ystr, 0, shape(y.str)[0], 0, shape(y.str)[1]);
-
-    uint [[1]] ms (m); ms = 1;
-    uint [[1]] ns (m); ns = n;
-
-    bool [[2]] xfv = reshape(myReplicate(x.fv, ms, ns), m, n);
-
-    //printArray(x.fv);
-    //pd_shared3p S0 [[2]] xstr0 = xstr;
-    //pd_shared3p S1 [[2]] ystr0 = ystr;
-    //printMatrix(declassify(xstr0));
-    //printMatrix(declassify(ystr0));
-    D T [[1]] val = choose(x.fv, y.val, x.val);
-    D S [[2]] str = choose(xfv, ystr, xstr);
-
-    relColumn<D, T, S> z;
-    z.val = val;
-    z.str = str;
-    z.fv = fv;
-
-    subst<D, relColumn<D, T, S> > theta;
-    theta.b = b;
-    theta.arg0 = z;
-
-    return theta;
+relColumn<D, T, S> myCat(relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y, uint index){
+    relColumn<D, T, S> z = myCat(x,y);
+    z.tableRef = index;
+    return z;
 }
-
 //postprocessing
 template<domain D>
 D uint32 [[1]] lpShuffle(D bool [[1]] b){
@@ -1931,48 +2045,37 @@ D bool [[1]] bop(string s, relColumn<D, T1, S1> x, relColumn<D, T2, S2> y){
 
 //boolean operation on data
 template<type T1, type T2, type S1, type S2>
-pd_shared3p bool [[1]] bop(string s, relColumn<pd_shared3p, T1, S1> x, relColumn<public, T2, S2> y, bool [[1]] b){
-    return _bop(s, x, y, b);
+pd_shared3p bool [[1]] bop(string s, relColumn<pd_shared3p, T1, S1> x, relColumn<public, T2, S2> y, uint [[2]] is){
+    return _bop(s, x, y, is);
 }
 
 template<type T1, type T2, type S1, type S2>
-pd_shared3p bool [[1]] bop(string s, relColumn<public, T1, S1> x, relColumn<pd_shared3p, T2, S2> y, bool [[1]] b){
-    return _bop(s, x, y, b);
+pd_shared3p bool [[1]] bop(string s, relColumn<public, T1, S1> x, relColumn<pd_shared3p, T2, S2> y, uint [[2]] is){
+    return _bop(s, x, y, is);
 }
 
 template<domain D, type T1, type T2, type S1, type S2>
-D bool [[1]] bop(string s, relColumn<D, T1, S1> x, relColumn<D, T2, S2> y, bool [[1]] b){
-    return _bop(s, x, y, b);
+D bool [[1]] bop(string s, relColumn<D, T1, S1> x, relColumn<D, T2, S2> y, uint [[2]] is){
+    return _bop(s, x, y, is);
 }
 
 template<domain D, domain D1, domain D2, type T1, type T2, type S1, type S2>
-D bool [[1]] _bop(string s, relColumn<D1, T1, S1> x, relColumn<D2, T2, S2> y, bool [[1]] b){
-    uint [[1]] src = filterToIndices(b);
-    uint n = size(src);
-    uint m = size(b);
-    uint [[1]] tgt = iota(n);
+D bool [[1]] _bop(string s, relColumn<D1, T1, S1> x, relColumn<D2, T2, S2> y, uint [[2]] is){
 
-    D1 T1 [[1]] x0 (n); x0 = partialRearrange(x.val, x0, src, tgt);
-    D2 T2 [[1]] y0 (n); y0 = partialRearrange(y.val, y0, src, tgt);
-    D bool [[1]] z0 = apply_bop(s, x0, y0);
-    D bool [[1]] z (m);
+    uint m = shape(is)[1];
 
-    return partialRearrange(z0, z, tgt, src);
+    uint [[1]] tgt = iota(m);
+    uint [[1]] srcx (m);
+    uint [[1]] srcy (m);
+
+    D1 T1 [[1]] x0 (m); x0 = partialRearrange(x.val, x0, is[x.tableRef,:], tgt);
+    D2 T2 [[1]] y0 (m); y0 = partialRearrange(y.val, y0, is[y.tableRef,:], tgt);
+    D bool [[1]] z = apply_bop(s, x0, y0);
+
+    return z;
 
 }
 
-uint [[1]] filterToIndices(bool [[1]] bitmask){
-    uint n = sum((uint)bitmask);
-    uint [[1]] indices (n);
-    uint j = 0;
-    for (uint i = 0; i < size(bitmask); i++){
-        if (bitmask[i]){
-            indices[j] = (uint)i;
-            j = j + 1;
-        }
-    }
-    return indices;
-}
 
 //integer division that rounds the result down to the nearest integer
 template<domain D, domain D0, domain D1>
@@ -2048,10 +2151,9 @@ D T [[1]] apply_aop(string s, D0 T [[1]] x, D1 T [[1]] y){
 //--
 template<domain D, type T, type S>
 relColumn<D, float32, float32> cast_float32(relColumn<D, T, S> x){
-    assert(sum((uint)x.fv) == 0);
 
     relColumn<D, float32, float32> y;
-    y.fv  = x.fv;
+    y.tableRef = x.tableRef;
     y.val = (float32)x.val;
     y.str = (float32)x.str;
     return y;
@@ -2061,46 +2163,75 @@ relColumn<D, float32, float32> cast_float32(relColumn<D, T, S> x){
 template<domain D, type T>
 relColumn<D, float32, float32> apply_sqrt(relColumn<D, T, T> x){
     relColumn<D, float32, float32> z;
-    z.fv  = false;
+    z.tableRef = x.tableRef;
     z.val = sqrt((float32)x.val);
     z.str = reshape(0,shape(x.str)[0], shape(x.str)[1]);
     return z;
 }
 
 //join of aop domains
+// TODO add indices to all aop-s
 template<type T, type S>
-relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, relColumn<public, T, S> y){
-    assert(sum((uint)x.fv) == 0);
-    assert(sum((uint)y.fv) == 0);
+relColumn<pd_shared3p, T, S> aop(string s, relColumn<pd_shared3p, T, S> x, relColumn<public, T, S> y, uint [[2]] is){
+
+    uint m = shape(is)[1];
+
+    uint [[1]] tgt = iota(m);
+    uint [[1]] srcx (m);
+    uint [[1]] srcy (m);
+
+    pd_shared3p T [[1]] x0 (m); x0 = partialRearrange(x.val, x0, is[x.tableRef,:], tgt);
+    public T [[1]] y0 (m);      y0 = partialRearrange(y.val, y0, is[y.tableRef,:], tgt);
 
     relColumn<pd_shared3p, T, S> z;
-    z.fv  = false;
-    z.val = apply_aop(s, x.val, y.val);
-    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
+
+    z.tableRef = shape(is)[0] - 1;
+
+    z.val = apply_aop(s, x0, y0);
+    z.str = reshape((S)0, shape(z.val)[0], shape(x.str)[1]);
     return z;
 }
 
 template<type T, type S>
-relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, relColumn<pd_shared3p, T, S> y){
-    assert(sum((uint)x.fv) == 0);
-    assert(sum((uint)y.fv) == 0);
+relColumn<pd_shared3p, T, S> aop(string s, relColumn<public, T, S> x, relColumn<pd_shared3p, T, S> y, uint [[2]] is){
+
+    uint m = shape(is)[1];
+
+    uint [[1]] tgt = iota(m);
+    uint [[1]] srcx (m);
+    uint [[1]] srcy (m);
+
+    public T [[1]] x0 (m);      x0 = partialRearrange(x.val, x0, is[x.tableRef,:], tgt);
+    pd_shared3p T [[1]] y0 (m); y0 = partialRearrange(y.val, y0, is[y.tableRef,:], tgt);
 
     relColumn<pd_shared3p, T, S> z;
-    z.fv  = false;
+
+    z.tableRef = shape(is)[0] - 1;
+
     z.val = apply_aop(s, x.val, y.val);
-    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
+    z.str = reshape((S)0,shape(z.val)[0], shape(x.str)[1]);
     return z;
 }
 
 template<domain D, type T, type S>
-relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, relColumn<D, T, S> y){
-    assert(sum((uint)x.fv) == 0);
-    assert(sum((uint)y.fv) == 0);
+relColumn<D, T, S> aop(string s, relColumn<D, T, S> x, relColumn<D, T, S> y, uint [[2]] is){
+
+    uint m = shape(is)[1];
+
+    uint [[1]] tgt = iota(m);
+    uint [[1]] srcx (m);
+    uint [[1]] srcy (m);
+
+    D T [[1]] x0 (m); x0 = partialRearrange(x.val, x0, is[x.tableRef,:], tgt);
+    D T [[1]] y0 (m); y0 = partialRearrange(y.val, y0, is[y.tableRef,:], tgt);
 
     relColumn<D, T, S> z;
-    z.fv  = false;
+
+    //TODO this should map to the last column
+    z.tableRef = 0;
+
     z.val = apply_aop(s, x.val, y.val);
-    z.str = reshape((S)0,shape(x.str)[0], shape(x.str)[1]);
+    z.str = reshape((S)0,shape(z.val)[0], shape(x.str)[1]);
     return z;
 }
 
@@ -2113,7 +2244,8 @@ relColumn<D0, int32, int32> count_filter(relColumn<D, T, S> x, D0 bool [[1]] b, 
     D0 int32 [[1]] bu = (int32)b;
 
     relColumn<D, int32, int32> y;
-    y.fv  = false;
+
+    y.tableRef = x.tableRef;
     y.val = sum(bu,n);
     y.str = reshape(0,n,0);
 
@@ -2127,7 +2259,7 @@ relColumn<D0, T, S> sum_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     D0 int32 [[1]] bu = (int32)b;
 
     relColumn<D, T, S> y;
-    y.fv  = false;
+    y.tableRef = x.tableRef;
     y.val = sum(x.val * bu, n);
     y.str = reshape((S)0,n,0);
 
@@ -2141,7 +2273,7 @@ relColumn<D0, float32, float32> avg_filter(relColumn<D, T, S> x, D0 bool [[1]] b
     D0 int32 [[1]] bu = (int32)b;
 
     relColumn<D, float32, float32> y;
-    y.fv  = false;
+    y.tableRef = x.tableRef;
     y.val = (float32)sum(x.val * bu, n) / (float32)sum(bu,n);
     y.str = reshape(0,n,0);
 
@@ -2172,7 +2304,7 @@ relColumn<D0, T, S> min_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     T dummy;
     T ff = maxValue(dummy);
     relColumn<D, T, S> y;
-    y.fv  = false;
+    y.tableRef = x.tableRef;
     y.val = min(bu * (x.val - maxValue(dummy)) + maxValue(dummy), n);
     y.str = reshape((S)0,n,0);
 
@@ -2187,7 +2319,7 @@ relColumn<D0, T, S> max_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
 
     T dummy;
     relColumn<D, T, S> y;
-    y.fv  = false;
+    y.tableRef = x.tableRef;
     y.val = max(bu * (x.val - minValue(dummy)) + minValue(dummy), n);
     y.str = reshape((S)0,n,0);
 
@@ -2201,7 +2333,7 @@ relColumn<D0, T, S> times_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     D0 int32 [[1]] bu = (int32)b;
 
     relColumn<D, T, S> y;
-    y.fv  = false;
+    y.tableRef = x.tableRef;
     y.val = product(bu * (x.val - 1) + 1, n);
     y.str = reshape((S)0,n,0);
 

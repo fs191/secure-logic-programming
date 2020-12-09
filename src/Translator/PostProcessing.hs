@@ -209,7 +209,7 @@ mergeTwoMatchingRules r1 r2 =
            else if (length as_from1 == 0) && (length as_from2 == 0) then
 
                let rHead = r1 ^. ruleHead in
-               let rTail = L.foldr1 eAnd $ ps <> cs_common <> [eOr (foldr eAnd eTrue cs_from1) (foldr eAnd eTrue cs_from2)] <> as_common in
+               let rTail = L.foldr1 eAnd $ ps <> as_common <> [eOr (foldr eAnd eTrue cs_from1) (foldr eAnd eTrue cs_from2)] <> cs_common in
                [Rule rHead rTail]
 
            -- if the assignments are different, then we are dealing with non-determinism
@@ -233,11 +233,7 @@ mergeTwoMatchingRules r1 r2 =
                let cats = map (\x -> eIs (var x) $ eChoose (eList [getValue subst1 x, getValue subst2 x]) (eList [cs1', cs2'])) asgnVars in
 
                let rHead = r1 ^. ruleHead in
-               let rTail = L.foldr1 eAnd $ ps <> cs_common <> as1' <> as2' <> cats in
-               --trace (show (pretty (r1 ^. ruleTail))) $
-               --trace (show (pretty (r2 ^. ruleTail))) $
-               --trace (show asgnVars) $
-               --trace (show (pretty rTail)) $
+               let rTail = L.foldr1 eAnd $ ps <> as1' <> as2' <> cats <> cs_common in
 
                -- apply 'simplify' to get rid of intermediate variables
                [simplifyRule $ Rule rHead rTail]
@@ -251,7 +247,6 @@ foldChoose (Choose ann (Expr.List _ xs) (Expr.List _ bs)) =
     let bs' = concat $ zipWith (\b y -> case y of {(Choose _ (Expr.List _ xs0) (Expr.List _ bs0)) -> map (eAnd b) bs0 ; _ -> [b]}) bs ys in
     (Choose ann (eList xs') (eList bs'))
 foldChoose e = e
-    --trace (show e) $ e
 
 foldChooseDP :: DatalogProgram -> DatalogProgram
 foldChooseDP dp = dp & dpRules . traversed . ruleTail %~ (\ttl -> L.foldr1 eAnd $ map foldChoose (simplifyAnds' ttl))
