@@ -1628,87 +1628,25 @@ pd_shared3p T [[N]] myCat(public T [[N]] x, pd_shared3p T [[N]] y){
     return myCat(x_pr, y);
 }
 
-
-//simple unification (without comparing term structure which we delegate to preprocessing)
-// we return a bit denoting whether the terms were unifiable, and the result of unification
-template<domain D, type T>
-struct subst {
-    D bool [[1]] b;
-    T arg0;
+template<domain D, type T0, type S0, type T1, type S1>
+relColumn<D, T0, S0> myCat(relColumn<D, T0, S0> x, relColumn<public, T1, S1> y, uint index){
+    relColumn<D, T0, S0> z = myCat(x,y);
+    z.tableRef = index;
+    return z;
 }
 
 template<domain D, type T, type S>
-subst<D, relColumn<D, T, S> > unify(relColumn<D, T, S> x, T y){
-
-    uint m = size(x.val);
-    relColumn<D, T, S> y_col;
-    y_col.val = reshape(y,m);
-    y_col.str = reshape((S)0,m,0);
-    y_col.fv  = reshape(false,m);
-    return unify(x, y_col);
+relColumn<D, T, S> myCat(relColumn<D, T, S> x, relColumn<D, T, S> y, uint index){
+    relColumn<D, T, S> z = myCat(x,y);
+    z.tableRef = index;
+    return z;
 }
 
-template<domain D, type T, type S>
-subst<D, relColumn<D, T, S> > unify(relColumn<D, T, S> x, string y){
-
-    D S [[1]] y_str = bl_str(y);
-    D T y_val = CRC32(y);
-
-    uint m = size(x.b);
-    uint n = size(y_str);
-
-    uint [[1]] ms (m); ms = 1;
-    uint [[1]] ns (m); ns = n;
-
-    relColumn<D, T, S> y_col;
-    y_col.val = reshape(y_val,m);
-    y_col.str = reshape(copyBlock(y_str,ms,ns),m,n);
-    y_col.fv  = reshape(false,m);
-    return unify(x, y_col);
-}
-
-template<domain D, type T, type S, domain D0, type T0, type S0, domain D1, type T1, type S1>
-subst<D, relColumn<D, T, S> > unify(relColumn<D0, T0, S0> x, relColumn<D1, T1, S1> y){
-
-    assert(size(x.val) == size(y.val));
-    D bool [[1]] b = (x.val == y.val) | x.fv | y.fv;
-
-
-    bool [[1]] fv = x.fv & y.fv;
-
-    //need special treatment for strings
-    uint m = shape(x.str)[0];
-    uint n = max(shape(x.str)[1], shape(y.str)[1]);
-
-    D0 S0 [[2]] xstr = reshape((S0)0, shape(x.str)[0], max(shape(x.str)[1], n));
-    xstr = mySetSlice(x.str, xstr, 0, shape(x.str)[0], 0, shape(x.str)[1]);
-
-    D1 S1 [[2]] ystr = reshape((S1)0, shape(y.str)[0], max(shape(y.str)[1], n));
-    ystr = mySetSlice(y.str, ystr, 0, shape(y.str)[0], 0, shape(y.str)[1]);
-
-    uint [[1]] ms (m); ms = 1;
-    uint [[1]] ns (m); ns = n;
-
-    bool [[2]] xfv = reshape(myReplicate(x.fv, ms, ns), m, n);
-
-    //printArray(x.fv);
-    //pd_shared3p S0 [[2]] xstr0 = xstr;
-    //pd_shared3p S1 [[2]] ystr0 = ystr;
-    //printMatrix(declassify(xstr0));
-    //printMatrix(declassify(ystr0));
-    D T [[1]] val = choose(x.fv, y.val, x.val);
-    D S [[2]] str = choose(xfv, ystr, xstr);
-
-    relColumn<D, T, S> z;
-    z.val = val;
-    z.str = str;
-    z.fv = fv;
-
-    subst<D, relColumn<D, T, S> > theta;
-    theta.b = b;
-    theta.arg0 = z;
-
-    return theta;
+template<domain D, type T0, type S0, type T1, type S1>
+relColumn<D, T1, S1> myCat(relColumn<public, T0, S0> x, relColumn<D, T1, S1> y, uint index){
+    relColumn<D, T1, S1> z = myCat(x,y);
+    z.tableRef = index;
+    return z;
 }
 
 //postprocessing
