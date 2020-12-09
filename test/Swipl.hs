@@ -160,9 +160,9 @@ compileSC file iterations = errExit False $ withTmpDir act
         let err = error "Cannot parse file"
         let _prog = fromRight err _prog'
         let conf = defaultOptions 
-          {_iterations = iterations
-          , _inFile = file
-          }
+              { _iterations = iterations
+              , _inFile = file
+              }
         trans <- runExceptT $ runReaderT process conf
         trans' <- case trans of
           Left ex -> do
