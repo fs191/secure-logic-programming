@@ -36,12 +36,15 @@ deriveAllGroundRules
      ) 
   => DatalogProgram 
   -> m DatalogProgram
-deriveAllGroundRules program = f program
+deriveAllGroundRules = loopPipeline pipeline
   where
-    -- Input program but db clauses are converted to rules
-    f rs = loopPipeline pipeline rs
     pipeline dp = 
       do
+        strat <- view inliningStrategy
+        let inlFun = case strat of
+              BreadthFirst -> inlineOnceBFS
+              DepthFirst -> inlineOnceDFS
+              FullGround -> inlineOnceGr
         pl0 <- dp & id %~ inlineOnceBFS
                   & dpRules . traversed %~ refreshRule "X_"
                   & dpRules %%~ filterM checkConsistency
@@ -69,11 +72,8 @@ loopPipeline pipeline dp = do
         loopPipeline pipeline dp'
 
 -- | Tries to unify the first predicate in each rule body with an appropriate rule using Breadth-First-Search strategy
-
 inlineOnceBFS :: DatalogProgram -> DatalogProgram
 inlineOnceBFS dp = 
-  --trace "====" $
-  --traceShow (pretty dp) $
   --trace (show (length (dp ^. dpRules))) $
   --trace (show (length (filter (isGround dp) (dp ^. dpRules)))) $
   dp & dpRules .~ rs'
@@ -98,6 +98,81 @@ inlineOnceBFS dp =
                   let subster x = applySubst x (tgt & ruleTail .~ mut stl)
                   maybeToList $ subster <$> subst
       res
+
+-- | Tries to unify the first predicate in each rule body with an appropriate rule using Depth-First-Search strategy
+inlineOnceDFS :: DatalogProgram -> DatalogProgram
+inlineOnceDFS dp = 
+  --trace "====" $
+  --trace (show (length (dp ^. dpRules))) $
+  --trace (show (length potentialSrc)) $
+  dp & dpRules .~ rs'
+
+  where
+    rs' = potentialSrc <> inlined <> (if length potentialTgt > 0 then tail potentialTgt else [])
+    rs  = dp ^. dpRules
+    (potentialSrc, potentialTgt') = L.partition (isGround dp) rs
+
+    -- we start from the rules that contain the least amount of IDB predicates and hence bring us ground rules faster
+    potentialTgt = L.sortOn (uncertaintyDegree dp) potentialTgt'
+
+    inlined = do
+      tgt <- refreshRule "T_" <$> L.head potentialTgt
+      let ttl = tgt ^. ruleTail
+      let fil (x,_) = isPredicate x && isIDBFact dp x
+      let tlPreds = filter fil $ U.contexts ttl
+      (p,mut) <- L.head tlPreds
+      let res
+            | null tlPreds = return tgt
+            | otherwise = 
+                do
+                  src <- findRules dp $ p ^. predName
+                  let shd = src ^. ruleHead
+                  let stl = src ^. ruleTail
+                  let subst = unify shd p
+                  let subster x = applySubst x (tgt & ruleTail .~ mut stl)
+                  maybeToList $ subster <$> subst
+      res
+
+-- | Tries to unify the first predicate in each rule body with an appropriate rule using full-ground strategy
+inlineOnceGr :: DatalogProgram -> DatalogProgram
+inlineOnceGr dp = 
+  --trace "====" $
+  --trace (show (length rs)) $
+  --trace (show (pretty potentialSrc)) $
+  --trace (show (pretty inlined)) $
+  --trace (show (length potentialTgt)) $
+  dp & dpRules .~ rs'
+
+
+  where
+    rs' = potentialSrc <> inlined <> potentialTgt
+    rs  = dp ^. dpRules
+    (potentialSrc, potentialTgt) = L.partition (isGround dp) rs
+
+    fil (x,_) = isPredicate x && isIDBFact dp x
+
+    inlined = do
+      tgt <- potentialTgt
+      substututeAllIDB tgt
+
+    substututeAllIDB :: Rule -> [Rule]
+    substututeAllIDB tgt' =
+        let tgt = refreshRule "T_" tgt' in
+        let ttl = tgt ^. ruleTail in
+        let tlPreds = filter fil $ U.contexts ttl in
+        if length tlPreds == 0 then [tgt]
+        else
+            let (p,mut) = fromMaybe undefined $ viaNonEmpty head tlPreds in
+            let tgts = do                
+                     src <- filter (isGround dp) $ findRules dp $ p ^. predName
+                     let shd = src ^. ruleHead
+                     let stl = src ^. ruleTail
+                     let subst = unify shd p
+                     let subster x = applySubst x (tgt & ruleTail .~ mut stl)
+                     maybeToList $ subster <$> subst
+            in
+            --trace ("\n" ++ show (pretty p) ++ "\n" ++ show (pretty tgt) ++ "\n" ++ show (pretty tgts)) $
+            concat $ map substututeAllIDB tgts
 
 -- Removes duplicate terms from AND operations at the root expression
 simplifyAnds :: Expr -> Expr

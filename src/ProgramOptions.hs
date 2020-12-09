@@ -2,6 +2,7 @@
 
 module ProgramOptions
   ( ProgramOptions(..)
+  , InliningStrategy(..)
   , iterations
   , dbCreateTables
   , verbose
@@ -10,6 +11,7 @@ module ProgramOptions
   , inferTypesOnly
   , debug
   , skipSemCheck
+  , inliningStrategy
   , defaultOptions
   ) where
 
@@ -17,15 +19,21 @@ import Relude
 
 import Control.Lens
 
+data InliningStrategy
+  = BreadthFirst
+  | DepthFirst
+  | FullGround
+
 data ProgramOptions = ProgramOptions
-  { _iterations     :: Int
-  , _dbCreateTables :: Bool
-  , _verbose        :: Bool
-  , _inferTypesOnly :: Bool
-  , _outFile        :: Text
-  , _debug          :: Bool
-  , _inFile         :: Text
-  , _skipSemCheck   :: Bool
+  { _iterations       :: Int
+  , _dbCreateTables   :: Bool
+  , _verbose          :: Bool
+  , _inferTypesOnly   :: Bool
+  , _outFile          :: Text
+  , _debug            :: Bool
+  , _inFile           :: Text
+  , _skipSemCheck     :: Bool
+  , _inliningStrategy :: InliningStrategy
   }
 makeLenses ''ProgramOptions
 
@@ -39,5 +47,6 @@ defaultOptions = ProgramOptions
   , _debug = False
   , _inFile = ""
   , _skipSemCheck = False
+  , _inliningStrategy = BreadthFirst
   }
 

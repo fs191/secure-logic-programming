@@ -65,6 +65,18 @@ programArgs = ProgramOptions
          , help "Skips the semantics check"
          , hidden
          ])
+  <*> option (maybeReader $ stratReader . toText) (mconcat
+        [ short 's'
+        , long "inlining-strategy"
+        , help "Specify the inlining strategy. Possible values:\n\
+        \ bfs, dfs, gr"
+        ])
+
+stratReader :: Text -> Maybe InliningStrategy
+stratReader "bfs" = Just BreadthFirst
+stratReader "dfs" = Just DepthFirst
+stratReader "gr" = Just FullGround
+stratReader _ = Nothing
 
 getProgramOptions :: IO ProgramOptions
 getProgramOptions = execParser opts
