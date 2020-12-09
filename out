@@ -1,0 +1,272 @@
+import stdlib;
+import shared3p;
+import shared3p_string;
+import shared3p_table_database;
+import table_database;
+
+import lp_essentials;
+
+
+
+struct out_sells
+{
+    public relColumn< pd_shared3p,xor_uint32,xor_uint8>  arg0;
+    public relColumn< pd_shared3p,xor_uint32,xor_uint8>  arg1;
+    public relColumn< pd_shared3p,int32,int32>  arg2;
+}
+
+struct out_buys
+{
+    public relColumn< pd_shared3p,xor_uint32,xor_uint8>  arg0;
+    public relColumn< pd_shared3p,xor_uint32,xor_uint8>  arg1;
+    public relColumn< pd_shared3p,int32,int32>  arg2;
+}
+
+out_sells getTable_sells (public string ds, public uint m, public int index)
+{
+    public out_sells result;
+    result.arg0 = getDBColumn(ds, "sells", 0, m, index);
+    result.arg1 = getDBColumn(ds, "sells", 1, m, index);
+    result.arg2 = getDBColumn(ds, "sells", 2, m, index);
+    return result;
+}
+
+out_buys getTable_buys (public string ds, public uint m, public int index)
+{
+    public out_buys result;
+    result.arg0 = getDBColumn(ds, "buys", 0, m, index);
+    result.arg1 = getDBColumn(ds, "buys", 1, m, index);
+    result.arg2 = getDBColumn(ds, "buys", 2, m, index);
+    return result;
+}
+
+template< domain D,type T0> 
+struct in_bargain_bff
+{
+    D bool [[1]] b;
+    public uint [[1]] indices;
+    public T0 arg0;
+}
+
+template< domain D,type T1,type T2> 
+struct out_bargain_bff
+{
+    D bool [[1]] b;
+    public uint [[1]] indices;
+    public T1 arg1;
+    public T2 arg2;
+}
+
+out_bargain_bff< pd_shared3p
+,relColumn< pd_shared3p,xor_uint32,xor_uint8> 
+,relColumn< pd_shared3p
+,xor_uint32
+,xor_uint8> >  goal_bargain_bff_0 ( public string ds
+, public in_bargain_bff< pd_shared3p,relColumn< public,uint32,uint8> >  args )
+{
+    
+    //compute the number of solutions in used EDB predicates
+    public uint m0 = size(args.b);
+    public uint m1 = tdbGetRowCount(ds, "buys");
+    public uint m2 = tdbGetRowCount(ds, "sells");
+    public uint m = m0* m1* m2;
+    public uint n0 = (m) / (m0);
+    public uint n1 = (m) / (m0* m1);
+    public uint n2 = (m) / (m0* m1* m2);
+    
+    //initial args
+    public in_bargain_bff< pd_shared3p
+    ,relColumn< public,uint32,uint8> >  table0 = args;
+    
+    //extract EDB predicate data
+    public out_buys edb_table_1 = getTable_buys(ds, m1, 1);
+    public out_sells edb_table_2 = getTable_sells(ds, m2, 2);
+    
+    //initalize table selection indices
+    public uint [[2]] indices = reshape(0, 4, m);
+    indices[0,:] = getExtensionIndices(m, m0, n0);
+    indices[1,:] = getExtensionIndices(m, m1, n1);
+    indices[2,:] = getExtensionIndices(m, m2, n2);
+    indices[3,:] = iota(m);
+    
+    //assign input variables
+    public relColumn< public,uint32,uint8>  X_0 = table0.arg0;
+    
+    //initialize filter
+    pd_shared3p bool [[1]] b = select(table0.b, indices[0,:]);
+    
+    //evaluate the clause body
+    
+    //q1
+    
+    //q1000
+    public relColumn< pd_shared3p
+    ,xor_uint32
+    ,xor_uint8>  X_3 = copyColumn(edb_table_1.arg0);
+    
+    //q1001
+    public relColumn< pd_shared3p
+    ,xor_uint32
+    ,xor_uint8>  X_4 = copyColumn(edb_table_1.arg1);
+    
+    //q1002
+    public relColumn< pd_shared3p
+    ,int32
+    ,int32>  X_5 = copyColumn(edb_table_1.arg2);
+    
+    //q2
+    
+    //q2000
+    public relColumn< pd_shared3p
+    ,xor_uint32
+    ,xor_uint8>  X_6 = copyColumn(edb_table_2.arg0);
+    
+    //q2001
+    public relColumn< pd_shared3p
+    ,xor_uint32
+    ,xor_uint8>  X_7 = copyColumn(edb_table_2.arg1);
+    
+    //q2002
+    public relColumn< pd_shared3p
+    ,int32
+    ,int32>  X_8 = copyColumn(edb_table_2.arg2);
+    
+    //q3
+    pd_shared3p bool [[1]] b3 = bop(">=", X_5, X_8, indices);
+    b = (b) & (b3);
+    
+    //q4
+    public relColumn< pd_shared3p,xor_uint32,xor_uint8>  X_2 = copyColumn(X_4);
+    
+    //q5
+    pd_shared3p bool [[1]] b5 = bop("==", X_2, X_7, indices);
+    b = (b) & (b5);
+    
+    //q6
+    pd_shared3p bool [[1]] b6 = bop("==", X_0, X_3, indices);
+    b = (b) & (b6);
+    
+    //q7
+    public relColumn< pd_shared3p,xor_uint32,xor_uint8>  X_1 = copyColumn(X_6);
+    
+    //q8
+    pd_shared3p bool [[1]] b8 = bop( "=="
+    , X_2
+    , constStrColumn("garlic", m, dims(indices))
+    , indices );
+    b = (b) & (b8);
+    
+    //output the updated predicate arguments
+    public out_bargain_bff< pd_shared3p
+    ,relColumn< pd_shared3p,xor_uint32,xor_uint8> 
+    ,relColumn< pd_shared3p,xor_uint32,xor_uint8> >  result;
+    result.b = select(b, indices);
+    result.indices = indices[0,:];
+    result.arg1 = select(X_1, indices);
+    result.arg2 = select(X_2, indices);
+    return result;
+}
+
+template< type T0,type T1,type T2> 
+T0 cat_bargain_bff (public T1 t1, public T2 t2)
+{
+    public T0 t0;
+    t0.b = myCat(t1.b, t2.b);
+    t0.indices = myCat(t1.indices, t2.indices);
+    t0.arg1 = myCat(t1.arg1, t2.arg1);
+    t0.arg2 = myCat(t1.arg2, t2.arg2);
+    return t0;
+}
+
+template< domain D,type T,type T0,type T1> 
+T0 permute_bargain_bff (public T1 t, D T [[1]] pi)
+{
+    public T0 result;
+    result.b = applyPermutation(t.b, pi);
+    result.indices = iota(size(t.indices));
+    result.arg1 = applyPermutation(t.arg1, pi);
+    result.arg2 = applyPermutation(t.arg2, pi);
+    return result;
+}
+
+template< type T0,type T1> 
+T0 getTable_bargain_bff (public string ds, public T1 args)
+{
+    public T0 result;
+    public out_bargain_bff< pd_shared3p
+    ,relColumn< pd_shared3p,xor_uint32,xor_uint8> 
+    ,relColumn< pd_shared3p
+    ,xor_uint32
+    ,xor_uint8> >  result0 = goal_bargain_bff_0(ds, args);
+    result = cat_bargain_bff(result, result0);
+    return result;
+}
+
+template< type T0,type T1> 
+T0 deduplicate_bargain_bff (public T1 t)
+{
+    pd_shared3p uint32 [[1]] pi;
+    public T0 result;
+    result.b = t.b;
+    result.indices = t.indices;
+    result.arg1 = copyColumn(t.arg1);
+    result.arg2 = copyColumn(t.arg2);
+    pi = countSortPermutation(result.b);
+    result = permute_bargain_bff(result, pi);
+    pi = quickSortPermutation(result.arg1);
+    result = permute_bargain_bff(result, pi);
+    pi = quickSortPermutation(result.arg2);
+    result = permute_bargain_bff(result, pi);
+    result.b = (result.b) & (!((findRepeating( result.arg2 )) & (findRepeating( result.arg1 ))));
+    return result;
+}
+
+void main ()
+{
+    //get user inputs
+    public string input_x1 = argument("x1");
+    //initialize input dimensions
+    public uint m = 1;
+    pd_shared3p bool [[1]] b = reshape(true, m);
+    public uint [[2]] indices = reshape(0, 1, m);
+    //construct input columns
+    public relColumn< public,uint32,uint8>  x1 = constColumn( input_x1
+    , m
+    , dims(indices) );
+    //open DB connection
+    public string ds = "DS1";
+    tdbOpenConnection(ds);
+    
+    //call the goal predicate
+    public relColumn< public,uint32,uint8>  arg1_0 = x1;
+    public in_bargain_bff< pd_shared3p,relColumn< public,uint32,uint8> >  args1;
+    args1.b = b;
+    args1.indices = iota(m);
+    args1.arg0 = arg1_0;
+    public out_bargain_bff< pd_shared3p
+    ,relColumn< pd_shared3p,xor_uint32,xor_uint8> 
+    ,relColumn< pd_shared3p
+    ,xor_uint32
+    ,xor_uint8> >  idb_table1 = getTable_bargain_bff(ds, args1);
+    public out_bargain_bff< pd_shared3p
+    ,relColumn< pd_shared3p,xor_uint32,xor_uint8> 
+    ,relColumn< pd_shared3p
+    ,xor_uint32
+    ,xor_uint8> >  idb_table_set1 = deduplicate_bargain_bff(idb_table1);
+    public relColumn< pd_shared3p
+    ,xor_uint32
+    ,xor_uint8>  Y = idb_table_set1.arg1;
+    public relColumn< pd_shared3p
+    ,xor_uint32
+    ,xor_uint8>  Z = idb_table_set1.arg2;
+    b = idb_table_set1.b;
+    
+    //close DB connection
+    tdbCloseConnection(ds);
+    
+    //shuffle and publish final result
+    public uint32 n = declassifyIfNeed(sum((uint32)b));
+    pd_shared3p uint32 [[1]] pi = lpShuffle(b);
+    publishCol(0, "Y", filterTrue(pi, n, Y));
+    publishCol(1, "Z", filterTrue(pi, n, Z));
+}

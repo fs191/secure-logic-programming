@@ -1,8 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module Translator 
-  ( TranslatorConfig(..)
-  , process
+  ( process
   ) where
 
 import Relude
@@ -29,96 +28,97 @@ import Translator.PubPriv
 import DatalogProgram
 import Rule
 import ErrorMsg
-
-data TranslatorConfig = TranslatorConfig
-  { _tcIterations :: Int
-  , _debug        :: Bool
-  , _skipSem      :: Bool
-  }
+import ProgramOptions
 
 process 
-  :: TranslatorConfig 
-  -> FilePath 
-  -> ExceptT [CompilerException] IO DatalogProgram
-process conf path = 
+  :: ( MonadIO m
+     , MonadReader ProgramOptions m
+     , MonadError CompilerException m
+     )
+  => m DatalogProgram
+process = 
   do
-    src <- readFileText path
+    path <- view inFile
+    src <- readFileText $ toString path
     dp <- case parseDatalog (toText path) src of
       Right x -> return x
       Left ex -> do
         putTextLn . show $ errorMsg "" ex 
         exitFailure
-    let debug = _debug conf
-    printDebug debug "Original" dp
+    dbg <- view debug
+    printDebug "Original" dp
     
-    let skipSem = _skipSem conf
+    skipSem <- view skipSemCheck
     unless skipSem $ do
       let (ex, success) = checkSemantics dp
       forM_ ex $ putTextLn . show . errorMsg src
       unless success exitFailure
-    liftIO . when debug $ putTextLn "Semantics check succeeded"
+    liftIO . when dbg $ putTextLn "Semantics check succeeded"
     let adp = adornProgram dp
-    printDebug debug "Adornment" adp
+    printDebug "Adornment" adp
 
-    pp <- withExceptT return $ preProcess adp
-    printDebug debug "PreProcessing" pp
+    pp <- preProcess adp
+    printDebug "PreProcessing" pp
 
     --let mag  = magicSets ap
-    let ite   = _tcIterations conf
-    tf <- liftIO $ deriveAllGroundRules ite pp
-    printDebug debug "Transform" tf
+    tf <- deriveAllGroundRules pp
+    printDebug "Transform" tf
 
     let pk    = pkTransform tf
-    printDebug debug "PKTransform" pk
+    printDebug "PKTransform" pk
 
-    post' <- withExceptT return $ postProcess pk
-    printDebug debug "PostProcess" post'
-    when (null $ post' ^. dpRules) $ throwError [DoesNotConverge]
+    post' <- postProcess pk
+    printDebug "PostProcess" post'
+    when (null $ post' ^. dpRules) $ throwError DoesNotConverge
 
     -- currently, simplifyRule may break some annotation, so we need to derive it again
     let ad = post' & dpRules . traversed %~ adornRule
-    printDebug debug "AdornRules" ad
+    printDebug "AdornRules" ad
 
     let ti = typeInference ad
-    printDebug debug "TypeInference" ti
+    printDebug "TypeInference" ti
 
     let pubPriv = pubPrivTransform ti
-    printDebug debug "PubPriv Reorder" pubPriv
+    printDebug "PubPriv Reorder" pubPriv
 
     let ad2 = pubPriv & dpRules . traversed %~ adornRule
-    printDebug debug "AdornRules2" ad2
+    printDebug "AdornRules2" ad2
 
     let cleared = clearTypings ad2
-    printDebug debug "ClearTypings" cleared
+    printDebug "ClearTypings" cleared
 
     let ti2 = typeInference cleared
-    printDebug debug "TypeInference2" ti2
+    printDebug "TypeInference2" ti2
 
     let dist = ti2 & dpRules . traversed . ruleTail %~ distribute
-    printDebug debug "Distribute" dist
+    printDebug "Distribute" dist
 
-    post2 <- withExceptT return $ postProcess dist
-    printDebug debug "PostProcess2" post2
+    post2 <- postProcess dist
+    printDebug "PostProcess2" post2
 
     let ad3 = post2 & dpRules . traversed %~ adornRule
-    printDebug debug "AdornRules2" ad3
+    printDebug "AdornRules2" ad3
 
     let ti3 = typeInference ad3
-    printDebug debug "TypeInference3" ti3
+    printDebug "TypeInference3" ti3
 
     return ti3
 
 printDebug 
-  :: (Pretty a, MonadIO m) 
-  => Bool 
-  -> Text 
+  :: ( Pretty a
+     , MonadIO m
+     , MonadReader ProgramOptions m
+     )
+  => Text 
   -> a 
   -> m ()
-printDebug debug component prog = 
-  liftIO . when debug $ do
-    putTextLn $ "[" <> component <> "]"
-    putTextLn "=========="
-    putTextLn . show $ pretty prog
-    putTextLn "=========="
-    putTextLn ""
+printDebug component prog = 
+  do
+    dbg <- view debug
+    liftIO . when dbg $ do
+      putTextLn $ "[" <> component <> "]"
+      putTextLn "=========="
+      putTextLn . show $ pretty prog
+      putTextLn "=========="
+      putTextLn ""
 

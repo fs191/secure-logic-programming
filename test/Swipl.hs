@@ -33,6 +33,7 @@ import Parser.DatalogParser
 import DatalogProgram
 import Expr
 import Rule
+import ProgramOptions
 
 import Language.SecreC
 import Translator
@@ -158,12 +159,14 @@ compileSC file iterations = errExit False $ withTmpDir act
         _prog' <- liftIO $ parseDatalogFromFile file
         let err = error "Cannot parse file"
         let _prog = fromRight err _prog'
-        let conf = TranslatorConfig iterations False False
-        trans <- liftIO . runExceptT . process conf $ toString file
+        let conf = defaultOptions 
+          {_iterations = iterations
+          , _inFile = file
+          }
+        trans <- runExceptT $ runReaderT process conf
         trans' <- case trans of
           Left ex -> do
-            forM_ ex $ \x -> do
-              putTextLn . show $ errorMsg src x
+            print $ errorMsg src ex
             exitFailure
           Right x -> return x
         let sc = secrecCode trans'
