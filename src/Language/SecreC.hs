@@ -61,7 +61,6 @@ data SCType
   | SCXorUInt32
   | SCXorUInt8
   | SCInt32
-  | SCInt
   | SCFloat32
   | SCBool
   | SCText
@@ -81,7 +80,6 @@ instance Pretty SCType where
   pretty SCXorUInt32 = "xor_uint32"
   pretty SCXorUInt8  = "xor_uint8"
   pretty SCInt32     = "int32"
-  pretty SCInt       = "int"
   pretty SCBool      = "bool"
   pretty SCText    = "string"
 
@@ -309,16 +307,14 @@ nameTableCat :: (Semigroup a, IsString a) => a -> a
 nameTableCat p       = "cat_" <> p
 nameTablePermute :: (Semigroup a, IsString a) => a -> a
 nameTablePermute p   = "permute_" <> p
+nameTableExt :: (Semigroup a, IsString a) => a -> a
+nameTableExt p       = "extend_" <> p
 nameGoalComp :: (Semigroup a1, IsString a1, Show a2) => a1 -> a2 -> a1
 nameGoalComp p l     = "goal_" <> p <> "_" <> show l
 
 -- fixed names that are used globally in different components
 nameArg :: (Semigroup a1, IsString a1, Show a2) => a2 -> a1
 nameArg  i = "arg" <> show i
-nameArgJ :: (Semigroup a1, IsString a1, Show a2) => a2 -> a2 -> a1
-nameArgJ j i = "arg" <> show j <> "_" <> show i
-nameRaw :: (Semigroup a, IsString a) => a -> a
-nameRaw x   = "input_" <> x
 nameMM :: Text
 nameMM     = "m"
 -- private component of the filter
@@ -327,24 +323,14 @@ nameBB     = "b"
 -- public component of the filter
 nameBP :: Text
 nameBP     = "bp"
--- selection indices
-nameIS :: Text
-nameIS     = "indices"
--- a variable that holds database name
-nameDS :: Text
-nameDS     = "ds"
 
 nameTableBB :: Text -> Text
 nameTableBB  t   = t <> "." <> nameBB
-nameTableIS :: Text -> Text
-nameTableIS  t   = t <> "." <> nameIS
 nameTableArg :: (Semigroup a, IsString a) => a -> Int -> a
 nameTableArg t i = t <> "." <> (nameArg i)
 nameIndex :: (Semigroup a1, IsString a1) => a1 -> Int -> a1
 nameIndex t i    = t <> show i
 
-nameIS_at :: (Semigroup a1, IsString a1) => Int -> a1
-nameIS_at    i = "indices[" <> show i <> ",:]"
 nameM :: (Semigroup a1, IsString a1) => Int -> a1
 nameM    i = "m" <> show i
 nameN :: (Semigroup a1, IsString a1) => Int -> a1
@@ -354,15 +340,15 @@ nameB    i = "b" <> show i
 nameArgs :: (Semigroup a1, IsString a1) => Int -> a1
 nameArgs i = "args" <> show i
 nameRes :: (Semigroup a1, IsString a1) => Int -> a1
-nameRes  i = "idb_table" <> show i
+nameRes  i = "res" <> show i
 nameResUn :: (Semigroup a1, IsString a1) => Int -> a1
-nameResUn i = "idb_table_set" <> show i
+nameResUn i = "resUnique" <> show i
 nameTable :: (Semigroup a1, IsString a1) => Int -> a1
-nameTable i = "edb_table_" <> show i
+nameTable i = "table" <> show i
 
 -- some functions that are already defined in SecreC
 funExtCol :: [SCExpr] -> SCExpr
-funExtCol   = SCFunCall "getExtensionIndices"
+funExtCol   = SCFunCall "extendColumn"
 funGetDBCol :: [SCExpr] -> SCExpr
 funGetDBCol = SCFunCall "getDBColumn"
 funCat :: [SCExpr] -> SCExpr
@@ -371,12 +357,6 @@ funPermute :: [SCExpr] -> SCExpr
 funPermute  = SCFunCall "applyPermutation"
 funReshape :: [SCExpr] -> SCExpr
 funReshape  = SCFunCall "reshape"
-funIota :: [SCExpr] -> SCExpr
-funIota  = SCFunCall "iota"
-funSelect :: [SCExpr] -> SCExpr
-funDims :: [SCExpr] -> SCExpr
-funDims = SCFunCall "dims"
-funSelect      = SCFunCall "select"
 funConstIntCol :: [SCExpr] -> SCExpr
 funConstIntCol   = SCFunCall "constIntColumn"
 funConstFloatCol :: [SCExpr] -> SCExpr
@@ -411,12 +391,7 @@ funCountSort :: [SCExpr] -> SCExpr
 funCountSort = SCFunCall "countSortPermutation"
 funQuickSort :: [SCExpr] -> SCExpr
 funQuickSort = SCFunCall "quickSortPermutation"
-funFilter :: [SCExpr] -> SCExpr
-funFilter = SCFunCall "filterIndices"
-funMergeIndices :: [SCExpr] -> SCExpr
-funMergeIndices = SCFunCall "mergeTableIndices"
-funCloneIndices :: [SCExpr] -> SCExpr
-funCloneIndices = SCFunCall "cloneTableIndices"
+
 funAggr :: Text -> [SCExpr] -> SCExpr
 funAggr s         = SCFunCall $ s <> "_filter"
 funFilterTrue :: [SCExpr] -> SCExpr
@@ -509,14 +484,6 @@ scConstType (ConstStr   _ c) = SCConstStr c
 scConstType (Attribute  _ c) = SCConstStr c
 scConstType e                 = error $ "Expecting a constant, not " <> show e
 
-scConstColType :: Expr -> SCExpr
-scConstColType (ConstInt   _ c) = funConstIntCol [SCConstInt c, SCVarName nameMM, funDims [SCVarName nameIS]]
-scConstColType (ConstFloat _ c) = funConstFloatCol [SCConstFloat c, SCVarName nameMM, funDims [SCVarName nameIS]]
-scConstColType (ConstBool  _ c) = funConstBoolCol [SCConstBool c, SCVarName nameMM, funDims [SCVarName nameIS]]
-scConstColType (ConstStr   _ c) = funConstStrCol [SCConstStr c, SCVarName nameMM, funDims [SCVarName nameIS]]
-scConstColType (Attribute  _ c) = funConstStrCol [SCConstStr c, SCVarName nameMM, funDims [SCVarName nameIS]]
-scConstColType e                 = error $ "Expecting a constant, not " <> show e
-
 dynamicColT :: Int -> SCType
 dynamicColT i = SCDynamicT (Just i)
 
@@ -539,7 +506,8 @@ secrecCode dp = program $
   <> map (Funct . extPredGet) extPreds
   <> map Struct (zipWith intPredInDecl intPredPs intPredXss)
   <> map Struct (zipWith intPredOutDecl intPredPs intPredYss)
-  <> map Funct (zipWith (ruleToSC extPredNames) rules  [0..])
+  <> map Funct (zipWith intPredExt intPredPs intPredXss)
+  <> map Funct (zipWith ruleToSC rules [0..])
   <> map Funct (zipWith intPredCat intPredPs intPredYss)
   <> map Funct (zipWith intPredPermute intPredPs intPredYss)
   <> map Funct (L.zipWith3 intPredGet lss intPredPs intPredYss)
@@ -549,7 +517,6 @@ secrecCode dp = program $
    rules = dp ^. DP.dpRules
    goal  = concreteGoal dp
    extPreds = dp ^.. DP.dpDBClauses
-   extPredNames = S.fromList $ map (\p -> p ^. predName) extPreds
    (intPredPs, intPredXss, intPredYss) = unzip3 $ L.nub 
                                          $ map (\p -> let zs = predicateVars p in
                                                       let (xs',ys') = partitionInputsOutputs zs in
@@ -559,8 +526,7 @@ secrecCode dp = program $
 
    lss = [ls | r <- rules
                , let ls' = zipWith (\r' l -> let p = ruleName r' in
-                                             --let boolType = scDomainFromAnn (ruleAnn r') in
-                                             let boolType = SCShared3p in
+                                             let boolType = scDomainFromAnn (ruleAnn r') in
                                              let argTypes = map scColType (ruleSchema r') in
                                              (if ruleName r == p then l else -1, (boolType, argTypes))
                                    ) rules [0..]
@@ -582,10 +548,11 @@ header =
   ]
 
 extPredDecl :: Expr -> StructDecl
-extPredDecl dbc = struct (SCTemplateDecl Nothing) (nameOutTableStruct p) ys
+extPredDecl dbc = struct (SCTemplateDecl Nothing) (nameOutTableStruct p) (y:ys)
   where
     p  = view predName dbc
     xs = view predArgs dbc
+    y  = variable SCPublic (SCArray 1 SCBool) nameBB
     is = [0..length xs - 1]
     ys = zipWith (\x i -> case x of {(Attribute pptype _) -> variable SCPublic (scColTypeI i pptype) (nameArg i) ; _ -> error $ "Expected an attribute, but got " <> show x}) xs is
 
@@ -593,33 +560,53 @@ extPredGet :: Expr -> FunctionDecl
 extPredGet dbc = function (SCTemplateDecl Nothing) returnType fname fargs fbody
   where
     result = "result"
+    ds = "ds"
     m  = "m"
-    idx = "index"
+    mi = "mi"
+    ni = "ni"
     p = view predName dbc
     n = length $ view predArgs dbc
     is = [0..n-1]
     returnType = Just $ SCStruct (nameOutTableStruct p) (SCTemplateUse Nothing)
     fname = nameGetTableStruct p
-    fargs = [variable SCPublic SCText nameDS, variable SCPublic SCUInt m, variable SCPublic SCInt idx]
-    fbody = [ VarDecl $ variable SCPublic (SCStruct (nameOutTableStruct p) (SCTemplateUse Nothing)) result]
-            <> map (\i -> VarAsgn (nameTableArg result i) (funGetDBCol [SCVarName nameDS, SCConstStr p, SCConstInt i, SCVarName m, SCVarName idx])) is
+    fargs = [variable SCPublic SCText ds, variable SCPublic SCUInt m, variable SCPublic SCUInt mi, variable SCPublic SCUInt ni]
+    fbody = [ VarDecl $ variable SCPublic (SCStruct (nameOutTableStruct p) (SCTemplateUse Nothing)) result
+            , VarAsgn (nameTableBB result) (funTrueCol [SCVarName m])
+            ]
+            <> map (\i -> VarAsgn (nameTableArg result i) (funGetDBCol [SCVarName ds, SCConstStr p, SCConstInt i, SCVarName m, SCVarName mi, SCVarName ni])) is
             <> [Return (SCVarName result)]
 
 intPredInDecl :: Text -> [Int] -> StructDecl
-intPredInDecl p is = struct template (nameInTableStruct p) (y0:y1:ys)
+intPredInDecl p is = struct template (nameInTableStruct p) (y:ys)
   where
     template = SCTemplateDecl $ Just ([SCDynamic Nothing], map dynamicColT is)
-    y0 = variable (SCDynamic Nothing) (SCArray 1 SCBool) nameBB
-    y1 = variable SCPublic (SCArray 1 SCUInt) nameIS
+    y  = variable (SCDynamic Nothing) (SCArray 1 SCBool) nameBB
     ys = map (\i -> variable SCPublic (SCDynamicT (Just i)) (nameArg i)) is
 
 intPredOutDecl :: Text -> [Int] -> StructDecl
-intPredOutDecl p is = struct template (nameOutTableStruct p) (y0:y1:ys)
+intPredOutDecl p is = struct template (nameOutTableStruct p) (y:ys)
   where
     template = SCTemplateDecl $ Just ([SCDynamic Nothing], map dynamicColT is)
-    y0 = variable (SCDynamic Nothing) (SCArray 1 SCBool) nameBB
-    y1 = variable SCPublic (SCArray 1 SCUInt) nameIS
+    y  = variable (SCDynamic Nothing) (SCArray 1 SCBool) nameBB
     ys = map (\i -> variable SCPublic (SCDynamicT (Just i)) (nameArg i)) is
+
+
+intPredExt :: Text -> [Int] -> FunctionDecl
+intPredExt p is = function template returnType fname fargs fbody
+  where
+    result = "result"
+    m  = "m"
+    mi = "mi"
+    ni = "ni"
+
+    template = SCTemplateDecl $ Just ([], [dynamicColT 0, dynamicColT 1])
+    returnType = Just $ dynamicColT 0
+    fname = nameTableExt p
+    fargs = [variable SCPublic (dynamicColT 1) result, variable SCPublic SCUInt m, variable SCPublic SCUInt mi, variable SCPublic SCUInt ni]
+    fbody = [VarAsgn (nameTableBB result) (funExtCol [SCVarName (nameTableBB result), SCVarName m, SCVarName mi, SCVarName ni])]
+            <> map (\i -> VarAsgn (nameTableArg result i) (funExtCol [SCVarName (nameTableArg result i), SCVarName m, SCVarName mi, SCVarName ni])) is
+            <> [Return (SCVarName result)]
+
 
 intPredCat :: Text -> [Int] -> FunctionDecl
 intPredCat p is = function template returnType fname fargs fbody
@@ -632,16 +619,15 @@ intPredCat p is = function template returnType fname fargs fbody
     returnType = Just $ dynamicColT 0
     fname = nameTableCat p
     fargs = [variable SCPublic (dynamicColT 1) input1, variable SCPublic (dynamicColT 2) input2]
-    fbody = [ VarDecl $ variable SCPublic (SCDynamicT (Just 0)) result
-            , VarAsgn (nameTableBB result) (funCat [SCVarName (nameTableBB input1), SCVarName (nameTableBB input2)])
-            , VarAsgn (nameTableIS result) (funCat [SCVarName (nameTableIS input1), SCVarName (nameTableIS input2)])
-            ]
+    fbody = [VarDecl $ variable SCPublic (SCDynamicT (Just 0)) result,
+             VarAsgn (nameTableBB result) (funCat [SCVarName (nameTableBB input1), SCVarName (nameTableBB input2)])]
             <> map (\i -> VarAsgn (nameTableArg result i) (funCat [SCVarName (nameTableArg input1 i), SCVarName (nameTableArg input2 i)])) is
             <> [Return (SCVarName result)]
 
 intPredGet :: [(Int, (SCDomain, [SCType]))] -> Text -> [Int] -> FunctionDecl
 intPredGet ls0 p is = function template returnType fname fargs fbody
   where
+    ds = "ds"
     input  = "args"
     result = "result"
 
@@ -652,9 +638,9 @@ intPredGet ls0 p is = function template returnType fname fargs fbody
     template = SCTemplateDecl $ Just ([], [dynamicColT 0, dynamicColT 1])
     returnType = Just $ dynamicColT 0
     fname = nameGetTableStruct p
-    fargs = [variable SCPublic SCText nameDS, variable SCPublic (dynamicColT 1) input]
+    fargs = [variable SCPublic SCText ds, variable SCPublic (dynamicColT 1) input]
     fbody = [ VarDecl (variable SCPublic (SCDynamicT (Just 0)) result)]
-            <> map (\(l,lt) -> VarInit (variable SCPublic lt (nameIndex result l)) (SCFunCall (nameGoalComp p l) [SCVarName nameDS, SCVarName input])) ls
+            <> map (\(l,lt) -> VarInit (variable SCPublic lt (nameIndex result l)) (SCFunCall (nameGoalComp p l) [SCVarName ds, SCVarName input])) ls
             <> map (\(l,_)  -> VarAsgn result $ SCFunCall (nameTableCat p) [SCVarName result, SCVarName (nameIndex result l)]) ls
             <> [Return (SCVarName result)]
 
@@ -670,8 +656,7 @@ intPredPermute p is = function template returnType fname fargs fbody
     fname = nameTablePermute p
     fargs = [variable SCPublic (SCDynamicT (Just 1)) table, variable (SCDynamic Nothing) (SCArray 1 (SCDynamicT Nothing)) pi_]
     fbody = [ VarDecl (variable SCPublic (SCDynamicT (Just 0)) result)
-            , VarAsgn (nameTableBB result) (funPermute [SCVarName (nameTableBB table), SCVarName pi_])
-            , VarAsgn (nameTableIS result) (funIota [funSize [SCVarName (nameTableIS table)]])]
+            , VarAsgn (nameTableBB result) (funPermute [SCVarName (nameTableBB table), SCVarName pi_])]
             <> map (\i -> VarAsgn (nameTableArg result i) (funPermute [SCVarName (nameTableArg table i), SCVarName pi_])) is
             <> [Return (SCVarName result)]
 
@@ -691,8 +676,7 @@ intPredDedup p is = function template returnType fname fargs fbody
 
     fbody = [ VarDecl (variable SCShared3p (SCArray 1 SCUInt32) pi_)
             , VarDecl (variable SCPublic (SCDynamicT (Just 0)) result)
-            , VarAsgn (nameTableBB result) (SCVarName (nameTableBB table))
-            , VarAsgn (nameTableIS result) (SCVarName (nameTableIS table))]
+            , VarAsgn (nameTableBB result) (SCVarName (nameTableBB table))]
             <> map (\i -> VarAsgn (nameTableArg result i) (funCopyCol [SCVarName (nameTableArg table i)])) is <>
             [VarAsgn pi_ (funCountSort [SCVarName (nameTableBB result)])
             , VarAsgn result (SCFunCall (nameTablePermute p) [SCVarName result, SCVarName pi_])]
@@ -713,41 +697,23 @@ intPredDedup p is = function template returnType fname fargs fbody
 concreteGoal :: DP.DatalogProgram -> FunctionDecl
 concreteGoal dp = mainFun $
 
-  -- get user inputs (if any)
-  (if length xs > 0 then [Comment "get user inputs"] else [])
-  <> map (\(Var xtype x) -> let (xdom,xsctype) = scVarType xtype in VarInit (variable xdom xsctype (nameRaw x)) (funGetArg [SCConstStr x])) xs <>
-
-  -- intialize dimensions of the "table of user's inputs"
-  [ Comment "initialize input dimensions"
-  , VarInit (variable SCPublic SCUInt nameMM) (SCConstInt 1)
-  , VarInit (variable SCShared3p (SCArray 1 SCBool) nameBB) (funReshape [SCConstBool True, SCVarName nameMM])
-  , VarInit (variable SCPublic (SCArray 2 SCUInt) nameIS) $ funReshape [SCConstInt 0, SCConstInt 1, SCVarName nameMM]
-  ]
-
-  --convert user inputs to columns
-  <> (if length xs > 0 then [Comment "construct input columns"] else [])
-  <> map (\(Var xtype x) -> VarInit (variable SCPublic (scColType xtype) x) (funConstCol [SCVarName (nameRaw x), SCVarName nameMM, funDims [SCVarName nameIS]])) xs <>
+  -- get user inputs
+  map (\(Var xtype x) -> let (xdom,xsctype) = scVarType xtype in VarInit (variable xdom xsctype x) (funGetArg [SCConstStr x])) xs <>
 
   -- establish database connection
-  [ Comment "open DB connection"
-  , VarInit (variable SCPublic SCText nameDS) strDataset
-  , funTdbOpenConnection [SCVarName nameDS]
+  [ VarInit (variable SCPublic SCText ds) strDataset
+  , funTdbOpenConnection [SCVarName ds]]
 
   -- construct a table that contains results for goalPred
-  , SCEmpty
-  , Comment "call the goal predicate"]
-  <> (prepareGoal extPredNames fullGoal j) <>
+
+  <> (prepareGoal ds xnames fullGoal j) <>
 
   -- close connection
-  [ SCEmpty
-  , Comment "close DB connection"
-  , funTdbCloseConnection [SCVarName nameDS]
+  [funTdbCloseConnection [SCVarName ds]
 
   -- shuffle the results and leave only those whose truth bit is 1
-  , SCEmpty
-  , Comment "shuffle and publish final result"
-  , VarInit (variable SCPublic SCUInt32 n) (funDeclassify [funSum [SCTypeCast SCUInt32 (SCVarName nameBB)]])
-  , VarInit (variable SCShared3p (SCArray 1 SCUInt32) pi_) (funShuffle [SCVarName nameBB])
+  , VarInit (variable SCPublic SCUInt32 n) (funDeclassify [funSum [SCTypeCast SCUInt32 (SCVarName (nameB j))]])
+  , VarInit (variable SCShared3p (SCArray 1 SCUInt32) pi_) (funShuffle [SCVarName (nameB j)])
   ] <>
 
   zipWith (\y i -> funPublishCol
@@ -756,20 +722,20 @@ concreteGoal dp = mainFun $
                        , (funFilterTrue [SCVarName pi_, SCVarName n, SCVarName y])
                        ]
 
+  -- TODO this is for testing aggregations, remove after we implement parsing aggregations
+  -- ) ["Y"] [0]
   ) ynames [0..length ynames-1]
 
   where
     xs       = dp ^.. DP.inputs
     ys       = dp ^.. DP.outputs
     fullGoal = dp ^.  DP.dpFullGoal
+    ds       = "ds"
     pi_       = "pi"
     n        = "n"
 
     -- a dummy index (not important if we have one statement in the goal)
     j = 1
-
-    extPreds = dp ^.. DP.dpDBClauses
-    extPredNames = S.fromList $ map (\p -> p ^. predName) extPreds
 
     xnames = S.fromList $ map (\(Var _ x) -> x) xs
     ynames =              map (\(Var _ y) -> y) ys
@@ -777,9 +743,10 @@ concreteGoal dp = mainFun $
 
 --------------------------------------------------
 -- convert a rule (a Horn Clause) to SecreC function (transformation S^C)
-ruleToSC :: S.Set Text -> Rule -> Int -> FunctionDecl
-ruleToSC extPreds r j = function template resTableType fname fargs fbody
+ruleToSC :: Rule -> Int -> FunctionDecl
+ruleToSC r j = function template resTableType fname fargs fbody
   where
+    ds    = "ds"
     input = "args"
     rtail = r ^. ruleTail
     p     = ruleName r
@@ -792,8 +759,8 @@ ruleToSC extPreds r j = function template resTableType fname fargs fbody
     argTypes = map (\(x,i) -> scColTypeI i (x ^. annotation)) xs
     resTypes = map (\(y,i) -> scColTypeI i (y ^. annotation)) ys
 
-    argTableType = SCStruct (nameInTableStruct p) (SCTemplateUse $ Just ([SCShared3p],   argTypes))
-    resTableType = Just $ SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([SCShared3p], resTypes))
+    argTableType = SCStruct (nameInTableStruct p) (SCTemplateUse $ Just ([SCPublic],   argTypes))
+    resTableType = Just $ SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([scDomainFromAnn ann], resTypes))
 
     -- TODO template may still be needed if we allow unknown types
     -- js = map fst $ filter snd $ map (\(z,i) -> (i, case scDomainFromAnn (z ^. annotation) of {SCDynamic _ -> True; _ -> False})) xs
@@ -802,42 +769,33 @@ ruleToSC extPreds r j = function template resTableType fname fargs fbody
     --
 
     fname      = nameGoalComp p j
-    fargs      = [SCVar SCPublic SCText nameDS, SCVar SCPublic argTableType input]
-    fbody      = ruleBodyToSC extPreds ann argTableType input p xs ys rtail
+    fargs      = [SCVar SCPublic SCText ds, SCVar SCPublic argTableType input]
+    fbody      = ruleBodyToSC ann argTableType ds input p xs ys rtail
 
 --------------------------------------------------
 -- convert body of a rule (a Horn Clause) to SecreC function (a subtransformation of S^C)
-ruleBodyToSC :: S.Set Text -> Ann -> SCType -> Text -> Text -> [(Expr,Int)] -> [(Expr,Int)] -> Expr -> [Statement]
-ruleBodyToSC extPreds ann argTableType input p xs ys q =
-  [ SCEmpty, Comment "compute the number of solutions in used EDB predicates"
+ruleBodyToSC :: Ann -> SCType -> Text -> Text -> Text -> [(Expr,Int)] -> [(Expr,Int)] -> Expr -> [Statement]
+ruleBodyToSC ann argTableType ds input p xs ys q =
+  [ SCEmpty, Comment "compute the number of solutions in used predicates"
   , VarInit (variable SCPublic SCUInt (nameM 0)) (funSize [SCVarName (nameTableBB input)])
   ] <> getRowCounts <>
   [ VarInit (variable SCPublic SCUInt nameMM) $ SCProd (SCVarName (nameM 0) : (map (\(_,i) -> SCVarName (nameM i)) ts))
   ] <> getNs <>
-
-  [ SCEmpty, Comment "initial args"
-  , VarInit (variable SCPublic argTableType inputTable) (SCVarName input)
+  [ SCEmpty, Comment "extend the initial args to appropriate size"
+  , VarInit (variable SCPublic argTableType inputTable) (SCFunCall (nameTableExt p) [SCVarName input, SCVarName nameMM, SCVarName (nameM 0), SCVarName (nameN 0)])
   ] <>
-  [SCEmpty, Comment "extract EDB predicate data"] <> getTables <>
-  [SCEmpty, Comment "initalize table selection indices"
-  , VarInit (variable SCPublic (SCArray 2 SCUInt) nameIS) $ funReshape [SCConstInt 0, SCConstInt (length ts + 2), SCVarName nameMM]
-  ] <> getIndexDecl <>
-
+  [SCEmpty, Comment "evaluate all underlying predicates"] <> getTables <>
   [SCEmpty, Comment "assign input variables"] <> asgnInputArgs <>
-
-  [SCEmpty, Comment "initialize filter"
-  , VarInit (variable SCShared3p (SCArray 1 SCBool) nameBB) (funSelect [SCVarName (nameTableBB inputTable), SCVarName (nameIS_at 0)])
-
-  , SCEmpty, Comment "evaluate the clause body"] <> evalBody <>
+  [SCEmpty, Comment "initialize filter"] <> initFilter <>
+  [SCEmpty, Comment "evaluate the clause body"] <> evalBody <>
 
   [ SCEmpty, Comment "output the updated predicate arguments"
 
   --, VarDecl (variable SCPublic (SCStruct (nameTableStruct p) (SCTemplateUse $ Just ([SCDynamic Nothing], map dynamicColumn [0..n-1]))) result)
-  , VarDecl (variable SCPublic (SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([SCShared3p], map (\(y,i) -> scColTypeI i (y ^. annotation)) ys))) result)
+  , VarDecl (variable SCPublic (SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([scDomainFromAnn ann], map (\(y,i) -> scColTypeI i (y ^. annotation)) ys))) result)
   --
 
-  , VarAsgn (nameTableBB result) (funSelect [SCVarName nameBB, SCVarName nameIS])
-  , VarAsgn (nameTableIS result) (SCVarName (nameIS_at 0))
+  , VarAsgn (nameTableBB result) (SCAnd (SCVarName nameBB) (SCVarName nameBP))
   ] <> asgnOutputArgs <>
   [Return (SCVarName result)]
 
@@ -846,7 +804,11 @@ ruleBodyToSC extPreds ann argTableType input p xs ys q =
     result   = "result"
 
     asgnInputArgs  = map (\((Var xtype x),i) -> VarInit (variable SCPublic (scColType xtype) x) (SCVarName $ nameTableArg inputTable i)) xs
-    asgnOutputArgs = map (\(z,i) -> VarAsgn (nameTableArg result i) (funSelect [exprToSC z, SCVarName nameIS])) ys
+    asgnOutputArgs = map (\(z,i) -> VarAsgn (nameTableArg result i) (exprToSC z)) ys
+
+    initFilter = [ VarInit (variable (scDomainFromAnn ann) (SCArray 1 SCBool) nameBB) (SCVarName (nameTableBB inputTable))
+                 , VarInit (variable SCPublic (SCArray 1 SCBool) nameBP) (funReshape [SCConstBool True, SCVarName nameMM])
+                 ]
 
     qs' = andsToList q
     qs  = mergeChoose qs'
@@ -854,15 +816,12 @@ ruleBodyToSC extPreds ann argTableType input p xs ys q =
     ts = map (\(qj,j) -> (qj ^. predName, j)) $ filter (has _Pred . fst) $ zip qs [1..]
     ks = 0 : (map snd ts)
 
-    getRowCounts = map (\(tk,k) -> VarInit (variable SCPublic SCUInt (nameM k)) (funTdbGetRowCount [SCVarName nameDS, SCConstStr tk])) ts
+    getRowCounts = map (\(tk,k) -> VarInit (variable SCPublic SCUInt (nameM k)) (funTdbGetRowCount [SCVarName ds, SCConstStr tk])) ts
     getNs        = map (\k      -> let js = (filter (k >=) ks) in
                                    VarInit (variable SCPublic SCUInt (nameN k)) (SCDiv (SCVarName nameMM) (SCProd (map (\j -> SCVarName (nameM j)) js))) ) ks
-    getTables    = map (\(tk,k) -> VarInit (variable SCPublic (SCStruct (nameOutTableStruct tk) (SCTemplateUse Nothing)) (nameTable k)) (SCFunCall (nameGetTableStruct tk) [SCVarName nameDS, SCVarName (nameM k), SCConstInt k])) ts
+    getTables    = map (\(tk,k) -> VarInit (variable SCPublic (SCStruct (nameOutTableStruct tk) (SCTemplateUse Nothing)) (nameTable k)) (SCFunCall (nameGetTableStruct tk) [SCVarName ds, SCVarName nameMM, SCVarName (nameM k), SCVarName (nameN k)])) ts
 
-    getIndexDecl = map (\k -> VarAsgn (nameIS_at k) (funExtCol [SCVarName nameMM, SCVarName (nameM k), SCVarName (nameN k)])) ks
-                   ++ [VarAsgn (nameIS_at (length ks)) (funIota [SCVarName nameMM])]
-
-    evalBody = concat $ zipWith (\qj j -> formulaToSC extPreds True qj j) qs [1..]
+    evalBody = concat $ zipWith (\qj j -> formulaToSC ds qj j) qs [1..]
 
 
 ---------------------------------------------------------------------
@@ -870,58 +829,38 @@ ruleBodyToSC extPreds ann argTableType input p xs ys q =
 
 -- TODO this works correctly as far as we pass a single one choice of inputs (which is the case so far)
 -- we would need to take into account the entire table for deduplication before aggregation
-predToSC :: Bool -> S.Set Text ->  Expr -> Int -> [Statement]
-predToSC isSetSemantics extPreds (Pred ann p zs') j =
+intPredToSC :: Bool -> Text -> Expr -> Int -> [Statement]
+intPredToSC isSetSemantics ds (Pred ptype p zs) j =
 
-  -- convert Attribute to Var if there are any
-  let zs = map (\z -> case z of {Attribute zann zval -> Var zann zval; _ -> z}) zs' in
-
-
-  if S.member p extPreds then
-      
-      -- for EDB predicates, the bool type depends on the schema
-      let dom  = scDomainFromAnn ann in
-      let updateFilter = if isSetSemantics then const SCEmpty
-                         else case dom of
-                             SCPublic -> (\x -> VarAsgn nameIS $ funFilter [SCVarName nameIS, x])
-                             _        -> (\x -> VarAsgn nameBB $ SCAnd (SCVarName nameBB) x)
-      in
-
-      -- TODO we would get more optimal privacy types having access to types of extensional predicates
-      let stmts = zipWith (\z i -> formulaToSC extPreds True (Un ann z (Var (z ^. annotation) (nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
-
-      let (comps', asgns') = L.partition snd $ zipWith (\s z -> (s, z ^. annotation ^. annBound)) stmts zs in
-      let comps = concat $ map (map (\(VarInit _ bexpr) -> bexpr) . fst) comps' in
-      let asgns = concat $ map fst asgns' in
-
-      let bb = if length comps > 0 then [updateFilter $ SCAnds comps] else [] in
-      asgns <> bb
-
-  else
-
-      -- for IDB predicates, we always return the private bool
-      -- since BB is passed as an input, we modify BB, and do not need to AND the result
-      -- TODO since BB is always private, it may be more efficient NOT to pass it
-      let addB = VarAsgn nameBB in
+      -- declared variables are the bounded arguments
+      let dv = map (\z -> z  ^. annotation ^. annBound) zs in
 
       -- link inputs, outputs, and constants to indices of zs
       let is = [0..length zs - 1] in
 
+      -- separate constants and variables
+      let (setZ',setC) = L.partition (\(zi,_) -> case zi of {Var _ _ -> True; Attribute _ _ -> True; Hole _ -> True; _ -> False}) (zip zs is) in
+      let setZ = map (\(z,i) -> case z of {Attribute zann zval -> (Var zann zval,i); _ -> (z,i)}) setZ' in
+
       -- all bounded variables will be inputs
       -- all free variables will be assigned in this execution
-      let (setX,setY) = L.partition (\(z,_) -> z  ^. annotation ^. annBound) $ zip zs is in
+      let (setX,setY) = L.partition (\(z,i) -> case z of
+                                                 Var _ _ -> dv L.!! i
+                                                 _       -> False) $ setZ
+      in
 
       -- the input table
-      let argTypes = map (\(z,i) -> scColTypeI i (z ^. annotation)) setX in
-      let argTableType = SCStruct (nameInTableStruct p) (SCTemplateUse $ Just ([SCShared3p], argTypes)) in
+      let argTypes = map (\(z,i) -> scColTypeI i (z ^. annotation)) setX <> map (\(z,i) -> scColTypeI i (z ^. annotation)) setC in
+      let argTableType = SCStruct (nameInTableStruct p) (SCTemplateUse $ Just ([SCPublic], argTypes)) in
       let argTableName = nameArgs j in
 
-      -- the output table without deduplication
+      -- the output table before deduplication
       let resTypes = map (\(z,i) -> scColTypeI i (z ^. annotation)) setY in
-      let resTableType = SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([SCShared3p],  resTypes)) in
+      let resDomain = scDomainFromAnn ptype in
+      let resTableType = SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([resDomain],  resTypes)) in
       let resTableName = nameRes j in
 
-      -- the output table (after deduplication if set semantics is used)
+      -- the output table after deduplication
 
       -- after deduplication, we get all-private-column table
       -- since at least one column (or the boolean condition) is private in secure computation
@@ -929,21 +868,23 @@ predToSC isSetSemantics extPreds (Pred ann p zs') j =
       -- TODO we can sort the private columns "piecewise within each public group" for best efficiency, keeping public columns public
       -- this may be a bit tricky to describe in a compact way in SecreC
       let resUnArgTypes = map (\(z,i) -> scColPrivateTypeI i (z ^. annotation)) setY in
-      let resUnTableType = SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([SCShared3p],  resUnArgTypes)) in
+      let resUnDomain = SCShared3p in
+      let resUnTableType = SCStruct (nameOutTableStruct p) (SCTemplateUse $ Just ([resUnDomain],  resUnArgTypes)) in
       let resUnTableName = nameResUn j in
       let something (Var ztype z,i) = VarInit (variable SCPublic (scColPrivateTypeI i ztype) z) (SCVarName (nameTableArg resUnTableName i)) in
 
-      map (\(z,i) -> VarInit (variable SCPublic ((scColTypeI i . (view annotation)) z) (nameArgJ j i)) (exprToSC z)) setX <>
+      map (\(Var xtype x,i) -> VarInit (variable SCPublic (scColTypeI i xtype) (nameArg i)) (funConstCol [SCVarName x])) setX <>
+            map (\(z,i)           -> VarInit (variable SCPublic ((scColTypeI i . (view annotation)) z) (nameArg i)) (funConstCol [scConstType z])) setC <>
 
             -- create an input data structure that corresponds to particular goal
             [ VarDecl $ variable SCPublic argTableType argTableName
-            , VarAsgn (nameTableBB argTableName) (SCVarName nameBB)
-            , VarAsgn (nameTableIS argTableName) (funIota [SCVarName nameMM])
+            , VarAsgn (nameTableBB argTableName) (funTrueCol [])
             ] <>
-            map (\(_,i) -> VarAsgn (nameTableArg argTableName i) (SCVarName (nameArgJ j i))) setX <>
+            map (\(_,i) -> VarAsgn (nameTableArg argTableName i) (SCVarName (nameArg i))) setX <>
+            map (\(_,i) -> VarAsgn (nameTableArg argTableName i) (SCVarName (nameArg i))) setC <>
 
             -- call the goal, read updated valuation of free variables
-            [ VarInit (variable SCPublic resTableType resTableName) (SCFunCall (nameGetTableStruct p) [SCVarName nameDS, SCVarName argTableName])] <>
+            [ VarInit (variable SCPublic resTableType resTableName) (SCFunCall (nameGetTableStruct p) [SCVarName ds, SCVarName argTableName])] <>
 
             if isSetSemantics then
                 -- remove duplicate solutions
@@ -952,12 +893,14 @@ predToSC isSetSemantics extPreds (Pred ann p zs') j =
                 -- assign the output variables
                 -- everything becomes private after deduplication
                 <> map something setY
-                <> [addB $ SCVarName (nameTableBB resUnTableName)]
+                <> [VarInit (variable resUnDomain (SCArray 1 SCBool) (nameB j)) (SCVarName (nameTableBB resUnTableName))]
            else
                 -- assign the output variables
                 -- the types come from type derivation
                 map (\(Var ztype z,i) -> VarInit (variable SCPublic (scColTypeI i ztype) z) (SCVarName (nameTableArg resTableName i))) setY
-                <> [addB $ SCVarName (nameTableBB resTableName)]
+                <> [VarInit (variable resDomain (SCArray 1 SCBool) (nameB j)) (SCVarName (nameTableBB resTableName))]
+
+
 
 -- TODO this index conversion is temporary here, we need something better
 ind :: Int -> Int -> Int
@@ -968,8 +911,8 @@ ind i1 i2 = i1 * 1000 + i2
 
 -- aggregation creates an intensional predicate table that will not be used anywhere else,
 -- so we do not need to increase the crros product table
-aggrToSC :: S.Set Text -> Expr -> Int -> [Statement]
-aggrToSC extPreds (Aggr _ f pr@(Pred _ _ zs) e1 e2) j =
+aggrToSC :: Text -> Expr -> Int -> [Statement]
+aggrToSC ds (Aggr _ f pr@(Pred _ _ zs) e1 e2) j =
 
                           let is = [0..length zs-1] in
 
@@ -995,7 +938,7 @@ aggrToSC extPreds (Aggr _ f pr@(Pred _ _ zs) e1 e2) j =
                           -- ignore updates of internal variables of pr since they are out of scope
                           -- remove duplicates before applying aggregation
                           let j1 = ind j 0 in
-                          let intPredStmts = predToSC True extPreds pr j1 in
+                          let intPredStmts = intPredToSC True ds pr j1 in
 
                           -- extract the index of aggregation input variable
                           let aggrInputIndices = filter snd $ zipWith (\z i -> (i, case z of {Var _ zn -> zn == x; _ -> False})) zs is in
@@ -1012,74 +955,75 @@ aggrToSC extPreds (Aggr _ f pr@(Pred _ _ zs) e1 e2) j =
                           -- although Bj has already been declared by the internal predicate, let us re-declare it
                           , VarInit (variable SCPublic (SCArray 1 SCBool) (nameB j)) (funTrueCol [funColSize [SCVarName y]])]
 
-prepareGoal :: (S.Set Text) -> Expr -> Int -> [Statement]
-prepareGoal extPreds goalPred j =
+prepareGoal :: Text -> (S.Set Text) -> Expr -> Int -> [Statement]
+prepareGoal ds _ goalPred j =
     case goalPred of
         -- we remove duplicates before publishing final results
-        Pred{} -> predToSC True extPreds goalPred j
-        Aggr{} -> aggrToSC extPreds goalPred j
+        Pred{} -> intPredToSC True ds goalPred j
+        Aggr{} -> aggrToSC ds goalPred j
         _      -> error $ "only a single predicate or an aggregation is supported in the goal"
 
 --------------------------------------------------
 -- convert a formula to SecreC (transformation S^F)
-formulaToSC :: S.Set Text -> Bool -> Expr -> Int -> [Statement]
-formulaToSC extPreds upd q j =
+formulaToSC :: Text -> Expr -> Int -> [Statement]
+formulaToSC ds q j =
   [SCEmpty, Comment ("q" <> show j)] <> formulaToSC_case q
   where
     ann = q ^. annotation
     dom = scDomainFromAnn ann
-    updateFilter = if not upd then const SCEmpty
-                   else case dom of
-                       SCPublic -> (\x -> VarAsgn nameIS $ funFilter [SCVarName nameIS, x])
-                       _        -> (\x -> VarAsgn nameBB $ SCAnd (SCVarName nameBB) x)
+    addB   = case dom of
+                 SCPublic -> VarAsgn nameBP . SCAnd (SCVarName nameBP)
+                 _        -> VarAsgn nameBB . SCAnd (SCVarName nameBB)
     bj     = SCVarName (nameB j)
     initBj = VarInit (variable dom (SCArray 1 SCBool) (nameB j))
     formulaToSC_case q' = case q' of
+        ConstBool _ b -> [addB (funReshape [SCConstBool b, SCVarName nameMM])]
 
-        ConstBool _ b -> [initBj $ funReshape [SCConstBool b, SCVarName nameMM], updateFilter bj]
+        Pred _ _ zs   -> --add database attributes to the set of declared variables
+                            -- TODO it would be nice to have access to data types of extensional predicates here
+                            let stmts = zipWith (\z i -> formulaToSC ds (Un ann z (Var (z ^. annotation) (nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
+                            let (comps', asgns') = L.partition snd $ zipWith (\s z -> (s, z ^. annotation ^. annBound)) stmts zs in
+                            let comps = concat $ map (map (\(VarInit _ bexpr) -> bexpr) . fst) comps' in
+                            let asgns = concat $ map fst asgns' in
 
-        Pred _ p zs   -> predToSC False extPreds q' j
+                            let bb = if length comps > 0 then [addB $ SCAnds comps] else [] in
+                            asgns <> bb
 
         Not _ (Pred _ _ zs) ->
-            [initBj $ SCNot (SCAnds $ zipWith (\z i -> SCEq (exprToSC z) (SCVarName (nameTableArg (nameTable j) i))) zs [0..]), updateFilter bj]
+            [initBj $ SCNot (SCAnds $ zipWith (\z i -> SCEq (exprToSC z) (SCVarName (nameTableArg (nameTable j) i))) zs [0..]), addB bj]
 
-        -- TODO we could put everything into a single expression using bexprToSC
-        -- however, we get problems in the cases where SecreC derives 'pubic x public -> private' type of bop
         Not _ e ->
             let b1 = nameB (ind j 1) in
-            let s1 = formulaToSC extPreds False e (ind j 1) in
-            s1 <> [initBj $ SCNot (SCVarName b1), updateFilter bj]
+            let s1 = formulaToSC ds e (ind j 1) in
+            s1 <> [initBj $ SCNot (SCVarName b1), addB bj]
 
         Or _ e1 e2 ->
             let b1 = nameB (ind j 1) in
             let b2 = nameB (ind j 2) in
-            let s1 = formulaToSC extPreds False e1 (ind j 1) in
-            let s2 = formulaToSC extPreds False e2 (ind j 2) in
-            s1 <> s2 <> [initBj $ SCOr (SCVarName b1) (SCVarName b2), updateFilter bj]
+            let s1 = formulaToSC ds e1 (ind j 1) in
+            let s2 = formulaToSC ds e2 (ind j 2) in
+            s1 <> s2 <> [initBj $ SCOr (SCVarName b1) (SCVarName b2), addB bj]
 
         And _ e1 e2 ->
             let b1 = nameB (ind j 1) in
             let b2 = nameB (ind j 2) in
-            let s1 = formulaToSC extPreds False e1 (ind j 1) in
-            let s2 = formulaToSC extPreds False e2 (ind j 2) in
-            s1 <> s2 <> [initBj $ SCAnd (SCVarName b1) (SCVarName b2), updateFilter bj]
+            let s1 = formulaToSC ds e1 (ind j 1) in
+            let s2 = formulaToSC ds e2 (ind j 2) in
+            s1 <> s2 <> [initBj $ SCAnd (SCVarName b1) (SCVarName b2), addB bj]
 
-        Lt _ _ _ -> [initBj $ exprToSC q', updateFilter bj]
-        Le _ _ _ -> [initBj $ exprToSC q', updateFilter bj]
-        Gt _ _ _ -> [initBj $ exprToSC q', updateFilter bj]
-        Ge _ _ _ -> [initBj $ exprToSC q', updateFilter bj]
-        Eq _ _ _ -> [initBj $ exprToSC q', updateFilter bj]
+        Lt _ _ _ -> [initBj $ exprToSC q', addB bj]
+        Le _ _ _ -> [initBj $ exprToSC q', addB bj]
+        Gt _ _ _ -> [initBj $ exprToSC q', addB bj]
+        Ge _ _ _ -> [initBj $ exprToSC q', addB bj]
+        Eq _ _ _ -> [initBj $ exprToSC q', addB bj]
 
-        -- TODO we could make the choose construction more compact
-        Un _ (Expr.List _ xs) (Choose _ (Expr.List _ zs) (Expr.List _ bs)) ->
+        -- TODO this is a workaround for choose construction
+        Is _ (Expr.List _ xs) (Choose _ (Expr.List _ zs) (Expr.List _ bs)) ->
             let n = length bs in
             let zss = chunksOf n zs in
-            [VarAsgn nameBB $ L.foldr1 (\x y -> funCat [x,y]) $ map (SCAnd (funSelect [SCVarName nameBB, SCVarName nameIS]) . bexprToSC) bs] <>
-            (zipWith (\(Var annx x) zs -> VarInit (variable SCPublic (scColType annx) x) $ L.foldr1 (\x y -> funCat [funSelect [x, SCVarName nameIS], funSelect [y, SCVarName nameIS], funDims [SCVarName nameIS]]) $ map exprToSC zs) xs zss)
-            <> 
-            [ VarAsgn nameIS $ funCloneIndices [SCVarName nameIS, SCConstInt (length bs)]]
-
-        Un _ e1 e2@(Choose _ _ _) -> formulaToSC_case $ Un ann (eList [e1]) e2
+            [ VarAsgn nameBB $ L.foldr1 (\x y -> funCat [x,y]) $ map (SCAnd (SCVarName nameBB) . bexprToSC) bs
+            , VarAsgn nameBP $ L.foldr1 (\x y -> funCat [x,y]) $ map (const $ SCVarName nameBP) bs] <>
+            zipWith (\(Var annx x) zs -> VarInit (variable SCPublic (scColType annx) x) $ L.foldr1 (\x y -> funCat [x,y]) $ map exprToSC zs) xs zss
 
         -- unification may be a comparison as well as initialization (for strings)
         Un _ e1 e2 ->  ex
@@ -1098,11 +1042,12 @@ formulaToSC extPreds upd q j =
                                                    else ez
                                    _            -> ez
                           -- if both x and y are not fresh, then compare
-                          ez = [initBj $ exprToSC (Eq ann e1 e2), updateFilter bj]
+                          ez = [initBj $ exprToSC (Eq ann e1 e2), addB bj]
 
+        -- TODO actually, we only have the initialization case due to previos processing
         Is _ e1 e2 -> formulaToSC_case (Un ann e1 e2)
 
-        Aggr _ _ _ _ _ -> aggrToSC extPreds q' j
+        Aggr _ _ _ _ _ -> aggrToSC ds q' j
 
         _ -> error $ "Unexpected boolean expression: " <> show q'
 
@@ -1110,15 +1055,15 @@ formulaToSC extPreds upd q j =
 exprToSC :: Expr -> SCExpr
 exprToSC e =
   case e of 
-    ConstInt   _ c -> funConstIntCol [SCConstInt c, SCVarName nameMM, funDims [SCVarName nameIS]]
-    ConstFloat _ c -> funConstFloatCol [SCConstFloat c, SCVarName nameMM, funDims [SCVarName nameIS]]
-    ConstStr   _ c -> funConstStrCol [SCConstStr c, SCVarName nameMM, funDims [SCVarName nameIS]]
-    ConstBool  _ c -> funConstBoolCol [SCConstBool c, SCVarName nameMM, funDims [SCVarName nameIS]]
+    ConstInt   _ c -> funConstIntCol [SCConstInt c, SCVarName nameMM]
+    ConstFloat _ c -> funConstFloatCol [SCConstFloat c, SCVarName nameMM]
+    ConstStr   _ c -> funConstStrCol [SCConstStr c, SCVarName nameMM]
+    ConstBool  _ c -> funConstBoolCol [SCConstBool c, SCVarName nameMM]
 
     -- should we distinguish between DB and Free variables? it seems that not.
     Var   _ x -> SCVarName $ x
 
-    Not  _ e0 -> funBoolOp [SCConstStr "not", exprToSC e0, SCVarName nameIS]
+    Not  _ e0 -> funBoolOp [SCConstStr "not", exprToSC e0, SCVarName nameBP]
     Neg  _ e0 -> SCFunCall "neg" [exprToSC e0]
     Inv  _ e0 -> SCFunCall "inv" [exprToSC e0]
     Sqrt _ e0 -> SCFunCall "apply_sqrt" [exprToSC e0]
@@ -1127,21 +1072,21 @@ exprToSC e =
     Div  _ e1 e2 -> binArith "div" e1 e2
     Mod  _ e1 e2 -> binArith "%" e1 e2
     Sub  _ e1 e2 -> binArith "-" e1 e2
-    Lt   _ e1 e2 -> funBoolOp [SCConstStr "<", exprToSC e1, exprToSC e2, SCVarName nameIS]
-    Le   _ e1 e2 -> funBoolOp [SCConstStr "<=", exprToSC e1, exprToSC e2, SCVarName nameIS]
-    Eq   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameIS]
-    Un   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameIS]
-    Gt   _ e1 e2 -> funBoolOp [SCConstStr ">", exprToSC e1, exprToSC e2, SCVarName nameIS]
-    Ge   _ e1 e2 -> funBoolOp [SCConstStr ">=", exprToSC e1, exprToSC e2, SCVarName nameIS]
+    Lt   _ e1 e2 -> funBoolOp [SCConstStr "<", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Le   _ e1 e2 -> funBoolOp [SCConstStr "<=", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Eq   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Un   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Gt   _ e1 e2 -> funBoolOp [SCConstStr ">", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Ge   _ e1 e2 -> funBoolOp [SCConstStr ">=", exprToSC e1, exprToSC e2, SCVarName nameBP]
     Mul  _ e1 e2 -> binArith "*" e1 e2
     Add  _ e1 e2 -> binArith "+" e1 e2
     Pow  _ e1 e2 -> binArith "pow" e1 e2
-    And  _ e1 e2 -> funBoolOp [SCConstStr "and", exprToSC e1, exprToSC e2, SCVarName nameIS]
-    Or   _ e1 e2 -> funBoolOp [SCConstStr "or", exprToSC e1, exprToSC e2, SCVarName nameIS]
+    And  _ e1 e2 -> funBoolOp [SCConstStr "and", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Or   _ e1 e2 -> funBoolOp [SCConstStr "or", exprToSC e1, exprToSC e2, SCVarName nameBP]
     Pred _ _ _ -> error $ "High order predicates are not supported"
     _          -> error $ "Unexpected expression: " <> show (prettyMinimal e)
   where
-    binArith s x y = funArithOp [SCConstStr s, cast x y x, cast x y y, SCVarName nameIS]
+    binArith s x y = funArithOp [SCConstStr s, cast x y x, cast x y y]
     -- Cast arguments to float if either one is already float
     cast :: Expr -> Expr -> Expr -> SCExpr
     cast x y z 
@@ -1159,13 +1104,13 @@ bexprToSC e =
     Var   _ x -> SCVarName x
     Not  _ e0 -> SCNot $ bexprToSC e0
 
-    Lt   _ e1 e2 -> funBoolOp [SCConstStr "<", exprToSC e1, exprToSC e2, SCVarName nameIS]
-    Le   _ e1 e2 -> funBoolOp [SCConstStr "<=", exprToSC e1, exprToSC e2, SCVarName nameIS]
-    Eq   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameIS]
-    Un   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameIS]
-    Is   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameIS]
-    Gt   _ e1 e2 -> funBoolOp [SCConstStr ">", exprToSC e1, exprToSC e2, SCVarName nameIS]
-    Ge   _ e1 e2 -> funBoolOp [SCConstStr ">=", exprToSC e1, exprToSC e2, SCVarName nameIS]
+    Lt   _ e1 e2 -> funBoolOp [SCConstStr "<", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Le   _ e1 e2 -> funBoolOp [SCConstStr "<=", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Eq   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Un   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Is   _ e1 e2 -> funBoolOp [SCConstStr "==", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Gt   _ e1 e2 -> funBoolOp [SCConstStr ">", exprToSC e1, exprToSC e2, SCVarName nameBP]
+    Ge   _ e1 e2 -> funBoolOp [SCConstStr ">=", exprToSC e1, exprToSC e2, SCVarName nameBP]
 
     And  _ e1 e2 -> SCAnd (bexprToSC e1) (bexprToSC e2)
     Or   _ e1 e2 -> SCOr  (bexprToSC e1) (bexprToSC e2)
@@ -1177,21 +1122,22 @@ bexprToSC e =
 
 csvImportCode :: DP.DatalogProgram -> IO (SCProgram)
 csvImportCode dp = do
+  let ds = "ds"
   let extPreds = dp ^.. DP.dpDBClauses
   tableData <- mapM (getTableData . view predName) extPreds
   return $ program $ header
                      <> [Funct $ mainFun $
-                                     [ VarInit (variable SCPublic SCText nameDS) strDataset
-                                     , funTdbOpenConnection [SCVarName nameDS]]
-                                     <> concat (zipWith tableGenerationCode extPreds tableData) <>
-                                     [funTdbCloseConnection [SCVarName nameDS]]]
+                                     [ VarInit (variable SCPublic SCText ds) strDataset
+                                     , funTdbOpenConnection [SCVarName ds]]
+                                     <> concat (zipWith (tableGenerationCode ds) extPreds tableData) <>
+                                     [funTdbCloseConnection [SCVarName ds]]]
 
-tableGenerationCode :: Expr -> [[Text]] -> [Statement]
-tableGenerationCode dbc (tableHeader:tableRows) =
+tableGenerationCode :: Text -> Expr -> [[Text]] -> [Statement]
+tableGenerationCode ds dbc (tableHeader:tableRows) =
 
-  [ funCreateTable  [ SCVarName nameDS, SCConstStr p, SCConstArr (map  SCConstInt types), SCConstArr (map  SCConstInt domains)
+  [ funCreateTable  [ SCVarName ds, SCConstStr p, SCConstArr (map  SCConstInt types), SCConstArr (map  SCConstInt domains)
                     , SCConstStr headerStr, SCConstArr (map SCConstInt hlengths)]
-  , funWriteToTable [ SCVarName nameDS, SCConstStr p, SCConstArr (map  SCConstInt types), SCConstArr (map  SCConstInt domains)
+  , funWriteToTable [ SCVarName ds, SCConstStr p, SCConstArr (map  SCConstInt types), SCConstArr (map  SCConstInt domains)
                     , SCConstArr (map SCConstAny boolData)
                     , SCConstArr (map SCConstAny intData)
                     , SCConstArr (map SCConstAny floatData)

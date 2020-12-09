@@ -38,11 +38,12 @@ extractSatSolution args es = do
   -- if we could not handle at least one expression, then the SAT model is overapproximated
   -- in Prolog, we assume that all "suitable" expressions are ground and can be pushed into the end
   -- in Datalog, the order is not important anyway (although it affects the efficiency)
-  let (badZ3, goodZ3) = partition (isNothing . snd) $ zip es (exprToSExpr <$> es)
+  let (goodZ3, badZ3) = partition (isNothing . snd) $ zip es (exprToSExpr <$> es)
   let sExprs = catMaybes $ map snd goodZ3
   let rest   = map fst badZ3
 
-  --putStrLn $ "^^^^"
+  --putStrLn $ "====="
+  --putStrLn $ show (pretty es)
   --putStrLn $ show sExprs
   --putStrLn $ show vnames
   --putStrLn $ show vargs
