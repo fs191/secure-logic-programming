@@ -105,7 +105,14 @@ aExpr5 = choice
       ]
 
 member :: Parser Expr
-member = binary [(Operator "member" eMember)] aExpr list
+member = 
+  do
+    try $ symbol "member("
+    el <- aExpr
+    symbol ","
+    lst <- list
+    symbol ")"
+    return $ eMember el lst
 
 unary 
   :: [Operator (Expr -> Expr)] 
