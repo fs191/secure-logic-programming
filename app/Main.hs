@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import Relude
@@ -10,25 +8,16 @@ import Language.SecreC
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text as T
 
-import Translator hiding (_debug)
+import Translator
 import Options.Applicative
 
 import ErrorMsg
-
-data ProgramOptions = ProgramOptions
-  { _iterations     :: Int
-  , _dbCreateTables :: Bool
-  , _verbose        :: Bool
-  , _inferTypesOnly :: Bool
-  , _outFile        :: Text
-  , _debug          :: Bool
-  , _inFile         :: Text
-  , _skipSemCheck   :: Bool
-  }
+import ProgramOptions
+import DatalogProgram
 
 programArgs :: Parser ProgramOptions
 programArgs = ProgramOptions
-  <$> (option auto $ mconcat
+  <$> option auto (mconcat
         [ short 'n'
         , long "iterations"
         , help "Specifies the maximum depth of recursion for the transformation\
@@ -38,45 +27,56 @@ programArgs = ProgramOptions
         , value 2
         , hidden
         ])
-      
-  <*> (switch $ mconcat
+  <*> switch (mconcat
         [ long "db-create-tables"
         , hidden
         , help "Create the required tables in the database using the data in input files\n \
                 \ the script is written into file createdb_XXX where XXX is the specified output file."
         ])
-  <*> (switch $ mconcat
+  <*> switch (mconcat
         [ short 'v'
         , long "verbose"
         , help "Produce verbose output."
         , hidden
         ])
-  <*> (switch $ mconcat
+  <*> switch (mconcat
         [ short 't'
         , long "only-types"
         , help "Outputs Privalog program with inferred types."
         , hidden
         ])
-  <*> (strOption $ mconcat
+  <*> strOption (mconcat
         [ short 'o'
         , long "output"
         , help "Specify output file path. Outputs into 'out' by default."
         , value "out"
         ])
-  <*> (switch $ mconcat
+  <*> switch (mconcat
         [ short 'd'
         , long "debug"
         , help "Prints debug information."
         , hidden
         ])
-  <*> (strArgument $ mconcat
+  <*> strArgument (mconcat
         [ metavar "INPUT"
         ])
-  <*> (switch $ mconcat
+  <*> switch (mconcat
          [ long "skip-semantics-check"
          , help "Skips the semantics check"
          , hidden
          ])
+  <*> option (maybeReader $ stratReader . toText) (mconcat
+        [ short 's'
+        , long "inlining-strategy"
+        , help "Specify the inlining strategy. Possible values:\n\
+        \ bfs, dfs, gr"
+        ])
+
+stratReader :: Text -> Maybe InliningStrategy
+stratReader "bfs" = Just BreadthFirst
+stratReader "dfs" = Just DepthFirst
+stratReader "gr" = Just FullGround
+stratReader _ = Nothing
 
 getProgramOptions :: IO ProgramOptions
 getProgramOptions = execParser opts
@@ -96,9 +96,7 @@ main =
     -- Text file containing output SecreC program
     let outFilePath = _outFile args
     let _ite = _iterations args
-    let inferTypesOnly = _inferTypesOnly args
-    let debug = _debug args
-    let skipSem = _skipSemCheck args
+    let onlyTypes = _inferTypesOnly args
 
     -- parse the input datalog program
     source <- liftIO . readFileText $ toString inFileName
@@ -106,22 +104,21 @@ main =
     program <- case program' of
           Left ex -> 
             do
-              putStrLn . show $ errorMsg source ex
+              print $ errorMsg source ex
               exitFailure
           Right x -> return x
 
-    let conf = TranslatorConfig _ite debug skipSem
-    tr <- runExceptT . process conf $ toString inFileName
+    tr <- runExceptT $ runReaderT process args :: IO (Either CompilerException DatalogProgram)
     case tr of
       Left ex -> 
         do
-          forM_ ex $ putStrLn . show . errorMsg source
+          print $ errorMsg source ex
           exitFailure
       Right tr' -> 
         do
           let sc = secrecCode tr'
 
-          let output = show $ if inferTypesOnly
+          let output = show $ if onlyTypes
               then pretty tr'
               else pretty sc
 
