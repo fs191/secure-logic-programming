@@ -200,3 +200,16 @@ Below is a list of all the supported aggregations
 
 # Nondeterminism
 
+# Command line arguments
+
++---------------------------|-----------------------------------------------------------------------------------------------+
+| -n,--iterations NUMBER    | Specifies the maximum recursion depth for predicates                                          |
+| --db-create-tables        | ???                                                                                           |
+| -v,--verbose              | Produces verbose output                                                                       |
+| -t,--only-types           | Outputs a typed PrivaLog program instead of SecreC                                            |
+| -o,--output FILE          | Specifies where to write the output program                                                   |
+| -d,--debug                | Outputs the intermediate program after each translation step                                  |
+| -s,--skip-semantics-check | Skips the semantics check and tries to translate a potentially semantically incorrect program |
+| -h,--help                 | Shows help text and exits                                                                     |
++---------------------------|-----------------------------------------------------------------------------------------------+
+
