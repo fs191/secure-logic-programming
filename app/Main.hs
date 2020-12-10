@@ -70,6 +70,7 @@ programArgs = ProgramOptions
         , long "inlining-strategy"
         , help "Specify the inlining strategy. Possible values:\n\
         \ bfs, dfs, gr"
+        , value BreadthFirst
         ])
 
 stratReader :: Text -> Maybe InliningStrategy
