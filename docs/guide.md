@@ -200,6 +200,8 @@ Below is a list of all the supported aggregations
 
 # Nondeterminism
 
+# Search strategies
+
 # Command line arguments
 
 | Option                    | Description                                                                                                       |
