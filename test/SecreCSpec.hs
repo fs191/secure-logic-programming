@@ -22,3 +22,7 @@ spec = parallel . describe "Language.SecreC" $ do
     compilesSuccessfully "examples/ppdatalog/ship_short.pl" 5
     compilesSuccessfully "examples/ppdatalog/precendence.pl" 5
     compilesSuccessfully "examples/ppdatalog/disjunction.pl" 5
+    compilesSuccessfully "examples/ppdatalog/nondet.pl" 5
+    compilesSuccessfully "examples/ppdatalog/sqrt.pl" 5
+    compilesSuccessfully "examples/ppdatalog/privacy_labels.pl" 5
+    compilesSuccessfully "examples/ppdatalog/ship_mintime.pl" 5

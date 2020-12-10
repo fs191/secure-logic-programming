@@ -1,4 +1,4 @@
-:-type(cat, [@name:public string, @gender:public string, @color:public string, @age:private int]).
+:-type(cat(@name:public string, @gender:public string, @color:public string, @age:private int)).
 
 friendly(Cat,X) :-
     cat(Cat,Gender,Color,Age),
