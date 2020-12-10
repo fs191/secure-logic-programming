@@ -45,7 +45,7 @@ deriveAllGroundRules = loopPipeline pipeline
               BreadthFirst -> inlineOnceBFS
               DepthFirst -> inlineOnceDFS
               FullGround -> inlineOnceGr
-        pl0 <- dp & id %~ inlineOnceBFS
+        pl0 <- dp & id %~ inlFun
                   & dpRules . traversed %~ refreshRule "X_"
                   & dpRules %%~ filterM checkConsistency
         pl  <- pl0 & dpRules . traversed %%~ simplifySat
@@ -108,19 +108,21 @@ inlineOnceDFS dp =
   dp & dpRules .~ rs'
 
   where
-    rs' = potentialSrc <> inlined <> (if length potentialTgt > 0 then tail potentialTgt else [])
+    rs' = potentialSrc <> inlined <> (if not $ null potentialTgt then L.tail potentialTgt else [])
     rs  = dp ^. dpRules
     (potentialSrc, potentialTgt') = L.partition (isGround dp) rs
 
     -- we start from the rules that contain the least amount of IDB predicates and hence bring us ground rules faster
+    potentialTgt :: [Rule]
     potentialTgt = L.sortOn (uncertaintyDegree dp) potentialTgt'
 
+    inlined :: [Rule]
     inlined = do
-      tgt <- refreshRule "T_" <$> L.head potentialTgt
+      let tgt = refreshRule "T_" $ L.head potentialTgt
       let ttl = tgt ^. ruleTail
       let fil (x,_) = isPredicate x && isIDBFact dp x
       let tlPreds = filter fil $ U.contexts ttl
-      (p,mut) <- L.head tlPreds
+      let (p,mut) = L.head tlPreds
       let res
             | null tlPreds = return tgt
             | otherwise = 
@@ -160,9 +162,9 @@ inlineOnceGr dp =
         let tgt = refreshRule "T_" tgt' in
         let ttl = tgt ^. ruleTail in
         let tlPreds = filter fil $ U.contexts ttl in
-        if length tlPreds == 0 then [tgt]
+        if null tlPreds then [tgt]
         else
-            let (p,mut) = fromMaybe undefined $ viaNonEmpty head tlPreds in
+            let (p,mut) = L.head tlPreds in
             let tgts = do                
                      src <- filter (isGround dp) $ findRules dp $ p ^. predName
                      let shd = src ^. ruleHead
@@ -172,7 +174,7 @@ inlineOnceGr dp =
                      maybeToList $ subster <$> subst
             in
             --trace ("\n" ++ show (pretty p) ++ "\n" ++ show (pretty tgt) ++ "\n" ++ show (pretty tgts)) $
-            concat $ map substututeAllIDB tgts
+            concatMap substututeAllIDB tgts
 
 -- Removes duplicate terms from AND operations at the root expression
 simplifyAnds :: Expr -> Expr
@@ -194,6 +196,9 @@ isPredicate _      = False
 
 isGround :: DatalogProgram -> Rule -> Bool
 isGround dp r = all (not . isIDBFact dp) . U.universe $ r ^. ruleTail
+
+uncertaintyDegree :: DatalogProgram -> Rule -> Int
+uncertaintyDegree dp r = length $ filter (isIDBFact dp) . U.universe $ r ^. ruleTail
 
 -- rewrite the assignments and look for contradictions
 checkConsistency :: (MonadIO m) => Rule -> m Bool
@@ -219,9 +224,9 @@ simplifyRule r =
     let rName = ruleName r in
     let rBody = simplifyAnds' $ r ^. ruleTail in
     let rArgs = args r in
-    let (boundedVars, freeVars) = L.partition (\z -> z ^. annotation ^. annBound) rArgs in
-    let boundedVarNames = concat $ map varNames boundedVars in
-    let freeVarNames = concat $ map varNames freeVars in
+    let (boundedVars, freeVars) = L.partition (\z -> z ^. annotation . annBound) rArgs in
+    let boundedVarNames = concatMap varNames boundedVars in
+    let freeVarNames = concatMap varNames freeVars in
     let newRuleBody = simplify rBody (boundedVarNames, freeVarNames) in
 
     let newRuleTail  = ordNub . filter (not . isAnd) $ newRuleBody in
