@@ -778,6 +778,9 @@ exprToSC e =
     Ge   _ e1 e2 -> BI.bop (SCConstStr ">=") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
     And  _ e1 e2 -> BI.bop (SCConstStr "and") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
     Or   _ e1 e2 -> BI.bop (SCConstStr "or") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
+    Cast a x     -> case a ^. annType of
+                      PPFloat32 -> SCFunCall "cast_float32" [exprToSC x]
+                      t         -> error $ "Casting not supported for type " <> show t
     Pred{}       -> error "High order predicates are not supported"
     _            -> error $ "Unexpected expression: " <> show (prettyMinimal e)
 
