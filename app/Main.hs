@@ -28,12 +28,6 @@ programArgs = ProgramOptions
         , hidden
         ])
   <*> switch (mconcat
-        [ long "db-create-tables"
-        , hidden
-        , help "Create the required tables in the database using the data in input files\n \
-                \ the script is written into file createdb_XXX where XXX is the specified output file."
-        ])
-  <*> switch (mconcat
         [ short 'v'
         , long "verbose"
         , help "Produce verbose output."
@@ -122,17 +116,6 @@ main =
           let output = show $ if onlyTypes
               then pretty tr'
               else pretty sc
-
-          -- create a Sharemind script that can be used to upload the tables used in given program
-          -- WARNING: this is used for testing only, do not apply it to actual private data!
-          when (_dbCreateTables args) $ do
-              createdb <- csvImportCode program
-              let createdbStr = show . pretty $ createdb
-              let outFileDir  = T.reverse $ T.dropWhile (/= '/') (T.reverse outFilePath)
-              let outFileName = T.reverse $ T.takeWhile (/= '/') (T.reverse outFilePath)
-
-              let createdbPath = outFileDir <> "createdb_" <> outFileName
-              writeFile (toString createdbPath) createdbStr
 
           -- Output the results
           writeFileText (toString outFilePath) output

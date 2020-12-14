@@ -4,7 +4,6 @@ module ProgramOptions
   ( ProgramOptions(..)
   , InliningStrategy(..)
   , iterations
-  , dbCreateTables
   , verbose
   , inFile
   , outFile
@@ -26,7 +25,6 @@ data InliningStrategy
 
 data ProgramOptions = ProgramOptions
   { _iterations       :: Int
-  , _dbCreateTables   :: Bool
   , _verbose          :: Bool
   , _inferTypesOnly   :: Bool
   , _outFile          :: Text
@@ -40,7 +38,6 @@ makeLenses ''ProgramOptions
 defaultOptions :: ProgramOptions
 defaultOptions = ProgramOptions
   { _iterations = 10
-  , _dbCreateTables = False
   , _verbose = False
   , _inferTypesOnly = False
   , _outFile = "out"

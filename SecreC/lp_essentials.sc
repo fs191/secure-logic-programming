@@ -1851,22 +1851,6 @@ D bool [[1]] apply_bop(string s, D0 T [[1]] x, D1 T [[1]] y){
     return b;
 }
 
-//TODO the following block is going to be deprecated
-template<type T1, type T2, type S1, type S2>
-pd_shared3p bool [[1]] bop(string s, relColumn<pd_shared3p, T1, S1> x, relColumn<public, T2, S2> y){
-    return apply_bop(s, x.val, y.val);
-}
-
-template<type T1, type T2, type S1, type S2>
-pd_shared3p bool [[1]] bop(string s, relColumn<public, T1, S1> x, relColumn<pd_shared3p, T2, S2> y){
-    return apply_bop(s, x.val, y.val);
-}
-
-template<domain D, type T1, type T2, type S1, type S2>
-D bool [[1]] bop(string s, relColumn<D, T1, S1> x, relColumn<D, T2, S2> y){
-    return apply_bop(s, x.val, y.val);
-}
-
 //boolean operation on data
 template<type T1, type T2, type S1, type S2>
 pd_shared3p bool [[1]] bop(string s, relColumn<pd_shared3p, T1, S1> x, relColumn<public, T2, S2> y, bool [[1]] b){
