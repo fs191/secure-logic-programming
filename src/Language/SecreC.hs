@@ -16,9 +16,6 @@ import qualified Data.List as L
 import Data.List.Split
 import qualified Data.Set as S
 
-import qualified Data.Text as T
-import Data.Text.Prettyprint.Doc
-
 import Annotation
 import qualified DatalogProgram as DP
 import Expr
@@ -28,9 +25,6 @@ import Rule
 import Language.SecreC.SCProgram
 import Language.SecreC.SCExpr
 import qualified Language.SecreC.Builtin as BI
-
-angled :: [Doc ann] -> Doc ann
-angled = encloseSep (langle <> space) (rangle <> space) comma
 
 -- some shorthand notation
 function :: SCTemplate -> Maybe SCType -> Text -> [SCVar] -> [Statement] -> FunctionDecl
@@ -136,11 +130,11 @@ scStructType f i ann =
   let dtype  = ann ^. annType in
   case (dtype, dom) of
       (PPBool, _)       -> f (scDomain i dom) SCBool  SCBool
-      (PPInt32,  _)       -> f (scDomain i dom) SCInt32 SCInt32
+      (PPInt32,  _)     -> f (scDomain i dom) SCInt32 SCInt32
       (PPStr,  Private) -> f (scDomain i dom) SCXorUInt32 SCXorUInt8
       (PPStr,  Public)  -> f (scDomain i dom) SCUInt32    SCUInt8
       (PPStr,  Unknown) -> error "cannot determine data type for a string of unknown domain"
-      (PPFloat32, _)      -> f (scDomain i dom) SCFloat32 SCFloat32
+      (PPFloat32, _)    -> f (scDomain i dom) SCFloat32 SCFloat32
       _                 -> f (scDomain i dom) (SCDynamicT i) (SCDynamicS i)
 
 scStructPrivateType :: (SCDomain -> SCType -> SCType -> SCType) -> Maybe Int -> Ann -> SCType
@@ -259,7 +253,7 @@ extPredGet dbc = function (SCTemplateDecl Nothing) returnType fname fargs fbody
     fname = nameGetTableStruct p
     fargs = [variable SCPublic SCText ds, variable SCPublic SCUInt m, variable SCPublic SCUInt mi, variable SCPublic SCUInt ni]
     fbody = [ VarDecl $ variable SCPublic (SCStruct (nameOutTableStruct p) (SCTemplateUse Nothing)) result
-            , VarAsgn (nameTableBB result) (BI.trueColumn [SCVarName m])
+            , VarAsgn (nameTableBB result) (BI.trueColumn (SCVarName m))
             ]
             <> map (\i -> VarAsgn (nameTableArg result i) (BI.getDBColumn (SCVarName ds) (SCConstStr p) (SCConstInt i) (SCVarName m) (SCVarName mi) (SCVarName ni))) is
             <> [Return (SCVarName result)]
@@ -366,15 +360,15 @@ intPredDedup p is = function template returnType fname fargs fbody
             , VarDecl (variable SCPublic (SCDynamicT (Just 0)) result)
             , VarAsgn (nameTableBB result) (SCVarName (nameTableBB table))]
             <> map (\i -> VarAsgn (nameTableArg result i) (BI.copyColumn (SCVarName (nameTableArg table i)))) is <>
-            [VarAsgn pi_ (BI.countSortPermutation [SCVarName (nameTableBB result)])
+            [VarAsgn pi_ (BI.countSortPermutation (SCVarName (nameTableBB result)))
             , VarAsgn result (SCFunCall (nameTablePermute p) [SCVarName result, SCVarName pi_])]
 
-            <> concatMap (\i -> [ VarAsgn pi_ (BI.quickSortPermutation [SCVarName (nameTableArg result i)])
+            <> concatMap (\i -> [ VarAsgn pi_ (BI.quickSortPermutation (SCVarName (nameTableArg result i)))
                                    , VarAsgn result (SCFunCall (nameTablePermute p) [SCVarName result, SCVarName pi_])]
                       ) is
             <>
             if not $ null is then
-                let (r:rs) = map (\i -> BI.findRepeating [SCVarName (nameTableArg result i)]) is in
+                let (r:rs) = map (BI.findRepeating . SCVarName . nameTableArg result) is in
                 [ VarAsgn (nameTableBB result) (SCAnd (SCVarName (nameTableBB result)) (SCNot (foldr SCAnd r rs)))
                 , Return (SCVarName result)]
             else
@@ -386,7 +380,7 @@ concreteGoal :: DP.DatalogProgram -> FunctionDecl
 concreteGoal dp = mainFun $
 
   -- get user inputs
-  map (\(Var xtype x) -> let (xdom,xsctype) = scVarType xtype in VarInit (variable xdom xsctype x) (BI.argument [SCConstStr x])) xs <>
+  map (\(Var xtype x) -> let (xdom,xsctype) = scVarType xtype in VarInit (variable xdom xsctype x) (BI.argument (SCConstStr x))) xs <>
 
   -- establish database connection
   [ VarInit (variable SCPublic SCText ds) strDataset
@@ -400,15 +394,14 @@ concreteGoal dp = mainFun $
   [BI.tdbCloseConnection (SCVarName ds)
 
   -- shuffle the results and leave only those whose truth bit is 1
-  , VarInit (variable SCPublic SCUInt32 n) (BI.declassifyIfNeed [BI.sum [SCTypeCast SCUInt32 (SCVarName (nameB j))]])
-  , VarInit (variable SCShared3p (SCArray 1 SCUInt32) pi_) (BI.lpShuffle [SCVarName (nameB j)])
+  , VarInit (variable SCPublic SCUInt32 n) (BI.declassifyIfNeed (BI.sum (SCTypeCast SCUInt32 (SCVarName (nameB j)))))
+  , VarInit (variable SCShared3p (SCArray 1 SCUInt32) pi_) (BI.lpShuffle (SCVarName (nameB j)))
   ] <>
 
   zipWith (\y i -> BI.publishColumn
-                       [ SCConstInt i
-                       , SCConstStr y
-                       , BI.filterTrue [SCVarName pi_, SCVarName n, SCVarName y]
-                       ]
+                       (SCConstInt i)
+                       (SCConstStr y)
+                       (BI.filterTrue (SCVarName pi_) (SCVarName n) (SCVarName y))
 
   -- TODO this is for testing aggregations, remove after we implement parsing aggregations
   -- ) ["Y"] [0]
@@ -465,7 +458,7 @@ ruleToSC r j = function template resTableType fname fargs fbody
 ruleBodyToSC :: Ann -> SCType -> Text -> Text -> Text -> [(Expr,Int)] -> [(Expr,Int)] -> Expr -> [Statement]
 ruleBodyToSC ann argTableType ds input p xs ys q =
   [ SCEmpty, Comment "compute the number of solutions in used predicates"
-  , VarInit (variable SCPublic SCUInt (nameM 0)) (BI.size [SCVarName (nameTableBB input)])
+  , VarInit (variable SCPublic SCUInt (nameM 0)) (BI.size (SCVarName (nameTableBB input)))
   ] <> getRowCounts <>
   [ VarInit (variable SCPublic SCUInt nameMM) $ SCProd (SCVarName (nameM 0) : map (\(_,i) -> SCVarName (nameM i)) ts)
   ] <> getNs <>
@@ -504,7 +497,7 @@ ruleBodyToSC ann argTableType ds input p xs ys q =
     ts = map (\(qj,j) -> (qj ^. predName, j)) $ filter (has _Pred . fst) $ zip qs [1..]
     ks = 0 : map snd ts
 
-    getRowCounts = map (\(tk,k) -> VarInit (variable SCPublic SCUInt (nameM k)) (BI.tdbGetRowCount [SCVarName ds, SCConstStr tk])) ts
+    getRowCounts = map (\(tk,k) -> VarInit (variable SCPublic SCUInt (nameM k)) (BI.tdbGetRowCount (SCVarName ds) (SCConstStr tk))) ts
     getNs        = map (\k      -> let js = filter (k >=) ks in
                                    VarInit (variable SCPublic SCUInt (nameN k)) (SCDiv (SCVarName nameMM) (SCProd (map (SCVarName . nameM) js))) ) ks
     getTables    = map (\(tk,k) -> VarInit (variable SCPublic (SCStruct (nameOutTableStruct tk) (SCTemplateUse Nothing)) (nameTable k)) (SCFunCall (nameGetTableStruct tk) [SCVarName ds, SCVarName nameMM, SCVarName (nameM k), SCVarName (nameN k)])) ts
@@ -567,7 +560,7 @@ intPredToSC isSetSemantics ds (Pred ptype p zs) j =
 
             -- create an input data structure that corresponds to particular goal
             [ VarDecl $ variable SCPublic argTableType argTableName
-            , VarAsgn (nameTableBB argTableName) (BI.trueColumn [])
+            , VarAsgn (nameTableBB argTableName) (BI.trueColumn (SCConstInt 1))
             ] <>
             map (\(_,i) -> VarAsgn (nameTableArg argTableName i) (SCVarName (nameArg i))) setX <>
             map (\(_,i) -> VarAsgn (nameTableArg argTableName i) (SCVarName (nameArg i))) setC <>
@@ -644,10 +637,10 @@ aggrToSC ds (Aggr _ f pr@(Pred _ _ zs) e1 e2) j =
                           intPredStmts <>
                           [VarInit (variable SCPublic (scColPrivateType ann) y) $ funAggr (SCVarName (nameTableArg (nameResUn j1) xi))
                                                                                           (SCVarName (nameTableBB (nameResUn j1)))
-                                                                                          (BI.size [SCVarName (nameTableBB (nameResUn j1))])
+                                                                                          (BI.size (SCVarName (nameTableBB (nameResUn j1))))
 
                           -- although Bj has already been declared by the internal predicate, let us re-declare it
-                          , VarInit (variable SCPublic (SCArray 1 SCBool) (nameB j)) (BI.trueColumn [BI.colSize [SCVarName y]])]
+                          , VarInit (variable SCPublic (SCArray 1 SCBool) (nameB j)) (BI.trueColumn (BI.colSize (SCVarName y)))]
 aggrToSC _ _ _ = undefined
 
 prepareGoal :: Text -> S.Set Text -> Expr -> Int -> [Statement]

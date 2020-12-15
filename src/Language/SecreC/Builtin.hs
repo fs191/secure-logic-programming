@@ -36,23 +36,23 @@ constStrColumn arg0 m = SCFunCall "constStrColumn" [arg0, m]
 constColumn :: SCExpr -> SCExpr
 constColumn arg0 = SCFunCall "constColumn" [arg0]
 
-trueColumn :: [SCExpr] -> SCExpr
-trueColumn  = SCFunCall "trueColumn"
+trueColumn :: SCExpr -> SCExpr
+trueColumn m = SCFunCall "trueColumn" [m]
 
-colSize :: [SCExpr] -> SCExpr
-colSize  = SCFunCall "colSize"
+colSize :: SCExpr -> SCExpr
+colSize x = SCFunCall "colSize" [x]
 
-size :: [SCExpr] -> SCExpr
-size     = SCFunCall "size"
+size :: SCExpr -> SCExpr
+size x = SCFunCall "size" [x]
 
-sum :: [SCExpr] -> SCExpr
-sum      = SCFunCall "sum"
+sum :: SCExpr -> SCExpr
+sum x = SCFunCall "sum" [x]
 
-argument :: [SCExpr] -> SCExpr
-argument   = SCFunCall "argument"
+argument :: SCExpr -> SCExpr
+argument x = SCFunCall "argument" [x]
 
-lpShuffle :: [SCExpr] -> SCExpr
-lpShuffle  = SCFunCall "lpShuffle"
+lpShuffle :: SCExpr -> SCExpr
+lpShuffle x = SCFunCall "lpShuffle" [x]
 
 aop :: SCExpr -> SCExpr -> SCExpr -> SCExpr -> SCExpr
 aop op x y b = SCFunCall "aop" [op, x, y, b]
@@ -60,17 +60,17 @@ aop op x y b = SCFunCall "aop" [op, x, y, b]
 bop :: SCExpr -> SCExpr -> SCExpr -> SCExpr -> SCExpr
 bop op x y b = SCFunCall "bop" [op, x, y, b]
 
-findRepeating :: [SCExpr] -> SCExpr
-findRepeating  = SCFunCall "findRepeating"
+findRepeating :: SCExpr -> SCExpr
+findRepeating x = SCFunCall "findRepeating" [x]
 
 copyColumn :: SCExpr -> SCExpr
 copyColumn x = SCFunCall "copyColumn" [x]
 
-countSortPermutation :: [SCExpr] -> SCExpr
-countSortPermutation = SCFunCall "countSortPermutation"
+countSortPermutation :: SCExpr -> SCExpr
+countSortPermutation x = SCFunCall "countSortPermutation" [x]
 
-quickSortPermutation :: [SCExpr] -> SCExpr
-quickSortPermutation = SCFunCall "quickSortPermutation"
+quickSortPermutation :: SCExpr -> SCExpr
+quickSortPermutation x = SCFunCall "quickSortPermutation" [x]
 
 countFilter :: SCExpr -> SCExpr ->SCExpr -> SCExpr
 countFilter x b m = SCFunCall "count_filter" [x, b, m]
@@ -90,17 +90,17 @@ maxFilter x b m = SCFunCall "max_filter" [x, b, m]
 timesFilter :: SCExpr -> SCExpr ->SCExpr -> SCExpr
 timesFilter x b m = SCFunCall "times_filter" [x, b, m]
 
-filterTrue :: [SCExpr] -> SCExpr
-filterTrue     = SCFunCall "filterTrue"
+filterTrue :: SCExpr -> SCExpr -> SCExpr -> SCExpr
+filterTrue x y z = SCFunCall "filterTrue" [x, y, z]
 
-declassifyIfNeed :: [SCExpr] -> SCExpr
-declassifyIfNeed     = SCFunCall "declassifyIfNeed"
+declassifyIfNeed :: SCExpr -> SCExpr
+declassifyIfNeed x = SCFunCall "declassifyIfNeed" [x]
 
-tdbGetRowCount :: [SCExpr] -> SCExpr
-tdbGetRowCount = SCFunCall "tdbGetRowCount"
+tdbGetRowCount :: SCExpr -> SCExpr -> SCExpr
+tdbGetRowCount ds tk = SCFunCall "tdbGetRowCount" [ds, tk]
 
-publishColumn :: [SCExpr] -> Statement
-publishColumn         = FunCall "publishCol"
+publishColumn :: SCExpr -> SCExpr -> SCExpr -> Statement
+publishColumn x y z = FunCall "publishCol" [x, y, z]
 
 createTable :: SCExpr -> SCExpr -> SCExpr -> SCExpr -> SCExpr -> SCExpr -> Statement
 createTable ds tableName colDataType colDomain headers ns = FunCall "createTable"
