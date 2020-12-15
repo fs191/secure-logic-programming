@@ -54,8 +54,8 @@ argument x = SCFunCall "argument" [x]
 lpShuffle :: SCExpr -> SCExpr
 lpShuffle x = SCFunCall "lpShuffle" [x]
 
-aop :: SCExpr -> SCExpr -> SCExpr -> SCExpr -> SCExpr
-aop op x y b = SCFunCall "aop" [op, x, y, b]
+aop :: SCExpr -> SCExpr -> SCExpr -> SCExpr
+aop op x y = SCFunCall "aop" [op, x, y]
 
 bop :: SCExpr -> SCExpr -> SCExpr -> SCExpr -> SCExpr
 bop op x y b = SCFunCall "bop" [op, x, y, b]

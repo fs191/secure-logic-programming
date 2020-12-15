@@ -560,7 +560,7 @@ intPredToSC isSetSemantics ds (Pred ptype p zs) j =
 
             -- create an input data structure that corresponds to particular goal
             [ VarDecl $ variable SCPublic argTableType argTableName
-            , VarAsgn (nameTableBB argTableName) (BI.trueColumn (SCConstInt 1))
+            , VarAsgn (nameTableBB argTableName) (BI.trueColumn (SCTypeCast SCUInt $ SCConstInt 1))
             ] <>
             map (\(_,i) -> VarAsgn (nameTableArg argTableName i) (SCVarName (nameArg i))) setX <>
             map (\(_,i) -> VarAsgn (nameTableArg argTableName i) (SCVarName (nameArg i))) setC <>
@@ -756,13 +756,13 @@ exprToSC e =
     Inv  _ e0 -> SCFunCall "inv" [exprToSC e0]
     Sqrt _ e0 -> SCFunCall "apply_sqrt" [exprToSC e0]
 
-    FDiv _ e1 e2 -> BI.aop (SCConstStr "/") (exprToSC e1) (exprToSC e2) (SCVarName nameBP)
-    Div  _ e1 e2 -> BI.aop (SCConstStr "div") (exprToSC e1) (exprToSC e2) (SCVarName nameBP)
-    Mod  _ e1 e2 -> BI.aop (SCConstStr "%") (exprToSC e1) (exprToSC e2) (SCVarName nameBP)
-    Sub  _ e1 e2 -> BI.aop (SCConstStr "-") (exprToSC e1) (exprToSC e2) (SCVarName nameBP)
-    Mul  _ e1 e2 -> BI.aop (SCConstStr "*") (exprToSC e1) (exprToSC e2) (SCVarName nameBP)
-    Add  _ e1 e2 -> BI.aop (SCConstStr "+") (exprToSC e1) (exprToSC e2) (SCVarName nameBP)
-    Pow  _ e1 e2 -> BI.aop (SCConstStr "pow") (exprToSC e1) (exprToSC e2) (SCVarName nameBP)
+    FDiv _ e1 e2 -> BI.aop (SCConstStr "/") (exprToSC e1) (exprToSC e2)
+    Div  _ e1 e2 -> BI.aop (SCConstStr "div") (exprToSC e1) (exprToSC e2)
+    Mod  _ e1 e2 -> BI.aop (SCConstStr "%") (exprToSC e1) (exprToSC e2)
+    Sub  _ e1 e2 -> BI.aop (SCConstStr "-") (exprToSC e1) (exprToSC e2)
+    Mul  _ e1 e2 -> BI.aop (SCConstStr "*") (exprToSC e1) (exprToSC e2)
+    Add  _ e1 e2 -> BI.aop (SCConstStr "+") (exprToSC e1) (exprToSC e2)
+    Pow  _ e1 e2 -> BI.aop (SCConstStr "pow") (exprToSC e1) (exprToSC e2)
     Lt   _ e1 e2 -> BI.bop (SCConstStr "<") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
     Le   _ e1 e2 -> BI.bop (SCConstStr "<=") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
     Eq   _ e1 e2 -> BI.bop (SCConstStr "==") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
