@@ -756,26 +756,29 @@ exprToSC e =
     Inv  _ e0 -> SCFunCall "inv" [exprToSC e0]
     Sqrt _ e0 -> SCFunCall "apply_sqrt" [exprToSC e0]
 
-    FDiv _ e1 e2 -> BI.aop (SCConstStr "/") (exprToSC e1) (exprToSC e2)
-    Div  _ e1 e2 -> BI.aop (SCConstStr "div") (exprToSC e1) (exprToSC e2)
-    Mod  _ e1 e2 -> BI.aop (SCConstStr "%") (exprToSC e1) (exprToSC e2)
-    Sub  _ e1 e2 -> BI.aop (SCConstStr "-") (exprToSC e1) (exprToSC e2)
-    Mul  _ e1 e2 -> BI.aop (SCConstStr "*") (exprToSC e1) (exprToSC e2)
-    Add  _ e1 e2 -> BI.aop (SCConstStr "+") (exprToSC e1) (exprToSC e2)
-    Pow  _ e1 e2 -> BI.aop (SCConstStr "pow") (exprToSC e1) (exprToSC e2)
-    Lt   _ e1 e2 -> BI.bop (SCConstStr "<") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
-    Le   _ e1 e2 -> BI.bop (SCConstStr "<=") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
-    Eq   _ e1 e2 -> BI.bop (SCConstStr "==") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
-    Un   _ e1 e2 -> BI.bop (SCConstStr "==") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
-    Gt   _ e1 e2 -> BI.bop (SCConstStr ">") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
-    Ge   _ e1 e2 -> BI.bop (SCConstStr ">=") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
-    And  _ e1 e2 -> BI.bop (SCConstStr "and") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
-    Or   _ e1 e2 -> BI.bop (SCConstStr "or") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
+    FDiv _ e1 e2 -> binArith "/" e1 e2
+    Div  _ e1 e2 -> binArith "div" e1 e2
+    Mod  _ e1 e2 -> binArith "%" e1 e2
+    Sub  _ e1 e2 -> binArith "-" e1 e2
+    Mul  _ e1 e2 -> binArith "*" e1 e2
+    Add  _ e1 e2 -> binArith "+" e1 e2
+    Pow  _ e1 e2 -> binArith "pow" e1 e2
+    Lt   _ e1 e2 -> binBool "<" e1 e2
+    Le   _ e1 e2 -> binBool "<=" e1 e2
+    Eq   _ e1 e2 -> binBool "==" e1 e2
+    Un   _ e1 e2 -> binBool "==" e1 e2
+    Gt   _ e1 e2 -> binBool ">" e1 e2
+    Ge   _ e1 e2 -> binBool ">=" e1 e2
+    And  _ e1 e2 -> binBool "and" e1 e2
+    Or   _ e1 e2 -> binBool "or" e1 e2
     Cast a x     -> case a ^. annType of
                       PPFloat32 -> SCFunCall "cast_float32" [exprToSC x]
                       t         -> error $ "Casting not supported for type " <> show t
     Pred{}       -> error "High order predicates are not supported"
     _            -> error $ "Unexpected expression: " <> show (prettyMinimal e)
+    where
+      binArith s x y = BI.aop (SCConstStr s) (exprToSC x) (exprToSC y)
+      binBool s x y = BI.bop (SCConstStr s) (exprToSC x) (exprToSC y) (SCVarName nameBP)
 
 -- convert a pure boolean expression to SecreC (used only for the condition bits)
 bexprToSC :: Expr -> SCExpr
