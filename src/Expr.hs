@@ -32,6 +32,7 @@ module Expr
   , eNeg
   , eNot
   , eInv
+  , eCast
   , eSqrt, ePow
   , eAdd, eSub
   , eMul, eDiv, eFDiv
@@ -128,6 +129,7 @@ data Expr
   | Neg  {_annotation :: !Ann, _arg :: !Expr}
   | Inv  {_annotation :: !Ann, _arg :: !Expr}
   | Sqrt {_annotation :: !Ann, _arg :: !Expr}
+  | Cast {_annotation :: !Ann, _arg :: !Expr}
   | FDiv {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Div  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Mod  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
@@ -206,14 +208,16 @@ instance PrologSource Expr where
                                   , prolog y <+> "is Y0/N"
                                   ]
   prolog (Aggr _ f p x y) = "findall(" <> prolog x <> "," <> prolog p <> ", Xs)," <+>
-                            pretty (prologAggr $ show f) <> "_list(Xs," <> prolog y <> ")"
+                            pretty (prologAggr f) <> "_list(Xs," <> prolog y <> ")"
+  prolog (Cast _ x) = prolog x
+  prolog (Choose _ x xs) = "??CHOOSE??(" <> prolog x <> ", " <> prolog xs <> ")"
 
 -- map datalog aggregations to prolog aggregations
-prologAggr :: Text -> Text
-prologAggr "sum"   = "sum_list"
-prologAggr "min"   = "min_list"
-prologAggr "max"   = "max_list"
-prologAggr "count" = "length"
+prologAggr :: Aggregation -> Text
+prologAggr Sum   = "sum_list"
+prologAggr Min   = "min_list"
+prologAggr Max   = "max_list"
+prologAggr Count = "length"
 
 isLeaf :: Expr -> Bool
 isLeaf (Var _ _)       = True
@@ -265,7 +269,7 @@ constBool = ConstBool (empty & annBound .~ True
 
 -- | Creates a new variable
 var :: Text -> Expr
-var n = Var a n 
+var = Var a 
   where a = empty & annType  .~ PPAuto
                   & domain   .~ Unknown
                   & annBound .~ False
@@ -316,6 +320,11 @@ eNot :: Expr -> Expr
 eNot = Not e
   where
     e = empty & annType .~ PPBool
+
+eCast :: Expr -> PPType -> Expr
+eCast e t = Cast ann e
+  where
+    ann = e ^. annotation & annType .~ t
 
 -- | Creates a new square root expression
 eSqrt :: Expr -> Expr
@@ -487,7 +496,7 @@ hole = Hole empty
 
 -- | Unifies the typings of the two expressions
 unifyExprAnns :: Expr -> Expr -> Maybe Expr
-unifyExprAnns x y = x & annotation %%~ (unifyAnns a)
+unifyExprAnns x y = x & annotation %%~ unifyAnns a
   where a = y ^. annotation
 
 -- | Returns the result of unifying the types of the two expressions
@@ -511,33 +520,33 @@ applyTyping t e = e & annotation . typing %%~ unifyTypings t
 
 -- | Returns True if expression is an arithmetic expression.
 isArithmetic :: Expr -> Bool
-isArithmetic (Add{}) = True
-isArithmetic (Sub{}) = True
-isArithmetic (Mul{}) = True
-isArithmetic (FDiv{}) = True
-isArithmetic (Div{}) = True
-isArithmetic (Mod{}) = True
-isArithmetic (Neg{}) = True
-isArithmetic (Inv{}) = True
-isArithmetic (Sqrt{}) = True
-isArithmetic (Pow{}) = True
+isArithmetic Add{} = True
+isArithmetic Sub{} = True
+isArithmetic Mul{} = True
+isArithmetic FDiv{} = True
+isArithmetic Div{} = True
+isArithmetic Mod{} = True
+isArithmetic Neg{} = True
+isArithmetic Inv{} = True
+isArithmetic Sqrt{} = True
+isArithmetic Pow{} = True
 isArithmetic _       = False
 
 isComparison :: Expr -> Bool
-isComparison (Gt{})   = True
-isComparison (Ge{})   = True
-isComparison (Eq{})   = True
-isComparison (Le{})   = True
-isComparison (Lt{})   = True
-isComparison (Is{})   = True
-isComparison (Un{})   = True
-isComparison (Neq{})  = True
+isComparison Gt{}   = True
+isComparison Ge{}   = True
+isComparison Eq{}   = True
+isComparison Le{}   = True
+isComparison Lt{}   = True
+isComparison Is{}   = True
+isComparison Un{}   = True
+isComparison Neq{}  = True
 isComparison _        = False
 
 -- | Returns True if the expression is a predicate, built-in or otherwise
 isPredicative :: Expr -> Bool
-isPredicative (Pred{}) = True
-isPredicative (Aggr{}) = True
+isPredicative Pred{} = True
+isPredicative Aggr{} = True
 isPredicative x
   | isComparison x = True
   | otherwise      = False
@@ -554,8 +563,8 @@ applyAnnotation ann expr =
 groundTerm :: Expr -> Bool
 groundTerm e =
     let vs = varExprs e in
-    let bs = L.map (\v -> v ^.annotation ^. annBound) vs in
-    L.foldr (&&) True bs
+    let bs = L.map (\v -> v ^. annotation . annBound) vs in
+    and bs
 
 -- annotation-preserving CNF and DNF
 -- subexpressions that only contain bounded variables are not being decomposed
@@ -585,9 +594,9 @@ toCNF = toCNF' . toNNF
     toCNF' :: Expr -> Expr
     toCNF' (And ann expr1 expr2) = And  ann (toCNF' expr1) (toCNF' expr2)
     toCNF' expr@(Or ann expr1 expr2)  = 
-      case groundTerm expr of
-        True  -> expr
-        False -> dist ann (toCNF' expr1) (toCNF' expr2)
+      if groundTerm expr
+        then expr
+        else dist ann (toCNF' expr1) (toCNF' expr2)
     toCNF' expr                  = expr
     
     dist :: Ann -> Expr -> Expr -> Expr
@@ -600,9 +609,9 @@ toDNF = toDNF' . toNNF
   where
     toDNF' :: Expr -> Expr
     toDNF' expr@(And ann expr1 expr2) = 
-      case groundTerm expr of
-        True  -> expr
-        False -> dist ann (toDNF' expr1) (toDNF' expr2)
+      if groundTerm expr
+        then expr
+        else dist ann (toDNF' expr1) (toDNF' expr2)
     toDNF' (Or  ann expr1 expr2) = Or   ann (toDNF' expr1) (toDNF' expr2)
     toDNF' expr                  = expr
 

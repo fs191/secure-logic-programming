@@ -22,8 +22,8 @@ import Translator.SemanticsChecker
 import Translator.Transform
 import Translator.TypeInference
 import Translator.Distribute
-import Translator.Simplify
 import Translator.PubPriv
+import Translator.CoerceTypes
 
 import DatalogProgram
 import Rule
@@ -102,7 +102,10 @@ process =
     let ti3 = typeInference ad3
     printDebug "TypeInference3" ti3
 
-    return ti3
+    let co = ti3 & dpRules . traversed . ruleTail %~ U.rewrite coerceTypes
+    printDebug "TypeCoercion" co
+
+    return co
 
 printDebug 
   :: ( Pretty a

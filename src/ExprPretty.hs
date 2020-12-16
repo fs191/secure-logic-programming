@@ -122,6 +122,10 @@ prettyEx (Choose e x y) =   do
     y' <- prettyEx y
     e' <- prettyExAnn e
     return $ "choose(" <> x' <> "," <> y' <> ")" <+> e'
+prettyEx (Cast e x) = 
+  do
+    x' <- prettyEx x
+    return $ "(" <> pretty (e ^. annType) <> ")" <+> x'
 
 prettyExBin :: Ann -> Expr -> Expr -> Doc ann -> Reader PrettyConfig (Doc ann)
 prettyExBin e x y op = 

@@ -33,7 +33,7 @@ data TopStatement
   -- Struct declaration
   | Struct StructDecl
   -- Import statement
-  | Import String
+  | Import Text
   -- SecreC domain statement
   | Domain SCDomain SCKind
   -- Empty line
@@ -48,31 +48,35 @@ instance Pretty TopStatement where
 
 -- | Statements with a return type
 data Statement 
-  = Comment String
+  = Comment Text
   -- Variable declaration
-  | VarDecl SCVar (Maybe SCExpr)
+  | VarDecl SCVar
+  -- Variable assignment
+  | VarAsgn Text SCExpr
+  -- Variable initialization
+  | VarInit SCVar SCExpr
   -- Function call
-  | ExprStmt SCExpr
+  | FunCall Text [SCExpr]
   -- Return Statement
   | Return SCExpr
   -- We decide to leave empty rows inside functions as well (for better readability)
   | SCEmpty
 
 instance Pretty Statement where
-  pretty (Comment t)   = "//" <> pretty t
-  pretty (VarDecl v Nothing)  = pretty v <> semi
-  pretty (VarDecl v (Just e)) = pretty v <+> "=" <+> pretty e <> semi
-  pretty (Return e)    = "return" <+> pretty e <> semi
-  pretty (SCEmpty)     = ""
-  pretty (ExprStmt e)  = pretty e <> semi
+  pretty (Comment t)      = "//" <> pretty t
+  pretty (VarDecl v)      = pretty v <> semi
+  pretty (VarAsgn v e)    = pretty v <+> "=" <+> pretty e <> semi
+  pretty (VarInit v e)    = pretty v <+> "=" <+> pretty e <> semi
+  pretty (Return e)       = "return" <+> pretty e <> semi
+  pretty SCEmpty          = ""
+  pretty (FunCall n pars) = pretty n <> pars' <> semi
+    where pars' = tupled $ pretty <$> pars
 
 data SCVar = SCVar
   { _vdDomain :: SCDomain
   , _vdType   :: SCType
   , _vdName   :: Text
   }
-
-
 
 instance Pretty SCVar where
   pretty v = k <+> t <+> n
@@ -82,7 +86,7 @@ instance Pretty SCVar where
       n = pretty $ _vdName v
 
 data FunctionDecl = FunctionDecl
-  { _fdTemplate   :: Maybe SCTemplate
+  { _fdTemplate   :: SCTemplate
   , _fdReturnType :: Maybe SCType
   , _fdName       :: Text
   , _fdParams     :: [SCVar]
@@ -102,12 +106,10 @@ instance Pretty FunctionDecl where
       n    = pretty $ _fdName fd
       pars = tupled $ pretty <$> _fdParams fd
       body = pretty <$> _fdBody fd
-      rt   = case _fdReturnType fd of
-        Just x  -> pretty x
-        Nothing -> "void"
+      rt   = maybe "void" pretty $ _fdReturnType fd
 
 data StructDecl = StructDecl
-  { _sdTemplate   :: Maybe SCTemplate
+  { _sdTemplate   :: SCTemplate
   , _sdName       :: Text
   , _sdMembers    :: [SCVar]
   }
@@ -123,7 +125,7 @@ instance Pretty StructDecl where
     where
       template = pretty $ _sdTemplate sd
       n  = pretty $ _sdName sd
-      ms = pretty <$> map (\x -> VarDecl x Nothing) (_sdMembers sd)
+      ms = pretty <$> map VarDecl (_sdMembers sd)
 
 varToExpr :: SCVar -> SCExpr
 varToExpr = undefined

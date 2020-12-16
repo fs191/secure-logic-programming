@@ -6,6 +6,9 @@ cradle:
     - path: "./app/Main.hs"
       component: "secure-logic-programming:exe:lpsec"
 
+    - path: "./app/GenDB.hs"
+      component: "secure-logic-programming:exe:lpsec-gen-table"
+
     - path: "./app/Paths_secure_logic_programming.hs"
       component: "secure-logic-programming:exe:lpsec"
 
