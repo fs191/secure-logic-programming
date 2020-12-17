@@ -43,20 +43,13 @@ instance Pretty SCDomain where
   pretty (SCDynamic (Just i)) = "D" <> pretty i
 
 data SCType
-  = SCUInt8
-  | SCUInt16
-  | SCUInt32
-  | SCUInt64
-  | SCXorUInt8
-  | SCXorUInt16
+  = SCUInt32
+  | SCUInt
+  | SCUInt8
   | SCXorUInt32
-  | SCXorUInt64
-  | SCInt8
-  | SCInt16
+  | SCXorUInt8
   | SCInt32
-  | SCInt64
   | SCFloat32
-  | SCFloat64
   | SCBool
   | SCText
   | SCDynamicT (Maybe Int)
@@ -68,20 +61,13 @@ data SCType
   deriving (Show, Eq)
 
 instance Pretty SCType where
-  pretty SCFloat32   = "float"
-  pretty SCFloat64   = "float64"
+  pretty SCFloat32   = "float32"
+  pretty SCUInt32    = "uint32"
+  pretty SCUInt      = "uint"
   pretty SCUInt8     = "uint8"
-  pretty SCUInt16    = "uint16"
-  pretty SCUInt32    = "uint"
-  pretty SCUInt64    = "uint64"
-  pretty SCXorUInt8  = "xor_uint8"
-  pretty SCXorUInt16 = "xor_uint16"
   pretty SCXorUInt32 = "xor_uint32"
-  pretty SCXorUInt64 = "xor_uint64"
-  pretty SCInt8      = "int8"
-  pretty SCInt16     = "int16"
+  pretty SCXorUInt8  = "xor_uint8"
   pretty SCInt32     = "int32"
-  pretty SCInt64     = "int64"
   pretty SCBool      = "bool"
   pretty SCText    = "string"
 

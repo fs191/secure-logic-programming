@@ -115,20 +115,12 @@ scVarType ann =
 
   let scDom = scDomain Nothing dom in
   let sctype = case (dtype, dom) of
-          (PPBool, _)       -> SCBool
-          (PPInt8,  _)      -> SCInt8
-          (PPInt16,  _)     -> SCInt16
-          (PPInt32,  _)     -> SCInt32
-          (PPInt64,  _)     -> SCInt64
-          (PPUInt8,  _)     -> SCUInt8
-          (PPUInt16,  _)    -> SCUInt16
-          (PPUInt32,  _)    -> SCUInt32
-          (PPUInt64,  _)    -> SCUInt64
+          (PPBool, _) -> SCBool
+          (PPInt32,  _) -> SCInt32
           (PPStr,  Private) -> SCArray 1 SCXorUInt8
           (PPStr,  Public)  -> SCText
           (PPStr,  Unknown) -> error "cannot determine data type for a string of unknown domain"
           (PPFloat32, _)      -> SCFloat32
-          (PPFloat64, _)      -> SCFloat64
           _                 -> SCDynamicT Nothing
   in (scDom, sctype)
 
@@ -138,19 +130,11 @@ scStructType f i ann =
   let dtype  = ann ^. annType in
   case (dtype, dom) of
       (PPBool, _)       -> f (scDomain i dom) SCBool  SCBool
-      (PPInt8,  _)      -> f (scDomain i dom) SCInt8  SCInt8
-      (PPInt16,  _)     -> f (scDomain i dom) SCInt16 SCInt16
       (PPInt32,  _)     -> f (scDomain i dom) SCInt32 SCInt32
-      (PPInt64,  _)     -> f (scDomain i dom) SCInt64 SCInt64
-      (PPUInt8,  _)     -> f (scDomain i dom) SCUInt8  SCUInt8
-      (PPUInt16,  _)    -> f (scDomain i dom) SCUInt16 SCUInt16
-      (PPUInt32,  _)    -> f (scDomain i dom) SCUInt32 SCUInt32
-      (PPUInt64,  _)    -> f (scDomain i dom) SCUInt64 SCUInt64
       (PPStr,  Private) -> f (scDomain i dom) SCXorUInt32 SCXorUInt8
       (PPStr,  Public)  -> f (scDomain i dom) SCUInt32    SCUInt8
       (PPStr,  Unknown) -> error "cannot determine data type for a string of unknown domain"
       (PPFloat32, _)    -> f (scDomain i dom) SCFloat32 SCFloat32
-      (PPFloat64, _)    -> f (scDomain i dom) SCFloat64 SCFloat64
       _                 -> f (scDomain i dom) (SCDynamicT i) (SCDynamicS i)
 
 scStructPrivateType :: (SCDomain -> SCType -> SCType -> SCType) -> Maybe Int -> Ann -> SCType
@@ -158,17 +142,9 @@ scStructPrivateType f i ann =
   let dtype  = ann ^. annType in
   case dtype of
       PPBool -> f SCShared3p SCBool  SCBool
-      PPInt8  -> f SCShared3p SCInt8 SCInt8
-      PPInt16 -> f SCShared3p SCInt16 SCInt16
       PPInt32 -> f SCShared3p SCInt32 SCInt32
-      PPInt64 -> f SCShared3p SCInt64 SCInt64
-      PPUInt8  -> f SCShared3p SCUInt8  SCUInt8
-      PPUInt16 -> f SCShared3p SCUInt16 SCUInt16
-      PPUInt32 -> f SCShared3p SCUInt32 SCUInt32
-      PPUInt64 -> f SCShared3p SCUInt64 SCUInt64
       PPStr  -> f SCShared3p SCXorUInt32 SCXorUInt8
       PPFloat32 -> f SCShared3p SCFloat32 SCFloat32
-      PPFloat64 -> f SCShared3p SCFloat64 SCFloat64
       _      -> f SCShared3p (SCDynamicT i) (SCDynamicS i)
 
 scColTypeI :: Int -> Ann -> SCType
@@ -275,7 +251,7 @@ extPredGet dbc = function (SCTemplateDecl Nothing) returnType fname fargs fbody
     is = [0..n-1]
     returnType = Just $ SCStruct (nameOutTableStruct p) (SCTemplateUse Nothing)
     fname = nameGetTableStruct p
-    fargs = [variable SCPublic SCText ds, variable SCPublic SCUInt32 m, variable SCPublic SCUInt32 mi, variable SCPublic SCUInt32 ni]
+    fargs = [variable SCPublic SCText ds, variable SCPublic SCUInt m, variable SCPublic SCUInt mi, variable SCPublic SCUInt ni]
     fbody = [ VarDecl $ variable SCPublic (SCStruct (nameOutTableStruct p) (SCTemplateUse Nothing)) result
             , VarAsgn (nameTableBB result) (BI.trueColumn (SCVarName m))
             ]
@@ -308,7 +284,7 @@ intPredExt p is = function template returnType fname fargs fbody
     template = SCTemplateDecl $ Just ([], [dynamicColT 0, dynamicColT 1])
     returnType = Just $ dynamicColT 0
     fname = nameTableExt p
-    fargs = [variable SCPublic (dynamicColT 1) result, variable SCPublic SCUInt32 m, variable SCPublic SCUInt32 mi, variable SCPublic SCUInt32 ni]
+    fargs = [variable SCPublic (dynamicColT 1) result, variable SCPublic SCUInt m, variable SCPublic SCUInt mi, variable SCPublic SCUInt ni]
     fbody = [VarAsgn (nameTableBB result) (BI.extendColumn (SCVarName $ nameTableBB result) (SCVarName m) (SCVarName mi) (SCVarName ni))]
             <> map (\i -> VarAsgn (nameTableArg result i) (BI.extendColumn (SCVarName (nameTableArg result i)) (SCVarName m) (SCVarName mi) (SCVarName ni))) is
             <> [Return (SCVarName result)]
@@ -482,9 +458,9 @@ ruleToSC r j = function template resTableType fname fargs fbody
 ruleBodyToSC :: Ann -> SCType -> Text -> Text -> Text -> [(Expr,Int)] -> [(Expr,Int)] -> Expr -> [Statement]
 ruleBodyToSC ann argTableType ds input p xs ys q =
   [ SCEmpty, Comment "compute the number of solutions in used predicates"
-  , VarInit (variable SCPublic SCUInt32 (nameM 0)) (BI.size (SCVarName (nameTableBB input)))
+  , VarInit (variable SCPublic SCUInt (nameM 0)) (BI.size (SCVarName (nameTableBB input)))
   ] <> getRowCounts <>
-  [ VarInit (variable SCPublic SCUInt32 nameMM) $ SCProd (SCVarName (nameM 0) : map (\(_,i) -> SCVarName (nameM i)) ts)
+  [ VarInit (variable SCPublic SCUInt nameMM) $ SCProd (SCVarName (nameM 0) : map (\(_,i) -> SCVarName (nameM i)) ts)
   ] <> getNs <>
   [ SCEmpty, Comment "extend the initial args to appropriate size"
   , VarInit (variable SCPublic argTableType inputTable) (SCFunCall (nameTableExt p) [SCVarName input, SCVarName nameMM, SCVarName (nameM 0), SCVarName (nameN 0)])
@@ -521,9 +497,9 @@ ruleBodyToSC ann argTableType ds input p xs ys q =
     ts = map (\(qj,j) -> (qj ^. predName, j)) $ filter (has _Pred . fst) $ zip qs [1..]
     ks = 0 : map snd ts
 
-    getRowCounts = map (\(tk,k) -> VarInit (variable SCPublic SCUInt32 (nameM k)) (BI.tdbGetRowCount (SCVarName ds) (SCConstStr tk))) ts
+    getRowCounts = map (\(tk,k) -> VarInit (variable SCPublic SCUInt (nameM k)) (BI.tdbGetRowCount (SCVarName ds) (SCConstStr tk))) ts
     getNs        = map (\k      -> let js = filter (k >=) ks in
-                                   VarInit (variable SCPublic SCUInt32 (nameN k)) (SCDiv (SCVarName nameMM) (SCProd (map (SCVarName . nameM) js))) ) ks
+                                   VarInit (variable SCPublic SCUInt (nameN k)) (SCDiv (SCVarName nameMM) (SCProd (map (SCVarName . nameM) js))) ) ks
     getTables    = map (\(tk,k) -> VarInit (variable SCPublic (SCStruct (nameOutTableStruct tk) (SCTemplateUse Nothing)) (nameTable k)) (SCFunCall (nameGetTableStruct tk) [SCVarName ds, SCVarName nameMM, SCVarName (nameM k), SCVarName (nameN k)])) ts
 
     evalBody = concat $ zipWith (formulaToSC ds) qs [1..]
@@ -584,7 +560,7 @@ intPredToSC isSetSemantics ds (Pred ptype p zs) j =
 
             -- create an input data structure that corresponds to particular goal
             [ VarDecl $ variable SCPublic argTableType argTableName
-            , VarAsgn (nameTableBB argTableName) (BI.trueColumn (SCTypeCast SCUInt32 $ SCConstInt 1))
+            , VarAsgn (nameTableBB argTableName) (BI.trueColumn (SCTypeCast SCUInt $ SCConstInt 1))
             ] <>
             map (\(_,i) -> VarAsgn (nameTableArg argTableName i) (SCVarName (nameArg i))) setX <>
             map (\(_,i) -> VarAsgn (nameTableArg argTableName i) (SCVarName (nameArg i))) setC <>
