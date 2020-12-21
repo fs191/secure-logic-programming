@@ -1133,11 +1133,10 @@ relColumn<D, T, S> extendColumn(relColumn<D, T, S> x, uint m, uint mi, uint ni){
     result.val = copyBlock(myReplicate(x.val, ms, ns), {mi * ni}, {m / (mi * ni)});
     result.str = copyBlock(myReplicate(x.str, ms, ns), {mi * ni}, {m / (mi * ni)});
     return result;
-
 }
 
-template<domain D, type T, type T0>
-relColumn<D, T, T> getDBColumn(string ds, string tableName, T0 _colIndex, uint m, uint mi, uint ni){
+template<domain D, type T, type K>
+relColumn<D, T, T> getDBColumn(string ds, string tableName, K _colIndex, uint m, uint mi, uint ni){
 
     uint colIndex = (uint)_colIndex;
     uint [[1]] ms (mi); ms = 1;
@@ -1155,74 +1154,39 @@ relColumn<D, T, T> getDBColumn(string ds, string tableName, T0 _colIndex, uint m
     public relColumn<D, T, T> result;
     result.fv  = reshape(false, m);
     result.val = col;
-    result.str = reshape((T)0, m, 0);
+    result.str = reshape((T) 0, m, 0);
     return result;
 }
 
-//TODO check out why it does not work with polymorphic T (like public string column)
-//template< type T>
-relColumn<pd_shared3p, xor_uint32, xor_uint8> getDBColumn(string ds, string tableName, int64 _colIndex, uint m, uint mi, uint ni){
+template<domain D, type T, type S, type K>
+relColumn<D, T, S> getDBStrColumn(string ds, string tableName, K _colIndex, uint m, uint mi, uint ni){
     //print("start:",mi);
-    uint colIndex = (uint)_colIndex;
+    uint colIndex = (uint) _colIndex;
     uint rv;
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
 
-    pd_shared3p xor_uint32 [[1]] col     = reshape(0,mi);
-    pd_shared3p xor_uint8 [[2]] col_str = reshape(0,mi,0);
-    rv = tdbReadColumn(ds, tableName, colIndex);
-    for (uint i = 0; i < mi; i++){
-        pd_shared3p xor_uint8 [[1]] temp = tdbVmapGetVlenValue(rv, "values", i);
-
-        col[i] = CRC32(temp);
-        uint n = size(temp);
-
-        pd_shared3p xor_uint8 [[2]] temp2 = reshape(0, shape(col_str)[0], max(shape(col_str)[1], n));
-        temp2 = mySetSlice(col_str, temp2, 0, shape(col_str)[0], 0, shape(col_str)[1]);
-        pd_shared3p xor_uint8 [[1]] temp3 = declassifyIfNeed(temp);
-        temp2 = mySetSlice(myReshape(temp3, 1, n), temp2, i, i+1, 0, n);
-        col_str = temp2;
-    }
-    col     = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
-    col_str = copyBlock(myReplicate(col_str, ms, ns), {mi * ni}, {m / (mi * ni)});
-
-    public relColumn<pd_shared3p, xor_uint32, xor_uint8> result;
-    result.fv  = reshape(false, m);
-    result.val = col;
-    result.str = col_str;
-    //print("finish:",mi);
-    return result;
-}
-
-template<type T>
-relColumn<public, uint32, uint8> getDBColumn(string ds, string tableName, T _colIndex, uint m, uint mi, uint ni){
-    //print("start:",mi);
-    uint colIndex = (uint)_colIndex;
-    uint rv;
-    uint [[1]] ms (mi); ms = 1;
-    uint [[1]] ns (mi); ns = ni;
-
-    public uint32 [[1]] col     = reshape(0,mi);
-    public uint8 [[2]] col_str = reshape(0,mi,0);
+    D T [[1]] col     = reshape(0,mi);
+    D S [[2]] col_str = reshape(0,mi,0);
     rv = tdbReadColumn(ds, tableName, colIndex);
     for (uint i = 0; i < mi; i++){
         //TODO we hope to find a better solution for public columns (need a public CRC32 function)
-        uint8 [[1]] _temp = tdbVmapGetVlenValue(rv, "values", i);
+        D S [[1]] _temp = tdbVmapGetVlenValue(rv, "values", i);
         pd_shared3p xor_uint8 [[1]] temp = _temp;
 
-        col[i] = declassify(CRC32(temp));
+        col[i] = declassifyIfNeed(CRC32(temp));
         uint n = size(temp);
 
-        public uint8 [[2]] temp2 = reshape(0, shape(col_str)[0], max(shape(col_str)[1], n));
+        D S [[2]] temp2 = reshape(0, shape(col_str)[0], max(shape(col_str)[1], n));
         temp2 = mySetSlice(col_str, temp2, 0, shape(col_str)[0], 0, shape(col_str)[1]);
-        public uint8 [[1]] temp3 = declassifyIfNeed(temp);
+        D S [[1]] temp3 = declassifyIfNeed(temp);
         temp2 = mySetSlice(myReshape(temp3, 1, n), temp2, i, i+1, 0, n);
         col_str = temp2;
     }
     col     = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
     col_str = copyBlock(myReplicate(col_str, ms, ns), {mi * ni}, {m / (mi * ni)});
 
-    public relColumn<public, uint32, uint8> result;
+    public relColumn<D, T, S> result;
     result.fv  = reshape(false, m);
     result.val = col;
     result.str = col_str;
@@ -1559,13 +1523,8 @@ relColumn<D, T, S> freeVarColumn(){
 //a column of booleans
 //used for non-prolog internal SecreC booleans only
 template<domain D>
-D bool [[1]] trueColumn(uint m){
+D bool [[1]] trueColumn(uint64 m){
     return reshape(true,m);
-}
-
-template<domain D>
-D bool [[1]] trueColumn(){
-    return trueColumn(1 :: uint);
 }
 
 template<domain D, type T, type S>

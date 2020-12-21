@@ -72,7 +72,7 @@ instance Pretty SCType where
   pretty SCFloat64   = "float64"
   pretty SCUInt8     = "uint8"
   pretty SCUInt16    = "uint16"
-  pretty SCUInt32    = "uint"
+  pretty SCUInt32    = "uint32"
   pretty SCUInt64    = "uint64"
   pretty SCXorUInt8  = "xor_uint8"
   pretty SCXorUInt16 = "xor_uint16"

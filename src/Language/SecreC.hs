@@ -266,20 +266,26 @@ extPredGet :: Expr -> FunctionDecl
 extPredGet dbc = function (SCTemplateDecl Nothing) returnType fname fargs fbody
   where
     result = "result"
-    ds = "ds"
-    m  = "m"
-    mi = "mi"
-    ni = "ni"
+    ds = SCVarName "ds"
+    m  = SCVarName "m"
+    mi = SCVarName "mi"
+    ni = SCVarName "ni"
     p = view predName dbc
-    n = length $ view predArgs dbc
+    as = view predArgs dbc
+    n = length as
     is = [0..n-1]
+    colGetter i = VarAsgn (nameTableArg result i) (fun ds (SCConstStr p) (SCConstInt i) m mi ni) 
+      where
+        fun = if Just True == as ^? ix i . annotation . annType . to (==PPStr)
+                then BI.getDBStrColumn
+                else BI.getDBColumn
     returnType = Just $ SCStruct (nameOutTableStruct p) (SCTemplateUse Nothing)
     fname = nameGetTableStruct p
-    fargs = [variable SCPublic SCText ds, variable SCPublic SCUInt32 m, variable SCPublic SCUInt32 mi, variable SCPublic SCUInt32 ni]
+    fargs = [variable SCPublic SCText "ds", variable SCPublic SCUInt64 "m", variable SCPublic SCUInt64 "mi", variable SCPublic SCUInt64 "ni"]
     fbody = [ VarDecl $ variable SCPublic (SCStruct (nameOutTableStruct p) (SCTemplateUse Nothing)) result
-            , VarAsgn (nameTableBB result) (BI.trueColumn (SCVarName m))
+            , VarAsgn (nameTableBB result) (BI.trueColumn m)
             ]
-            <> map (\i -> VarAsgn (nameTableArg result i) (BI.getDBColumn (SCVarName ds) (SCConstStr p) (SCConstInt i) (SCVarName m) (SCVarName mi) (SCVarName ni))) is
+            <> map colGetter is
             <> [Return (SCVarName result)]
 
 intPredInDecl :: Text -> [Int] -> StructDecl
@@ -308,7 +314,7 @@ intPredExt p is = function template returnType fname fargs fbody
     template = SCTemplateDecl $ Just ([], [dynamicColT 0, dynamicColT 1])
     returnType = Just $ dynamicColT 0
     fname = nameTableExt p
-    fargs = [variable SCPublic (dynamicColT 1) result, variable SCPublic SCUInt32 m, variable SCPublic SCUInt32 mi, variable SCPublic SCUInt32 ni]
+    fargs = [variable SCPublic (dynamicColT 1) result, variable SCPublic SCUInt64 m, variable SCPublic SCUInt64 mi, variable SCPublic SCUInt64 ni]
     fbody = [VarAsgn (nameTableBB result) (BI.extendColumn (SCVarName $ nameTableBB result) (SCVarName m) (SCVarName mi) (SCVarName ni))]
             <> map (\i -> VarAsgn (nameTableArg result i) (BI.extendColumn (SCVarName (nameTableArg result i)) (SCVarName m) (SCVarName mi) (SCVarName ni))) is
             <> [Return (SCVarName result)]
@@ -482,9 +488,9 @@ ruleToSC r j = function template resTableType fname fargs fbody
 ruleBodyToSC :: Ann -> SCType -> Text -> Text -> Text -> [(Expr,Int)] -> [(Expr,Int)] -> Expr -> [Statement]
 ruleBodyToSC ann argTableType ds input p xs ys q =
   [ SCEmpty, Comment "compute the number of solutions in used predicates"
-  , VarInit (variable SCPublic SCUInt32 (nameM 0)) (BI.size (SCVarName (nameTableBB input)))
+  , VarInit (variable SCPublic SCUInt64 (nameM 0)) (BI.size (SCVarName (nameTableBB input)))
   ] <> getRowCounts <>
-  [ VarInit (variable SCPublic SCUInt32 nameMM) $ SCProd (SCVarName (nameM 0) : map (\(_,i) -> SCVarName (nameM i)) ts)
+  [ VarInit (variable SCPublic SCUInt64 nameMM) $ SCProd (SCVarName (nameM 0) : map (\(_,i) -> SCVarName (nameM i)) ts)
   ] <> getNs <>
   [ SCEmpty, Comment "extend the initial args to appropriate size"
   , VarInit (variable SCPublic argTableType inputTable) (SCFunCall (nameTableExt p) [SCVarName input, SCVarName nameMM, SCVarName (nameM 0), SCVarName (nameN 0)])
@@ -521,9 +527,9 @@ ruleBodyToSC ann argTableType ds input p xs ys q =
     ts = map (\(qj,j) -> (qj ^. predName, j)) $ filter (has _Pred . fst) $ zip qs [1..]
     ks = 0 : map snd ts
 
-    getRowCounts = map (\(tk,k) -> VarInit (variable SCPublic SCUInt32 (nameM k)) (BI.tdbGetRowCount (SCVarName ds) (SCConstStr tk))) ts
+    getRowCounts = map (\(tk,k) -> VarInit (variable SCPublic SCUInt64 (nameM k)) (BI.tdbGetRowCount (SCVarName ds) (SCConstStr tk))) ts
     getNs        = map (\k      -> let js = filter (k >=) ks in
-                                   VarInit (variable SCPublic SCUInt32 (nameN k)) (SCDiv (SCVarName nameMM) (SCProd (map (SCVarName . nameM) js))) ) ks
+                                   VarInit (variable SCPublic SCUInt64 (nameN k)) (SCDiv (SCVarName nameMM) (SCProd (map (SCVarName . nameM) js))) ) ks
     getTables    = map (\(tk,k) -> VarInit (variable SCPublic (SCStruct (nameOutTableStruct tk) (SCTemplateUse Nothing)) (nameTable k)) (SCFunCall (nameGetTableStruct tk) [SCVarName ds, SCVarName nameMM, SCVarName (nameM k), SCVarName (nameN k)])) ts
 
     evalBody = concat $ zipWith (formulaToSC ds) qs [1..]
@@ -584,7 +590,7 @@ intPredToSC isSetSemantics ds (Pred ptype p zs) j =
 
             -- create an input data structure that corresponds to particular goal
             [ VarDecl $ variable SCPublic argTableType argTableName
-            , VarAsgn (nameTableBB argTableName) (BI.trueColumn (SCTypeCast SCUInt32 $ SCConstInt 1))
+            , VarAsgn (nameTableBB argTableName) (BI.trueColumn (SCTypeCast SCUInt64 $ SCConstInt 1))
             ] <>
             map (\(_,i) -> VarAsgn (nameTableArg argTableName i) (SCVarName (nameArg i))) setX <>
             map (\(_,i) -> VarAsgn (nameTableArg argTableName i) (SCVarName (nameArg i))) setC <>
