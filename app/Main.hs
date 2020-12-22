@@ -65,6 +65,7 @@ programArgs = ProgramOptions
         , help "Specify the inlining strategy. Possible values:\n\
         \ bfs, dfs, gr"
         , value BreadthFirst
+        , hidden
         ])
 
 stratReader :: Text -> Maybe InliningStrategy
