@@ -38,7 +38,7 @@ main =
   do
     let opts = info (optParse <**> helper) $ mconcat
           [ fullDesc
-          , progDesc "Generate SecreC programs for setting up the database"
+          , progDesc "Generate a SecreC program for setting up the database"
           ]
     args <- execParser opts
     let inFilePath = _poInFilePath args
