@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c77083061e4fc10a55bae44d7291f120e422511fe6bb44e3e6bed460b0b223e4
+-- hash: 4145294a7f45920997018a0edbfeba3ee64600b7303e6f7375aa8d18fd98aca0
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -96,6 +96,38 @@ executable lpsec
       Paths_secure_logic_programming
   hs-source-dirs:
       app
+  ghc-options: -Wall -XNoImplicitPrelude -XOverloadedStrings -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      HUnit
+    , base >=4.7 && <5
+    , containers
+    , hspec
+    , hspec-expectations
+    , lens
+    , listsafe
+    , megaparsec
+    , mtl
+    , optparse-applicative
+    , parser-combinators
+    , prettyprinter
+    , relude
+    , secure-logic-programming
+    , semigroups
+    , shelly
+    , simple-smt
+    , split
+    , text
+    , transformers
+    , union-find
+    , uniplate
+  default-language: Haskell2010
+
+executable lpsec-gen-tables
+  main-is: Main.hs
+  other-modules:
+      Paths_secure_logic_programming
+  hs-source-dirs:
+      table-gen
   ghc-options: -Wall -XNoImplicitPrelude -XOverloadedStrings -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       HUnit

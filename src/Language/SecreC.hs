@@ -30,17 +30,11 @@ import qualified Language.SecreC.Builtin as BI
 function :: SCTemplate -> Maybe SCType -> Text -> [SCVar] -> [Statement] -> FunctionDecl
 function = FunctionDecl
 
-mainFun :: [Statement] -> FunctionDecl
-mainFun = function (SCTemplateDecl Nothing) Nothing "main" []
-
 struct :: SCTemplate -> Text -> [SCVar] -> StructDecl
 struct = StructDecl
 
 variable :: SCDomain -> SCType -> Text -> SCVar
 variable = SCVar
-
-program :: [TopStatement] -> SCProgram
-program = SCProgram
 
 -- some variable/function names that are used multiple times
 nameInTableStruct :: (Semigroup a, IsString a) => a -> a
@@ -206,7 +200,7 @@ partitionInputsOutputs zs =
 --------------------------------------------------
 -- convert a program to SecreC (transformation S^P)
 secrecCode :: DP.DatalogProgram -> SCProgram
-secrecCode dp = program $
+secrecCode dp = SCProgram $
 
   header
   <> map (Struct . extPredDecl) extPreds
