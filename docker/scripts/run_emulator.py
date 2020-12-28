@@ -9,7 +9,7 @@ from subprocess import call
 
 scriptpath = './'
 filepath   = './'
-runscript  = './sharemind-emulator'
+runscript  = 'sharemind-emulator'
 
 class IncompleteInput(Exception):
     pass

@@ -1,0 +1,5 @@
+#!/bin/bash
+lpsec -n 10 --output /root/lpsec/scripts/out.sc $1
+PWD=/root/lpsec lpsec-gen-tables $1 /root/lpsec/scripts/createdb_out.sc
+cd /root/lpsec/scripts
+./runsc out

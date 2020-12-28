@@ -23,8 +23,7 @@ RUN make -j 8
 
 # Install sharemind API
 WORKDIR /root
-ADD docker/scripts/* /usr/bin/
-ADD docker/config/* /root/.config/sharemind/
+#ADD docker/config/* /root/.config/sharemind/
 RUN cp -r build-sdk/prefix/bin/* /usr/bin
 RUN cp -r build-sdk/prefix/lib/* /usr/lib
 RUN cp -r build-sdk/prefix/include/* /usr/include
@@ -48,9 +47,15 @@ ADD stack.yaml.lock .
 RUN stack install --only-dependencies
 ADD src src
 ADD app app
+ADD table-gen table-gen
 ADD test test
 ADD README.md .
 RUN stack install
 CMD stack test
 ADD examples examples
 ADD SecreC SecreC
+RUN chmod +x /usr/bin/*
+
+ADD docker/scripts /root/lpsec/scripts
+RUN chmod +x /root/lpsec/scripts/runsc
+RUN chmod +x /root/lpsec/scripts/runlp
