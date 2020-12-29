@@ -50,12 +50,11 @@ ADD app app
 ADD table-gen table-gen
 ADD test test
 ADD README.md .
-RUN stack install
 CMD stack test
 ADD examples examples
 ADD SecreC SecreC
 RUN chmod +x /usr/bin/*
 
-ADD docker/scripts /root/lpsec/scripts
-RUN chmod +x /root/lpsec/scripts/runsc
-RUN chmod +x /root/lpsec/scripts/runlp
+ADD docker/scripts /root/lpsec/docker/scripts
+RUN chmod +x /root/lpsec/docker/scripts/runsc
+RUN chmod +x /root/lpsec/docker/scripts/runlp

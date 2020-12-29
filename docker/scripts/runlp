@@ -1,5 +1,5 @@
 #!/bin/bash
-lpsec -n 10 --output /root/lpsec/scripts/out.sc $1
-PWD=/root/lpsec lpsec-gen-tables $1 /root/lpsec/scripts/createdb_out.sc
-cd /root/lpsec/scripts
+lpsec -n 10 --output /root/lpsec/docker/scripts/out.sc $1
+PWD=/root/lpsec lpsec-gen-tables -d examples/database $1 scripts/createdb_out.sc
+cd /root/lpsec/docker/scripts
 ./runsc out
