@@ -32,7 +32,7 @@ spec = parallel . describe "Language.SecreC" $ do
     emulatorGivesCorrectAnswer "examples/ppdatalog/employee.pl" "true\n[bob,0]\n[henry,1200]\n[victor,1900]\n[alice,2000]\n[peggy,2100]\n" 4
     emulatorGivesCorrectAnswer "examples/ppdatalog/relatives.pl" "true\n[dave]\n[chris]\n" 3
     emulatorGivesCorrectAnswer "examples/ppdatalog/fib_unfolded_3_fulltyped.pl" "kljds" 2
-    emulatorGivesCorrectAnswer "examples/ppdatalog/aggregation.pl" "true\n[0]\n" 7
+    emulatorGivesCorrectAnswer "examples/ppdatalog/aggregation.pl" "true\n[15]\n" 7
     emulatorGivesCorrectAnswer "examples/ppdatalog/market_unfolded_fulltyped.pl" "lsdjg" 4
     emulatorGivesCorrectAnswer "examples/ppdatalog/employee_unfolded_fulltyped.pl" "true\n[bob,0]\n[henry,1200]\n[victor,1900]\n[alice,2000]\n[peggy,2100]\n" 4
     emulatorGivesCorrectAnswer "examples/ppdatalog/relatives_unfolded_3_fulltyped.pl" "fjdslkj" 3

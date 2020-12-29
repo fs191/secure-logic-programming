@@ -1,13 +1,14 @@
 % Aggregation test
 
-less_than(0, Y) :-
+less_than_eq(0, Y) :-
   Y >= 0.
 
 less_than_eq(X, Y) :-
-  X > 0,
-  X1 is X - 1,
+  Y > 0,
   Y1 is Y - 1,
-  less_than_eq(X1, Y1).
+  less_than_eq(X1, Y1),
+  Z is X1 + 1,
+  X = Z.
 
 :-outputs([Y]).
-?-sum(less_than(X,5), X, Y).
+?-sum(less_than_eq(X,5), X, Y).
