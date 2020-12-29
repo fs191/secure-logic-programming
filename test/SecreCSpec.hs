@@ -8,7 +8,7 @@ import Swipl
 
 spec :: Spec
 spec = parallel . describe "Language.SecreC" $ do
-    compilesSuccessfully "examples/ppdatalog/fib.pl" 2
+    compilesSuccessfully "examples/ppdatalog/fib.pl" 4
     compilesSuccessfully "examples/ppdatalog/market.pl" 4
     compilesSuccessfully "examples/ppdatalog/auction.pl" 4
     compilesSuccessfully "examples/ppdatalog/employee.pl" 4
@@ -26,7 +26,7 @@ spec = parallel . describe "Language.SecreC" $ do
     compilesSuccessfully "examples/ppdatalog/sqrt.pl" 5
     compilesSuccessfully "examples/ppdatalog/privacy_labels.pl" 5
     compilesSuccessfully "examples/ppdatalog/ship_mintime.pl" 5
-    emulatorGivesCorrectAnswer "examples/ppdatalog/fib.pl" "" 2
+    emulatorGivesCorrectAnswer "examples/ppdatalog/fib.pl" "" 4
     emulatorGivesCorrectAnswer "examples/ppdatalog/market.pl" "" 4
     emulatorGivesCorrectAnswer "examples/ppdatalog/auction.pl" "" 4
     emulatorGivesCorrectAnswer "examples/ppdatalog/employee.pl" "" 4
