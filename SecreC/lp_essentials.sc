@@ -1770,7 +1770,10 @@ D bool [[1]] apply_bop(string s, D0 bool [[1]] x, D1 bool [[1]] y){
     if (s == "==") b = (y == x);
     if (s == "&")  b = (y & x);
     if (s == "|")  b = (y | x);
-    else assert(false);
+    else {
+      print("Unexpected operator: '" + s + "'");
+      assert(false);
+    }
     return b;
 }
 

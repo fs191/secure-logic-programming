@@ -29,7 +29,6 @@ RUN cp -r build-sdk/prefix/lib/* /usr/lib
 RUN cp -r build-sdk/prefix/include/* /usr/include
 RUN cp -r build-sdk/prefix/share/* /usr/share
 RUN rm -rf build-sdk
-ADD SecreC/lp_essentials.sc /usr/lib/sharemind/stdlib
 
 # Install SWI-Prolog
 #ADD docker/install-swipl.sh install-swipl.sh
@@ -53,6 +52,7 @@ ADD README.md .
 CMD stack test
 ADD examples examples
 ADD SecreC SecreC
+ADD SecreC/lp_essentials.sc /usr/lib/sharemind/stdlib
 RUN chmod +x /usr/bin/*
 
 ADD docker/scripts /root/lpsec/docker/scripts

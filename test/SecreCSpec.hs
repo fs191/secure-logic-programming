@@ -14,11 +14,11 @@ spec = parallel . describe "Language.SecreC" $ do
     compilesSuccessfully "examples/ppdatalog/auction.pl" 4
     compilesSuccessfully "examples/ppdatalog/employee.pl" 4
     compilesSuccessfully "examples/ppdatalog/relatives.pl" 3
-    compilesSuccessfully "examples/ppdatalog/fib_unfolded_3_fulltyped.pl" 2
+    compilesSuccessfully "examples/ppdatalog/fib_unfolded_3_fulltyped.pl" 0
     compilesSuccessfully "examples/ppdatalog/aggregation.pl" 7
-    compilesSuccessfully "examples/ppdatalog/market_unfolded_fulltyped.pl" 4
-    compilesSuccessfully "examples/ppdatalog/employee_unfolded_fulltyped.pl" 4
-    compilesSuccessfully "examples/ppdatalog/relatives_unfolded_3_fulltyped.pl" 3
+    compilesSuccessfully "examples/ppdatalog/market_unfolded_fulltyped.pl" 0
+    compilesSuccessfully "examples/ppdatalog/employee_unfolded_fulltyped.pl" 0
+    compilesSuccessfully "examples/ppdatalog/relatives_unfolded_3_fulltyped.pl" 0
     compilesSuccessfully "examples/ppdatalog/ship.pl" 15
     compilesSuccessfully "examples/ppdatalog/ship_short.pl" 5
     compilesSuccessfully "examples/ppdatalog/precendence.pl" 5
@@ -56,8 +56,8 @@ spec = parallel . describe "Language.SecreC" $ do
     emulatorGivesCorrectAnswer
       "examples/ppdatalog/fib_unfolded_3_fulltyped.pl"
       ["[2]"]
-      2
-      [ "x=2:public:int64"
+      0
+      [ "x=2:private:int64"
       ]
     emulatorGivesCorrectAnswer
       "examples/ppdatalog/aggregation.pl"
@@ -67,18 +67,18 @@ spec = parallel . describe "Language.SecreC" $ do
     emulatorGivesCorrectAnswer
       "examples/ppdatalog/market_unfolded_fulltyped.pl"
       marketRes
-      4
+      0
       [ "x=alice:public:string"
       ]
     emulatorGivesCorrectAnswer
       "examples/ppdatalog/employee_unfolded_fulltyped.pl"
       employeeRes
-      4
+      0
       []
     emulatorGivesCorrectAnswer
       "examples/ppdatalog/relatives_unfolded_3_fulltyped.pl"
       marketRes
-      3
+      0
       [ "x1=dave:public:string"
       ]
     emulatorGivesCorrectAnswer
