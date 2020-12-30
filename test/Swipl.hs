@@ -19,9 +19,10 @@ import Shelly
 
 import Control.Lens hiding ((??))
 
-import Data.Set as S
+import qualified Data.Set as S
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text as T
+import qualified Data.List as L
 
 import Control.Exception
 import Control.Monad.Except
@@ -233,8 +234,8 @@ importCsv tmp =
     return . show $ pretty scProg
 
 runEmulator 
-  :: Text -> Int -> Sh Text
-runEmulator file ite = silently . withTmpDir $ \tmp ->
+  :: Text -> Int -> [Text] -> Sh (Either SwiplException Text)
+runEmulator file ite ins = silently . withTmpDir $ \tmp ->
   do
     let progPath = tmp <> "/prog.pl"
     scripts <- ls "docker/scripts"
@@ -253,21 +254,26 @@ runEmulator file ite = silently . withTmpDir $ \tmp ->
     writeFileText (tmp <> "/createdb_out.sc") $ either (error . show) id csvRes
 
     -- Run the emulator
-    runRes <- bash (tmp <> "/runsc") ["out"]
+    runRes <- bash (tmp <> "/runsc") $ ["out"] <> ins
     resCode <- lastExitCode
     err <- lastStderr
     cd tmp
     case resCode of
-      0 -> return runRes
-      _ -> error . show $ EmulatorException err
+      0 -> if "" == runRes
+             then return . Left $ EmulatorException err
+             else return $ Right runRes
+      _ -> return . Left $ EmulatorException err
 
-emulatorGivesCorrectAnswer :: Text -> Text -> Int -> Spec
-emulatorGivesCorrectAnswer src expected ite = it (toString desc) $ 
+emulatorGivesCorrectAnswer :: Text -> [Text] -> Int -> [Text] -> Spec
+emulatorGivesCorrectAnswer src expected ite ins = it (toString desc) $ 
   do
-    res <- catch (shelly $ runEmulator src ite) $ \ex -> do
+    res <- catch (shelly $ runEmulator src ite ins) $ \ex -> do
       let ex' = (ex :: SomeException)
       error $ show ex'
-    res `shouldBe` expected
+    -- We don't care about the order of answers
+    let splt = L.init . T.splitOn "\n" $ either (error . show) id res
+    let lst = cons (L.head splt) . sort . L.tail $ splt
+    lst `shouldBe` ["true"] <> sort expected
   where
     desc = "Emulator gives correct answer when running " <> src
 

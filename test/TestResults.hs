@@ -21,6 +21,12 @@ employeeRes =
   , "[victor,1900]"
   ]
 
+relativesRes :: [Text]
+relativesRes =
+  [ "[chris]"
+  , "[dave]"
+  ]
+
 --
 -- PPDatalog databases
 --
