@@ -254,15 +254,15 @@ runEmulator file ite ins = silently . withTmpDir $ \tmp ->
     writeFileText (tmp <> "/createdb_out.sc") $ either (error . show) id csvRes
 
     -- Run the emulator
-    runRes <- bash (tmp <> "/runsc") $ ["out"] <> ins
+    runRes <- errExit False $ bash (tmp <> "/runsc") $ ["out"] <> ins
     resCode <- lastExitCode
     err <- lastStderr
     cd tmp
     case resCode of
       0 -> if "" == runRes
-             then return . Left $ EmulatorException err
+             then return . Left . EmulatorException $ "No result given by emulator\n" <> err
              else return $ Right runRes
-      _ -> return . Left $ EmulatorException err
+      x -> return . Left . EmulatorException $ "Error code: " <> show x <> "\n" <> err
 
 emulatorGivesCorrectAnswer :: Text -> [Text] -> Int -> [Text] -> Spec
 emulatorGivesCorrectAnswer src expected ite ins = it (toString desc) $ 
