@@ -44,7 +44,7 @@ newtype Subst = Th (M.Map Text Expr)
   deriving (Semigroup, Monoid, Eq)
 
 instance Show Subst where
-  show (Th theta) = concat $ map (\(k,v) -> show k ++ " -> " ++ show v ++ "\n") (M.toList theta)
+  show (Th theta) = concatMap (\(k,v) -> show k ++ " -> " ++ show v ++ "\n") (M.toList theta)
 
 instance Pretty Subst where
   pretty (Th s) = tupled $ (\(a, b) -> pretty a <+> "->" <+> prettyFull b) <$> M.toList s
@@ -67,7 +67,7 @@ compress :: Subst -> Subst
 compress (Th m) = runIdentity . runUnionFind $
   do
     let joins = [(k, v) | (k, Var _ v) <- M.toList m]
-        vs = nub $ (M.keys m) <> [v | Var _ v <- M.elems m]
+        vs = nub $ M.keys m <> [v | Var _ v <- M.elems m]
     points <- traverse fresh vs
     let pointMap :: M.Map Text (Point Text)
         pointMap = M.fromList $ vs `zip` points
@@ -79,7 +79,7 @@ compress (Th m) = runIdentity . runUnionFind $
     let varByName :: Text -> Maybe Expr
         varByName n = m ^? to M.elems 
                          . folded 
-                         . filtered (\x -> fromMaybe False $ x ^? _Var . _2 . to (==n))
+                         . filtered (\x -> Just True == x ^? _Var . _2 . to (==n))
     let mapper :: Expr -> Expr
         mapper v@(Var _ n) = fromMaybe v $
           do
@@ -90,7 +90,7 @@ compress (Th m) = runIdentity . runUnionFind $
 
 -- | Unit substitution
 emptyTheta :: Subst
-emptyTheta = Th $ M.empty
+emptyTheta = Th M.empty
 
 -- | Substitute variable `x` with term `y`
 (|->) :: Expr -> Expr -> Subst
@@ -98,18 +98,18 @@ v |-> y = Th (M.singleton x t)
   where x = fromMaybe err  $ identifier v
         t = fromMaybe err2 $ unifyExprAnns y v
         err =  error $ show v <> "does not have an identifier"
-        err2 = error $ "Failed to unify " <> show v <> " and " <> show y
+        err2 = error $ "Failed to unify " <> show (prettyFull v) <> " and " <> show (prettyFull y)
 
 -- | Get the substitution term for variable `x`
 evalTheta :: Subst -> Expr -> Expr
 evalTheta (Th theta) v@(Var a n) = 
   if M.member n theta 
     then 
-      fromMaybe err $ x & annotation %%~ (unifyAnns a)
+      fromMaybe err $ x & annotation %%~ unifyAnns a
     else v
   where 
     x = theta M.! n
-    err = error $ "Failed to unify " <> show x <> " and " <> show a
+    err = error $ "Failed to unify " <> show (prettyFull x) <> " and " <> show a
 evalTheta _ x = error $ "Attempting to unify a non-variable: " <> show x
 
 -- | Apply a substitution to an expression
@@ -121,7 +121,7 @@ applyToExpr theta bexpr = removeSafePrefixes . transform f $ safePrefix _bexpr
         f x         = x
         _vars       = [b | (Var _ b) <- universe bexpr]
         -- Ensure that no variables begin with the safe string before application
-        _bexpr      = assert (all (not . T.isPrefixOf safeStr) _vars) bexpr
+        _bexpr      = assert (not $ any (T.isPrefixOf safeStr) _vars) bexpr
 
 removeSafePrefixes :: Expr -> Expr
 removeSafePrefixes = transform f
@@ -165,7 +165,7 @@ unify x y = unify' [(x, y)]
 unify' :: [(Expr, Expr)] -> Maybe Subst
 unify' [] = Just emptyTheta
 -- Eliminate
-unify' g@((v@(Var{}), y):t)
+unify' g@((v@Var{}, y):t)
   | v `elem` vars g = 
     do
       let subst = v |-> y
@@ -191,7 +191,7 @@ unify' ((Neg _ x, Neg _ y):t) = unify' $ [x] `zip` [y] <> t
 unify' ((Inv _ x, Inv _ y):t) = unify' $ [x] `zip` [y] <> t
 unify' ((Sqrt _ x, Sqrt _ y):t) = unify' $ [x] `zip` [y] <> t
 -- Swap
-unify' ((x, y@(Var{})):t) = unify' $ (y, x):t
+unify' ((x, y@Var{}):t) = unify' $ (y, x):t
 -- Delete / conflict
 unify' ((x,y):t) 
   | x `valEq` y    = unify' t
@@ -216,4 +216,6 @@ keys (Th theta) = map var (M.keys theta)
 
 elems :: Subst -> [Expr]
 elems (Th theta) = M.elems theta
+
+getValue :: Subst -> Text -> Expr
 getValue (Th theta) = (theta M.!)

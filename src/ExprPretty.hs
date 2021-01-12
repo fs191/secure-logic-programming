@@ -116,7 +116,6 @@ prettyEx (Mod e x y) =
     y' <- prettyEx y
     e' <- prettyExAnn e
     return $ "mod(" <> x' <> ", " <> y' <> ")" <+> e'
-
 prettyEx (Choose e x y) =   do
     x' <- prettyEx x
     y' <- prettyEx y
@@ -126,6 +125,11 @@ prettyEx (Cast e x) =
   do
     x' <- prettyEx x
     return $ "(" <> pretty (e ^. annType) <> ")" <+> x'
+prettyEx (Reshare e x) = 
+  do
+    x' <- prettyEx x
+    e' <- prettyExAnn e
+    return $ "reshare(" <> x' <> ")" <+> e'
 
 prettyExBin :: Ann -> Expr -> Expr -> Doc ann -> Reader PrettyConfig (Doc ann)
 prettyExBin e x y op = 

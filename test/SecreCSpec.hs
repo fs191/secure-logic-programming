@@ -27,6 +27,7 @@ spec = describe "Language.SecreC" $ do
     compilesSuccessfully "examples/ppdatalog/sqrt.pl" 5
     compilesSuccessfully "examples/ppdatalog/privacy_labels.pl" 5
     compilesSuccessfully "examples/ppdatalog/ship_mintime.pl" 5
+    compilesSuccessfully "examples/ppdatalog/xor_cast.pl" 5
     emulatorGivesCorrectAnswer 
       "examples/ppdatalog/fib.pl"
       ["[2]"]

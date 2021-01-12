@@ -29,7 +29,7 @@ data Operator f = Operator Text f
 -------------------------
 
 aTerm :: Parser Expr
-aTerm = (withSrcPos $ asum
+aTerm = withSrcPos (asum
   [ varParse
   , predParse
   , boolParse
@@ -96,8 +96,9 @@ aExpr5 = choice
   where
     par = typable $ parens aExpr
     ops =
-      [ Operator "sqrt" eSqrt
-      , Operator "\\+"  eNot
+      [ Operator "sqrt"    eSqrt
+      , Operator "\\+"     eNot
+      , Operator "reshare" eReshare
       ]
     binOps =
       [ Operator "mod" eMod
@@ -122,21 +123,20 @@ binary
   -> Parser Expr 
   -> Parser Expr 
   -> Parser Expr
-binary ops this next = (typable $
+binary ops this next = typable (
   do
     f <- try $ do
       lhs <- next
       opr <- choice $ parseOperator <$> ops
       return $ opr lhs
-    rhs <- this
-    return $ f rhs
+    f <$> this
   ) <|> next
 
 binaryFuns
   :: [Operator (Expr -> Expr -> Expr)] 
   -> Parser Expr 
   -> Parser Expr 
-binaryFuns funs next = (typable $ 
+binaryFuns funs next = typable $ 
   do
     f <- choice $ parseOperator <$> funs
     void $ symbol "("
@@ -145,13 +145,12 @@ binaryFuns funs next = (typable $
     y <- next
     void $ symbol ")"
     return $ f x y
-  )
 
 parseOperator :: Operator f -> Parser f
-parseOperator (Operator sym f) = symbol sym *> return f
+parseOperator (Operator sym f) = symbol sym $> f
 
 list :: Parser Expr
-list = (withSrcPos $ eList <$> (brackets $ sepBy aTerm comma)) <?> "list"
+list = withSrcPos (eList <$> brackets (sepBy aTerm comma)) <?> "list"
 
 -----------------------
 -- Helper functions
@@ -231,8 +230,8 @@ attributeParse = withSrcPos $
 
 boolParse :: Parser Expr
 boolParse = choice
-  [ symbol "true"  *> return constTrue
-  , symbol "false" *> return constFalse
+  [ symbol "true"  $> constTrue
+  , symbol "false" $> constFalse
   ]
 
 --
@@ -244,9 +243,7 @@ typable e =
   do
     e' <- e
     t <- optional typing
-    let f = case t of
-          Just p  -> p
-          Nothing -> A.empty
+    let f = fromMaybe A.empty t
     let err = customFailure $ TypeApplicationFailed (f ^. annType) e'
     maybe err return $ applyAnnotation f e'
 
@@ -255,4 +252,4 @@ withSrcPos parser =
   do
     begin <- getSourcePos
     res <- parser
-    return $ res & annotation . A.srcPos .~ Just begin
+    return $ res & annotation . A.srcPos ?~ begin

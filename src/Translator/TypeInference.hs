@@ -8,7 +8,6 @@ module Translator.TypeInference
 import Relude
 
 import Control.Lens
-import Control.Monad.Except
 
 import qualified Data.Map.Strict as M
 import qualified Data.List as L
@@ -27,7 +26,7 @@ import Data.Text.Prettyprint.Doc
 -- | A substitution for typings. Substitutes types based on expression 
 -- identifier. It does not overwrite the typing, but rather tries to unify the 
 -- new typing with the old.
-data TypeSubstitution 
+newtype TypeSubstitution 
   = TypeSubstitution (M.Map Text Typing)
   deriving (Show)
 
@@ -93,21 +92,22 @@ inferFromDB dp (Pred _ n xs) = mconcat newParams'
     -- If the parameter is unbound, then it takes its domain from the schema,
     -- otherwise nothing changes
     inferParams :: (Expr, Typing) -> TypeSubstitution
-    inferParams (v, (Typing d t)) = 
-      (fromMaybe (err v) $ identifier v) |-> Typing y t
+    inferParams (v, Typing d t) = 
+      fromMaybe (err v) (identifier v) |-> Typing y t
       where 
         y | v ^. annotation . annBound = Unknown
           | otherwise     = d
     err v = error $ 
-      (show $ v ^. annotation . srcPos) <> " "
+      show (v ^. annotation . srcPos) <> " "
       <> show v <> " does not have an indentifier"
     newParams' = inferParams <$> (xs `zip` unified)
 inferFromDB _ _ = mempty
 
--- | Sets typings of all constants to their default value (always public).
+-- | Sets typings of all constants to their default value.
 inferConstants :: Expr -> Expr
 inferConstants (ConstStr _ x) = constStr x
 inferConstants (ConstInt _ x) = constInt x
+inferConstants (ConstFloat _ x) = constFloat x
 inferConstants (ConstBool _ x) = constBool x
 -- Ensure that the return type of all predicates is boolean
 inferConstants (Pred _ n xs) = predicate n xs 
@@ -136,7 +136,7 @@ inferDBRet dp = dp & dpRules . traversed . ruleTail %~ U.transform f
 
 
         anyPC = any privateComp $ xs `zip` ys
-        anyUnk = any (==Unknown) $ xs ^.. folded . annotation . domain
+        anyUnk = elem Unknown $ xs ^.. folded . annotation . domain
     f x = x
 
 applyBin :: (Expr -> Expr -> Expr -> b) -> Expr -> Maybe b
@@ -168,6 +168,14 @@ inferBuiltins r = r & ruleTail %~ U.transform ret
     rewr e@(Sqrt a x) = Sqrt (a & typing %~ fromMaybe err . unifyTypings xt) x
       where err = error . show $ TypeApplicationFailed (xt ^. tType) e
             xt = x ^. annotation . typing
+    rewr e@(Reshare a x) 
+      | x ^. annotation . annType . to (==PPXorUInt64) = Reshare ( a & annType .~ PPUInt64
+                                                                     & domain  .~ (x ^. annotation . domain)
+                                                                 ) x
+      | x ^. annotation . annType . to (==PPUInt64)    = Reshare ( a & annType .~ PPXorUInt64
+                                                                     & domain  .~ (x ^. annotation . domain)
+                                                                 ) x
+      | otherwise = e
     rewr x = x
 
 inferBinRet :: Expr -> Expr -> Expr -> Expr
@@ -181,7 +189,7 @@ inferBinRet e@Choose{} (Expr.List _ xs) (Expr.List _ _) =
       ds = map (\x -> x ^. annotation . domain)  xs
 
       t = L.foldr1 (\t1 t2 -> fromMaybe (err t1 t2) $ unifyTypes t1 t2) ts
-      d = L.foldr1 (\d1 d2 -> safelyUnifyDomains d1 d2) ds
+      d = L.foldr1 safelyUnifyDomains ds
 
       err t1 t2  = error $ "Failed to unify expressions " <> show t1 <> " and " <> show t2
       err2       = error $ "Failed to apply typing " <> show t <> " to " <> show e
@@ -207,19 +215,19 @@ inferBinRet e x y
     yt = y ^. annotation . annType
 
   -- TODO we need to handle Choose in a nicer way
-    d  = if has _Choose x then
+    d | has _Choose x =
              case x of
                  Choose _ _ (Expr.List _ bs) -> 
                      let ds = map (\b -> b ^. annotation . domain) bs in
-                     L.foldr1 (\d1 d2 -> safelyUnifyDomains d1 d2) ds
+                     L.foldr1 safelyUnifyDomains ds
                  _ -> Public
-         else if has _Choose y then
+      | has _Choose y =
              case y of
                  Choose _ _ (Expr.List _ bs) -> 
                      let ds = map (\b -> b ^. annotation . domain) bs in
-                     L.foldr1 (\d1 d2 -> safelyUnifyDomains d1 d2) ds
+                     L.foldr1 safelyUnifyDomains ds
                  _ -> Public
-         else Public
+      | otherwise = Public
 
     ut | isArithmetic e  = fromMaybe err $ unifyTypes xt yt
        | isPredicative e = PPBool
@@ -230,8 +238,8 @@ inferBinRet e x y
 inferBinArgs :: Expr -> Expr -> Expr -> TypeSubstitution
 inferBinArgs e x y
   | xb && yb = mempty
-  | yb       = fromMaybe mempty $ (|-> yt) <$> identifier x
-  | xb       = fromMaybe mempty $ (|-> xt) <$> identifier y
+  | yb       = maybe mempty (|-> yt) (identifier x)
+  | xb       = maybe mempty (|-> xt) (identifier y)
   | otherwise = error $ "Uninitialized subexpressions: " <> show e
   where
     xt = x ^. annotation . typing
@@ -253,11 +261,11 @@ inferFromGoal dp = dp & dpRules . traverse %~ subst
         rxs <- r ^? ruleHead . predArgs
         gxs <- g ^? predArgs
         -- Unify goal and rule arguments
-        let unified = (uncurry unifyExprTypings) <$> (rxs `zip` gxs)
-            f (x, y) = (,) <$> (maybeToList $ identifier x) <*> [y]
+        let unified = uncurry unifyExprTypings <$> (rxs `zip` gxs)
+            f (x, y) = (,) <$> maybeToList (identifier x) <*> [y]
             paramNames :: [(Text, Typing)]
             paramNames = concat $ traverse f $ rxs `zip` unified
-            s = mconcat $ (uncurry (|->)) <$> paramNames
+            s = mconcat $ uncurry (|->) <$> paramNames
         return $ applyTypeSubst s r
 
 -- | Creates a new type substitution from an expression identifier and a typing
@@ -280,8 +288,9 @@ inferGoal dp = dp & dpGoal  %~ U.transform f
                   . _3
     foldUnify :: [Expr] -> Typing
     foldUnify (x:xt) = foldl' (unifyWithError unifyTypings) (x ^. annotation . typing) xt
+    foldUnify [] = error "No expressions to unify"
     f = applyTypeSubstToExpr .
-          mconcat $ [x |-> (foldUnify y) | (Just x, y) <- goalRules]
+          mconcat $ [x |-> foldUnify y | (Just x, y) <- goalRules]
 
 unifyWithError :: (Typing -> Typing -> Maybe Typing) -> Typing -> Expr -> Typing
 unifyWithError f x y = fromMaybe err $ f x (y ^. annotation . typing)
@@ -292,7 +301,7 @@ unifyWithError f x y = fromMaybe err $ f x (y ^. annotation . typing)
 inferFromInputs :: DatalogProgram -> DatalogProgram
 inferFromInputs dp = dp & dpGoal %~ applyTypeSubstToExpr (mconcat inps)
   where
-    inps = dp ^.. inputs . to(\v -> (fromJust $ identifier v) |-> (v ^. annotation . typing))
+    inps = dp ^.. inputs . to(\v -> fromJust (identifier v) |-> (v ^. annotation . typing))
 
 -- | Decides the return type of a rule by looking at the return types of the
 -- predicates in its body
@@ -315,7 +324,7 @@ inferGoalRet dp = dp & dpGoal . annotation . domain .~ d
 
 -- | Applies a type substitution to an expression
 applyTypeSubstToExpr :: TypeSubstitution -> Expr -> Expr
-applyTypeSubstToExpr (TypeSubstitution ts) e = U.transform f e
+applyTypeSubstToExpr (TypeSubstitution ts) = U.transform f
   where
     t :: Expr -> Typing
     t v = fromMaybe (exprTyping v) $ identifier v >>= (`M.lookup` ts)
@@ -351,7 +360,7 @@ clearTypings dp = dp & dpRules %~ U.transformBi clearTypings'
                      & outputs  %~ U.transform clearTypings'
 
 clearTypings' :: Expr -> Expr
-clearTypings' e = U.transform f e
+clearTypings' = U.transform f
   where
     f = annotation . typing .~ emptyTyping
 

@@ -32,7 +32,7 @@ module Expr
   , eNeg
   , eNot
   , eInv
-  , eCast
+  , eCast, eReshare
   , eSqrt, ePow
   , eAdd, eSub
   , eMul, eDiv, eFDiv
@@ -130,6 +130,7 @@ data Expr
   | Inv  {_annotation :: !Ann, _arg :: !Expr}
   | Sqrt {_annotation :: !Ann, _arg :: !Expr}
   | Cast {_annotation :: !Ann, _arg :: !Expr}
+  | Reshare {_annotation :: !Ann, _arg :: !Expr}
   | FDiv {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Div  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
   | Mod  {_annotation :: !Ann, _leftHand :: !Expr, _rightHand :: !Expr}
@@ -191,6 +192,7 @@ instance PrologSource Expr where
   prolog (Or _ x y)          = prolog x <> ";\n" <> prolog y
   prolog (And _ x y)         = prolog x <> ",\n" <> prolog y
   prolog (List _ x)          = list $ prolog <$> x
+  prolog (Reshare _ x)       = prolog x
 
   -- TODO there may be more compact/better ways for aggregations
   prolog (Aggr _ Prod p x y) = "findall(" <> "X0" <> "," <> "(" <> prolog p <> "," <> "X0 is log(" <> prolog x <> ")), Xs)" <> "," <+>
@@ -325,6 +327,9 @@ eCast :: Expr -> PPType -> Expr
 eCast e t = Cast ann e
   where
     ann = e ^. annotation & annType .~ t
+
+eReshare :: Expr -> Expr
+eReshare = Reshare empty
 
 -- | Creates a new square root expression
 eSqrt :: Expr -> Expr

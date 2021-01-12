@@ -52,8 +52,8 @@ variable = toText <$> lexeme variable' <?> "variable"
 
 identifier :: Parser Text
 identifier = asum
-  [ lexeme $ (try sQuote) *> identifier' <* sQuote
-  , lexeme $ (try dQuote) *> identifier' <* dQuote
+  [ lexeme $ try sQuote *> identifier' <* sQuote
+  , lexeme $ try dQuote *> identifier' <* dQuote
   , lexeme identifier'
   ] >>= check
   <?> "identifier"
@@ -63,7 +63,7 @@ identifier = asum
       if x `elem` keywords
         then fail . toString $ "reserved keyword " <> x <> " cannot be an identifier."
         else return x
-    keywords = ["sqrt", "is", "mod"]
+    keywords = ["sqrt", "is", "mod", "reshare"]
 
 attributeIdentifier :: Parser Text
 attributeIdentifier =
@@ -82,7 +82,7 @@ identifier' :: Parser Text
 identifier' = 
   do
     h <- toText . (:[]) <$> lowerChar
-    t <- toText <$> (many $ alphaNumChar <|> identifierSymbols)
+    t <- toText <$> many (alphaNumChar <|> identifierSymbols)
     return $ h <> t
 
 identifierSymbols :: Parser Char
@@ -111,40 +111,40 @@ impliedBy = void $ symbol ":-"
 
 domainType :: Parser PPDomain
 domainType =
-      (symbol "public"  *> return Public)
-  <|> (symbol "private" *> return Private)
+      (symbol "public"  $> Public)
+  <|> (symbol "private" $> Private)
   <?> "privacy type"
 
 dataType :: Parser PPType
 dataType =
-      (symbol "bool"   *> return PPBool)
-  <|> (symbol "int"    *> return PPInt32)
-  <|> (symbol "float"  *> return PPFloat32)
-  <|> (symbol "string" *> return PPStr)
-  <|> (symbol "bool" *> return PPBool)
-  <|> (symbol "int8" *> return PPInt8)
-  <|> (symbol "int16" *> return PPInt16)
-  <|> (symbol "int32" *> return PPInt32)
-  <|> (symbol "int64" *> return PPInt64)
-  <|> (symbol "uint8" *> return PPUInt8)
-  <|> (symbol "uint16" *> return PPUInt16)
-  <|> (symbol "uint32" *> return PPUInt32)
-  <|> (symbol "uint64" *> return PPUInt64)
-  <|> (symbol "xor_uint8" *> return PPXorUInt8)
-  <|> (symbol "xor_uint16" *> return PPXorUInt16)
-  <|> (symbol "xor_uint32" *> return PPXorUInt32)
-  <|> (symbol "xor_uint64" *> return PPXorUInt64)
-  <|> (symbol "string" *> return PPStr)
-  <|> (symbol "float32" *> return PPFloat32)
-  <|> (symbol "float64" *> return PPFloat64)
-  <|> (symbol "auto" *> return PPAuto)
+      (symbol "bool"       $> PPBool)
+  <|> (symbol "int"        $> PPInt32)
+  <|> (symbol "float"      $> PPFloat32)
+  <|> (symbol "string"     $> PPStr)
+  <|> (symbol "bool"       $> PPBool)
+  <|> (symbol "int8"       $> PPInt8)
+  <|> (symbol "int16"      $> PPInt16)
+  <|> (symbol "int32"      $> PPInt32)
+  <|> (symbol "int64"      $> PPInt64)
+  <|> (symbol "uint8"      $> PPUInt8)
+  <|> (symbol "uint16"     $> PPUInt16)
+  <|> (symbol "uint32"     $> PPUInt32)
+  <|> (symbol "uint64"     $> PPUInt64)
+  <|> (symbol "xor_uint8"  $> PPXorUInt8)
+  <|> (symbol "xor_uint16" $> PPXorUInt16)
+  <|> (symbol "xor_uint32" $> PPXorUInt32)
+  <|> (symbol "xor_uint64" $> PPXorUInt64)
+  <|> (symbol "string"     $> PPStr)
+  <|> (symbol "float32"    $> PPFloat32)
+  <|> (symbol "float64"    $> PPFloat64)
+  <|> (symbol "auto"       $> PPAuto)
   <?> "data type"
 
 typing :: Parser A.Ann
 typing =
   do
     try . void $ symbol ":" >> notFollowedBy (char '-')
-    isPK <- isJust <$> (optional $ symbol "primary")
+    isPK <- isJust <$> optional (symbol "primary")
     dom <- option Unknown domainType
     dat <- dataType
     return $ A.empty & A.annType .~ dat

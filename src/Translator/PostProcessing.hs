@@ -124,7 +124,7 @@ splitTail ttl = (ps,cs,as)
     exprs = andsToList ttl
     ps = exprs ^.. folded . filtered (has _Pred)
     cs = exprs ^.. folded . filtered groundTerm
-    as = exprs ^.. folded . filtered (\x -> not ((has _Pred) x) && not (groundTerm x))
+    as = exprs ^.. folded . filtered (\x -> not (has _Pred x) && not (groundTerm x))
 
 -- fills all EDB predicates with fresh variables
 -- while it makes rules longer, it is easier to optimize them in this form
@@ -249,7 +249,7 @@ foldChoose (Choose ann (Expr.List _ xs) (Expr.List _ bs)) =
     let ys = map foldChoose xs in
     let xs' = concat $ zipWith (\b y -> case y of {(Choose _ (Expr.List _ xs0) (Expr.List _ bs0)) -> xs0              ; _ -> [y]}) bs ys in
     let bs' = concat $ zipWith (\b y -> case y of {(Choose _ (Expr.List _ xs0) (Expr.List _ bs0)) -> map (eAnd b) bs0 ; _ -> [b]}) bs ys in
-    (Choose ann (eList xs') (eList bs'))
+    Choose ann (eList xs') (eList bs')
 foldChoose e = e
     --trace (show e) $ e
 
