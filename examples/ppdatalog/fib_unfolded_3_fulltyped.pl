@@ -14,8 +14,8 @@ fib(N: private int, F: public int) : private bool :-
         N: private int > 1: public int                     : private bool,
         % in an 'is' expression, we can always derive the type of LHS from type of RHS
         % since N1 is a free variable, we have an assignment and not a comparison, so bool type is public
-        N1: private int is (N: private int - 1: public int) : private int : public bool,
-        N2: private int is (N: private int - 2: public int) : private int : public bool,
+        N2: private int is (N: private int - 1: public int) : private int : public bool,
+        N1: private int is (N: private int - 2: public int) : private int : public bool,
         N1: private int = 0: public int                                   : private bool,
         F1: public int  = 1: public int                                   : public bool,
         N2: private int = 1: public int                                   : private bool,
@@ -24,13 +24,13 @@ fib(N: private int, F: public int) : private bool :-
 
 fib(N: private int, F: public int) : private bool :-
         N: private int > 1: public int                                     : private bool,
-        N1: private int is (N: private int - 1: public int) : private int  : public bool,
-        N2: private int is (N: private int - 2: public int) : private int  : public bool,
+        N2: private int is (N: private int - 1: public int) : private int  : public bool,
+        N1: private int is (N: private int - 2: public int) : private int  : public bool,
         N1: private int = 1: public int                                    : private bool,
         F1: public int = 1: public int                                     : public bool,
         N2: private int > 1: public int                                    : private bool,
-        NN1: private int is (N2: private int-1: public int) : private int  : public bool,
-        NN2: private int is (N2: private int-2: public int) : private int  : public bool,
+        NN2: private int is (N2: private int-1: public int) : private int  : public bool,
+        NN1: private int is (N2: private int-2: public int) : private int  : public bool,
         NN1: private int = 0: public int                                   : private bool,
         FF1: public int = 1: public int                                    : public bool, 
         NN2: private int = 1: public int                                   : private bool,

@@ -479,7 +479,20 @@ D T[[2]] myCat(D T[[2]] X, D T[[2]] Y, int d) {
         D T [[2]] Z;
         uint offset;
         if (d == 0){
-            assert(shape(X)[1] == shape(Y)[1]);
+            //in lpsec, we may want to concatenate strings of different lengths
+            //just increase the shorter to the size of the bigger
+            if (shape(X)[1] > shape(Y)[1]){
+                uint [[1]] src = iota (size(Y));
+                uint [[1]] tgt = reshape(reshape(iota (shape(Y)[0]*shape(X)[1]), shape(Y)[0], shape(X)[1])[:,:shape(Y)[1]], size(Y));
+                D T[[2]] temp (shape(Y)[0], shape(X)[1]);
+                Y = partialRearrange(Y,temp,src,tgt);
+            } else if (shape(X)[1] < shape(Y)[1]){
+                uint [[1]] src = iota (size(X));
+                uint [[1]] tgt = reshape(reshape(iota (shape(X)[0]*shape(Y)[1]), shape(X)[0], shape(Y)[1])[:,:shape(X)[1]], size(X));
+                D T[[2]] temp (shape(X)[0], shape(Y)[1]);
+                X = partialRearrange(X,temp,src,tgt);
+            }
+
             offset = shape(X)[1];
             D T [[2]] Z_aux (shape(X)[0] + shape(Y)[0], shape(X)[1]);
             Z = Z_aux;
@@ -1768,8 +1781,8 @@ template<domain D, domain D0, domain D1>
 D bool [[1]] apply_bop(string s, D0 bool [[1]] x, D1 bool [[1]] y){
     D bool [[1]] b;
     if (s == "==") b = (y == x);
-    if (s == "&")  b = (y & x);
-    if (s == "|")  b = (y | x);
+    else if (s == "&")  b = (y & x);
+    else if (s == "|")  b = (y | x);
     else {
       print("Unexpected operator: '" + s + "'");
       assert(false);

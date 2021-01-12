@@ -59,12 +59,21 @@ nameArg :: (Semigroup a1, IsString a1, Show a2) => a2 -> a1
 nameArg  i = "arg" <> show i
 nameMM :: Text
 nameMM     = "m"
+
 -- private component of the filter
 nameBB :: Text
 nameBB     = "b"
 -- public component of the filter
 nameBP :: Text
 nameBP     = "bp"
+
+-- temporary storage for older states of b and bp (need for Or-branching)
+-- private component of the filter
+nameBBres :: (Semigroup a1, IsString a1) => Int -> a1
+nameBBres    i = "b_res_" <> show i
+-- public component of the filter
+nameBPres :: (Semigroup a1, IsString a1) => Int -> a1
+nameBPres    i = "bp_res_" <> show i
 
 nameTableBB :: Text -> Text
 nameTableBB  t   = t <> "." <> nameBB
@@ -712,9 +721,16 @@ formulaToSC ds q j =
         Or _ e1 e2 ->
             let b1 = nameB (ind j 1) in
             let b2 = nameB (ind j 2) in
+            -- store the current state of BB and BP
+            let bsave = [ VarInit (variable SCShared3p (SCArray 1 SCBool) (nameBBres j)) (SCVarName nameBB)
+                        , VarInit (variable SCPublic   (SCArray 1 SCBool) (nameBPres j)) (SCVarName nameBP)] in
+            -- compute the branches
             let s1 = formulaToSC ds e1 (ind j 1) in
             let s2 = formulaToSC ds e2 (ind j 2) in
-            s1 <> s2 <> [initBj $ SCOr (SCVarName b1) (SCVarName b2), addB bj]
+            -- return to the saved state of BB and BP after exiting each branch
+            let bload = [ VarAsgn nameBB (SCVarName (nameBBres j))
+                        , VarAsgn nameBP (SCVarName (nameBPres j))] in
+            bsave <> s1 <> bload <> s2 <> bload <> [initBj $ SCOr (SCVarName b1) (SCVarName b2), addB bj]
 
         And _ e1 e2 ->
             let b1 = nameB (ind j 1) in

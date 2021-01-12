@@ -57,7 +57,7 @@ spec = describe "Language.SecreC" $ do
       "examples/ppdatalog/fib_unfolded_3_fulltyped.pl"
       ["[2]"]
       0
-      [ "x=2:private:int64"
+      [ "x=2:private:int32"
       ]
     emulatorGivesCorrectAnswer
       "examples/ppdatalog/aggregation.pl"
@@ -77,20 +77,20 @@ spec = describe "Language.SecreC" $ do
       []
     emulatorGivesCorrectAnswer
       "examples/ppdatalog/relatives_unfolded_3_fulltyped.pl"
-      marketRes
+      relativesRes
       0
       [ "x1=dave:public:string"
       ]
     emulatorGivesCorrectAnswer
       "examples/ppdatalog/ship.pl"
-      []
+      ["[0.0]"]
       15
       [ "portname_in=alma:private:string"
       , "cargotype_in=garlic:private:string"
       ]
     emulatorGivesCorrectAnswer
       "examples/ppdatalog/ship_short.pl"
-      []
+      ["[0.0]"]
       5
       [ "portname_in=alma:private:string"
       , "cargotype_in=garlic:private:string"
@@ -102,12 +102,12 @@ spec = describe "Language.SecreC" $ do
       []
     emulatorGivesCorrectAnswer
       "examples/ppdatalog/disjunction.pl"
-      []
+      ["[frank]","[maria]","[tika]"]
       5
       []
     emulatorGivesCorrectAnswer
       "examples/ppdatalog/nondet.pl"
-      []
+      ["[maria,0]","[maria,1]","[maria,2]"]
       5
       []
     emulatorGivesCorrectAnswer
@@ -126,7 +126,7 @@ spec = describe "Language.SecreC" $ do
       ]
     emulatorGivesCorrectAnswer
       "examples/ppdatalog/ship_mintime.pl"
-      []
+      ["[0.0]"]
       5
       [ "queryportname=alma:private:string"
       , "querycargotype=garlic:private:string"

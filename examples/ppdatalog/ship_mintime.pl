@@ -8,17 +8,18 @@
 :-type(port(@portname:primary public string,
             @portlatitude:public float,
             @portlongitude:public float,
-            @offloadcapacity:public int)).
+            @offloadcapacity:public int,
+            @available:public bool)).
 
 %how much Time it takes for Ship to reach the Port?
 reachability_time(Ship,Port,Time) :-
     ship(Ship,X1,Y1,Speed,_,_),
-    port(Port,X2,Y2,_),
+    port(Port,X2,Y2,_,_),
     Time is sqrt((X1 - X2)^2 + (Y1 - Y2)^2) / Speed.
 
 %is the Port able to pick up the Ship's cargo?
 suitable_port(Ship,Port) :-
-    port(Port,_,_,Capacity),
+    port(Port,_,_,Capacity,_),
     ship(Ship,_,_,_,_,CargoAmount),
     Capacity >= CargoAmount.
 
