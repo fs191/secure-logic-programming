@@ -5,9 +5,11 @@ module Language.Privalog.Types
   ( PPType(..), PPDomain(..)
   , unifyTypes
   , unifyDomains
+  , isNumericType
+  , typeSize
   ) where
 
-import Relude hiding (show, widen)
+import Relude hiding (show)
 
 import Data.Text.Prettyprint.Doc
 import Data.Data
@@ -60,6 +62,40 @@ instance Show PPDomain where
 instance Pretty PPDomain where
   pretty = pretty . show
 
+isNumericType :: PPType -> Bool
+isNumericType PPInt8 = True
+isNumericType PPInt16 = True
+isNumericType PPInt32 = True
+isNumericType PPInt64 = True
+isNumericType PPUInt8 = True
+isNumericType PPUInt16 = True
+isNumericType PPUInt32 = True
+isNumericType PPUInt64 = True
+isNumericType PPXorUInt8 = True
+isNumericType PPXorUInt16 = True
+isNumericType PPXorUInt32 = True
+isNumericType PPXorUInt64 = True
+isNumericType PPFloat32 = True
+isNumericType PPFloat64 = True
+isNumericType _ = False
+
+typeSize :: PPType -> Maybe Int
+typeSize PPInt8 = Just 8
+typeSize PPUInt8 = Just 8
+typeSize PPXorUInt8 = Just 8
+typeSize PPInt16 = Just 16
+typeSize PPUInt16 = Just 16
+typeSize PPXorUInt16 = Just 16
+typeSize PPInt32 = Just 32
+typeSize PPUInt32 = Just 32
+typeSize PPXorUInt32 = Just 32
+typeSize PPFloat32 = Just 32
+typeSize PPInt64 = Just 64
+typeSize PPUInt64 = Just 64
+typeSize PPXorUInt64 = Just 64
+typeSize PPFloat64 = Just 64
+typeSize _ = Nothing
+
 unifyTypes :: PPType -> PPType -> Maybe PPType
 unifyTypes PPAuto x = Just x
 unifyTypes x PPAuto = Just x
@@ -90,4 +126,5 @@ unifyDomains Public Public = Public
 unifyDomains Unknown x     = x
 unifyDomains x Unknown     = x
 unifyDomains _ _           = Private
+
 

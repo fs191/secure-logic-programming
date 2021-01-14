@@ -84,10 +84,10 @@ process =
     let ad2 = pubPriv & dpRules . traversed %~ adornRule
     printDebug "AdornRules2" ad2
 
-    let cleared = clearTypings ad2
-    printDebug "ClearTypings" cleared
+--    let cleared = clearTypings ad2
+--    printDebug "ClearTypings" cleared
 
-    let ti2 = typeInference cleared
+    let ti2 = typeInference ad2
     printDebug "TypeInference2" ti2
 
     let dist = ti2 & dpRules . traversed . ruleTail %~ distribute

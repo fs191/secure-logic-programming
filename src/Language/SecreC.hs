@@ -128,7 +128,9 @@ scVarType ann =
           (PPUInt32,  _)    -> SCUInt32
           (PPUInt64,  _)    -> SCUInt64
           (PPXorUInt8, _)   -> SCXorUInt8
+          (PPXorUInt16, _)  -> SCXorUInt16
           (PPXorUInt32, _)  -> SCXorUInt32
+          (PPXorUInt64, _)  -> SCXorUInt64
           (PPStr,  Private) -> SCArray 1 SCXorUInt8
           (PPStr,  Public)  -> SCText
           (PPStr,  Unknown) -> error "cannot determine data type for a string of unknown domain"
@@ -151,6 +153,10 @@ scStructType f i ann =
       (PPUInt16,  _)    -> f (scDomain i dom) SCUInt16 SCUInt16
       (PPUInt32,  _)    -> f (scDomain i dom) SCUInt32 SCUInt32
       (PPUInt64,  _)    -> f (scDomain i dom) SCUInt64 SCUInt64
+      (PPXorUInt8, _)   -> f (scDomain i dom) SCXorUInt8 SCXorUInt8
+      (PPXorUInt16, _)  -> f (scDomain i dom) SCXorUInt16 SCXorUInt16
+      (PPXorUInt32, _)  -> f (scDomain i dom) SCXorUInt32 SCXorUInt32
+      (PPXorUInt64, _)  -> f (scDomain i dom) SCXorUInt64 SCXorUInt64
       (PPStr,  Private) -> f (scDomain i dom) SCXorUInt32 SCXorUInt8
       (PPStr,  Public)  -> f (scDomain i dom) SCUInt32    SCUInt8
       (PPStr,  Unknown) -> error "cannot determine data type for a string of unknown domain"
@@ -816,7 +822,7 @@ exprToSC e =
     Cast a x     -> case a ^. annType of
                       PPFloat32 -> SCFunCall "cast_float32" [exprToSC x]
                       t         -> error $ "Casting not supported for type " <> show t
-    Reshare _ x  -> SCFunCall "reshare" [exprToSC x]
+    Reshare _ x  -> SCFunCall "lp_reshare" [exprToSC x]
     Pred{}       -> error "High order predicates are not supported"
     _            -> error $ "Unexpected expression: " <> show (prettyMinimal e)
     where

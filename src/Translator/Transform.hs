@@ -195,7 +195,7 @@ isPredicate Pred{} = True
 isPredicate _      = False
 
 isGround :: DatalogProgram -> Rule -> Bool
-isGround dp r = all (not . isIDBFact dp) . U.universe $ r ^. ruleTail
+isGround dp r = not . any (isIDBFact dp) . U.universe $ r ^. ruleTail
 
 uncertaintyDegree :: DatalogProgram -> Rule -> Int
 uncertaintyDegree dp r = length $ filter (isIDBFact dp) . U.universe $ r ^. ruleTail
@@ -212,7 +212,7 @@ simplifySat r =
     let e = r ^. ruleTail
     newTails <- liftIO . Solve.extractSatSolution vars $ andsToList e
     let newTail = case nonEmpty newTails of
-          Just x  -> L.foldl eAnd (head x) (tail x)
+          Just x  -> L.foldl1 eAnd x
           Nothing -> constFalse
     return $ r & ruleTail .~ newTail
 
@@ -230,7 +230,7 @@ simplifyRule r =
     let newRuleBody = simplify rBody (boundedVarNames, freeVarNames) in
 
     let newRuleTail  = ordNub . filter (not . isAnd) $ newRuleBody in
-    let newRuleTail' = L.foldl eAnd (L.head newRuleTail) (L.tail newRuleTail) in
+    let newRuleTail' = L.foldl1 eAnd newRuleTail in
     --trace ("before: " ++ show (pretty r)) $
     --trace ("after: " ++ show (pretty (rule rName rArgs newRuleTail))) $
     --trace "=====" $

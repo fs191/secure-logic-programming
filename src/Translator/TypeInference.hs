@@ -105,12 +105,22 @@ inferFromDB _ _ = mempty
 
 -- | Sets typings of all constants to their default value.
 inferConstants :: Expr -> Expr
-inferConstants (ConstStr _ x) = constStr x
-inferConstants (ConstInt _ x) = constInt x
-inferConstants (ConstFloat _ x) = constFloat x
+inferConstants x@(ConstStr _ _) = err $ applyTyping (Typing Public PPStr) x
+  where
+    err = fromMaybe $ error "Failed to apply typing"
+inferConstants x@(ConstInt _ _) 
+  | isNumericType (x ^. annotation . annType) = err $ applyTyping (Typing Public PPAuto) x
+  | otherwise                                 = err $ applyTyping (Typing Public PPInt64) x
+  where
+    err = fromMaybe $ error "Failed to apply typing"
+inferConstants x@(ConstFloat _ _)
+  | isNumericType (x ^. annotation . annType) = err $ applyTyping (Typing Public PPAuto) x
+  | otherwise                                 = err $ applyTyping (Typing Public PPFloat64) x
+  where
+    err = fromMaybe $ error "Failed to apply typing"
 inferConstants (ConstBool _ x) = constBool x
 -- Ensure that the return type of all predicates is boolean
-inferConstants (Pred _ n xs) = predicate n xs 
+inferConstants (Pred _ n xs) = predicate n xs
 -- Square root should return a float
 inferConstants (Sqrt _ x) = eSqrt x
 inferConstants x = x
@@ -139,6 +149,12 @@ inferDBRet dp = dp & dpRules . traversed . ruleTail %~ U.transform f
         anyUnk = elem Unknown $ xs ^.. folded . annotation . domain
     f x = x
 
+applyUn :: (Expr -> Expr -> b) -> Expr -> Maybe b
+applyUn f e =
+  do
+    x <- e ^? arg
+    return $ f e x
+
 applyBin :: (Expr -> Expr -> Expr -> b) -> Expr -> Maybe b
 applyBin f e =
   do
@@ -156,26 +172,36 @@ applyBin f e =
 -- sure that it converges.
 inferBuiltins :: Rule -> Rule
 inferBuiltins r = r & ruleTail %~ U.transform ret
-                    & id %~ U.transform subst'
+                    & id       %~ U.transform subst'
                     & ruleTail %~ U.transform rewr
   where
     ret :: Expr -> Expr
     ret x = fromMaybe x $ applyBin inferBinRet x
     subst :: [Expr] -> TypeSubstitution
-    subst x = mconcat . catMaybes $ applyBin inferBinArgs <$> x
+    subst x = bin <> unry
+      where
+        bin = mconcat . catMaybes $ applyBin inferBinArgs <$> x
+        unry  = mconcat . catMaybes $ applyUn inferUnArg <$> x
     subst' :: Rule -> Rule
     subst' x = applyTypeSubst (x ^. ruleTail . to (subst . U.universe)) x
     rewr e@(Sqrt a x) = Sqrt (a & typing %~ fromMaybe err . unifyTypings xt) x
       where err = error . show $ TypeApplicationFailed (xt ^. tType) e
             xt = x ^. annotation . typing
-    rewr e@(Reshare a x) 
-      | x ^. annotation . annType . to (==PPXorUInt64) = Reshare ( a & annType .~ PPUInt64
-                                                                     & domain  .~ (x ^. annotation . domain)
-                                                                 ) x
-      | x ^. annotation . annType . to (==PPUInt64)    = Reshare ( a & annType .~ PPXorUInt64
-                                                                     & domain  .~ (x ^. annotation . domain)
-                                                                 ) x
-      | otherwise = e
+    rewr e@(Reshare a x) = fromMaybe e $ asum
+      [ reshareBetween PPXorUInt64 PPUInt64
+      , reshareBetween PPXorUInt32 PPUInt32
+      , reshareBetween PPXorUInt16 PPUInt16
+      , reshareBetween PPXorUInt8  PPUInt8
+      ]
+      where
+        reshareBetween t1 t2
+          | x ^. annotation . annType . to (==t1) = Just $ Reshare ( a & annType .~ t2
+                                                                       & domain  .~ Private
+                                                                   ) x
+          | x ^. annotation . annType . to (==t2) = Just $ Reshare ( a & annType .~ t1
+                                                                       & domain  .~ Private
+                                                                   ) x
+          | otherwise = Nothing
     rewr x = x
 
 inferBinRet :: Expr -> Expr -> Expr -> Expr
@@ -246,6 +272,12 @@ inferBinArgs e x y
     xb = x ^. annotation . annBound
     yt = y ^. annotation . typing
     yb = y ^. annotation . annBound
+
+inferUnArg :: Expr -> Expr -> TypeSubstitution
+inferUnArg Reshare{} x = maybe mempty (|-> xt) (identifier x)
+  where 
+    xt = x ^. annotation . typing . to (tDom .~ Private)
+inferUnArg _ _           = mempty
 
 -- | Infers rule types from the parameter typings in the goal predicate.
 inferFromGoal :: DatalogProgram -> DatalogProgram

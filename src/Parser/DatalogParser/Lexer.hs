@@ -118,7 +118,7 @@ domainType =
 dataType :: Parser PPType
 dataType =
       (symbol "bool"       $> PPBool)
-  <|> (symbol "int"        $> PPInt32)
+  <|> (symbol "int"        $> PPInt64)
   <|> (symbol "float"      $> PPFloat32)
   <|> (symbol "string"     $> PPStr)
   <|> (symbol "bool"       $> PPBool)

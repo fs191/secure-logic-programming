@@ -1395,9 +1395,9 @@ relColumn<pd_shared3p, xor_uint32, xor_uint8> constStrColumn(string arg, uint m)
 //public->public
 //private->private
 template <domain D, type T>
-relColumn<D, int32, int32> constIntColumn(D T arg0, uint m){
-    D int32 arg = (int32)arg0;
-    relColumn<D, int32, int32> result;
+relColumn<D, int64, int64> constIntColumn(D T arg0, uint m){
+    D int64 arg = (int64)arg0;
+    relColumn<D, int64, int64> result;
     result.val = reshape(arg,m);
     result.str = reshape(0,m,0);
     result.fv = reshape(false,m);
@@ -1406,9 +1406,9 @@ relColumn<D, int32, int32> constIntColumn(D T arg0, uint m){
 
 //public->private
 template <domain D, type T>
-relColumn<D, int32, int32> constIntColumn(T arg0, uint m){
-    D int32 arg = (int32)arg0;
-    relColumn<D, int32, int32> result;
+relColumn<D, int64, int64> constIntColumn(T arg0, uint m){
+    D int64 arg = (int64)arg0;
+    relColumn<D, int64, int64> result;
     result.val = reshape(arg,m);
     result.str = reshape(0,m,0);
     result.fv = reshape(false,m);
@@ -2102,6 +2102,14 @@ relColumn<D0, T, S> times_filter(relColumn<D, T, S> x, D0 bool [[1]] b, uint m){
     y.val = product(bu * (x.val - 1) + 1, n);
     y.str = reshape((S)0,n,0);
 
+    return y;
+}
+
+relColumn<pd_shared3p, uint64, uint64> lp_reshare(relColumn<pd_shared3p, xor_uint64, xor_uint64> x) {
+    relColumn<pd_shared3p, uint64, uint64> y;
+    y.fv = x.fv;
+    y.val = reshare(x.val);
+    y.str = reshare(x.str);
     return y;
 }
 

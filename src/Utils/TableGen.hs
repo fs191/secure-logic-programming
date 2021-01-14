@@ -71,7 +71,7 @@ tableGenerationCode ds dbc (tableHeader:tableRows) =
         types = map (\x -> let dtype  = x ^. annotation . annType in
                         case dtype of
                             PPBool  -> 0
-                            PPInt32   -> 1
+                            PPInt64   -> 1
                             PPFloat32 -> 2
                             PPStr   -> 3
                             _       -> error "Can only create a table for bool, int, float, string datatypes."

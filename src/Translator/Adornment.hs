@@ -101,8 +101,8 @@ popQueue =
   do
     _queue <- use gsQueue
     when (L.null _queue) $ error "trying to pop an empty queue"
-    modify $ gsQueue %~ tail . fromMaybe undefined . nonEmpty
-    return $ head . fromMaybe undefined $ nonEmpty _queue
+    modify $ gsQueue %~ L.tail
+    return $ L.head _queue
 
 adornRule :: Rule -> Rule
 adornRule r = runAdornM $
@@ -118,9 +118,10 @@ adornRule r = runAdornM $
     _bound <- use gsBound
 
     -- Reorder the terms in rule body
-    let _terms = (andsToList $ r ^. ruleTail)
+    let _terms = andsToList $ r ^. ruleTail
     _boundTerms <- bindTerms _terms
     return $ r & ruleTail .~ foldWithAnds _boundTerms
+               & ruleTail %~ U.transform bindConstants
 
 adornRule' :: Adornable -> AdornM ()
 adornRule' a@(Adornable r _bp _) = 
@@ -135,7 +136,7 @@ adornRule' a@(Adornable r _bp _) =
     _bound <- use gsBound
 
     -- Reorder the terms in rule body
-    let _terms = (andsToList $ r ^. ruleTail)
+    let _terms = andsToList $ r ^. ruleTail
     _boundTerms <- bindTerms _terms
 
     -- Suffix any predicates in rule body that are not database facts
@@ -218,13 +219,13 @@ bindTerms l  =
     return $ _ad:_t
 
 allBound :: Rule -> Expr -> Adornable
-allBound r e = Adornable r (True <$ args r) e
+allBound r = Adornable r (True <$ args r)
 
 -- | Suffixes the predicate based on its annotations
 suffixExpr :: Expr -> Expr
 suffixExpr = U.transform f
   where
-    f p@(Pred _ _ _) = suffixPredicate (p ^. paramBindings) p
+    f p@Pred{} = suffixPredicate (p ^. paramBindings) p
     f x = x
 
 goalToRule :: Expr -> Rule
@@ -252,4 +253,9 @@ allAdornables p = ordNub . runAdornM $
   do
     initialize p
     graphLoop
+
+bindConstants :: Expr -> Expr
+bindConstants x 
+  | isConstExpr x = x & annotation . annBound .~ True
+  | otherwise = x
 

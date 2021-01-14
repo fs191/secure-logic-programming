@@ -16,6 +16,7 @@ module Expr
   , predName
   , predArgs
   , leftHand, rightHand
+  , arg
   , constStr
   , constInt
   , constFloat
@@ -48,7 +49,6 @@ module Expr
   , annotation
   , vals
   , aggr, aggrPred, sourceExpr, targetExpr
-  , arg
   , annType, domain
   , applyTyping
   , _Var
@@ -245,14 +245,12 @@ constInt :: Int -> Expr
 constInt = ConstInt a
   where
     a = empty & annBound .~ True
-              & annType  .~ PPInt32
               & domain   .~ Public
 
 constFloat :: Float -> Expr
 constFloat = ConstFloat a
   where
     a = empty & annBound .~ True
-              & annType  .~ PPFloat32
               & domain   .~ Public
 
 -- | Creates a new true boolean
