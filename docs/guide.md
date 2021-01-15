@@ -200,7 +200,11 @@ Below is a list of all the supported aggregations
 
 # Nondeterminism
 
+TODO
+
 # Search strategies
+
+TODO
 
 # Command line arguments
 
