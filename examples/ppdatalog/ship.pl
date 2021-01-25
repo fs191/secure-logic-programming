@@ -14,7 +14,6 @@
             @port_latitude:public float,
             @port_longitude:public float,
             @offloadcapacity:public int,
-            %we do not have a boolean type yet
             @available:private bool)).
 
 % the placeholder "_" denotes an unnamed variable

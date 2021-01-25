@@ -5,11 +5,11 @@ import sys
 import numpy as np
 import struct
 
-from subprocess import call
+from subprocess import call, check_call
 
 scriptpath = './'
 filepath   = './'
-runscript  = './sharemind-emulator'
+runscript  = 'sharemind-emulator'
 
 class IncompleteInput(Exception):
     pass
@@ -197,17 +197,13 @@ for i in range(k,n):
 if os.path.exists(outfile):
   os.remove(outfile)
 
-fout = open(logfile, "w")
-result = call(s, stdout=fout)
-fout.close()
+with open(logfile, "w") as fout:
+    check_call(s, stdout=fout)
 
-fin = open(outfile, "r")
-result = parseArguments(fin)
-fin.close()
-
-#print(result)
-
-if niceprint:
-    nicePrint(format(result))
-else:
-    testPrint(format(result))
+with open(outfile, "r") as fin:
+    result = parseArguments(fin)
+    if niceprint:
+        nicePrint(format(result))
+    else:
+        testPrint(format(result))
+    exit(0)

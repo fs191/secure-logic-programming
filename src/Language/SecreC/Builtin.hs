@@ -12,6 +12,9 @@ extendColumn x m mi ni = SCFunCall "extendColumn" [x, m, mi, ni]
 getDBColumn :: SCExpr -> SCExpr -> SCExpr -> SCExpr -> SCExpr -> SCExpr -> SCExpr
 getDBColumn ds tableName colIndex m mi ni = SCFunCall "getDBColumn" [ds, tableName, colIndex, m, mi, ni]
 
+getDBStrColumn :: SCExpr -> SCExpr -> SCExpr -> SCExpr -> SCExpr -> SCExpr -> SCExpr
+getDBStrColumn ds tableName colIndex m mi ni = SCFunCall "getDBStrColumn" [ds, tableName, colIndex, m, mi, ni]
+
 myCat :: SCExpr -> SCExpr -> SCExpr
 myCat x y = SCFunCall "myCat" [x, y]
 

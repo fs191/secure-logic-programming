@@ -29,7 +29,6 @@ checkSemantics dp =
     -- Ensure that there are no duplicate attributes
     andM
       [ checkDBDuplicates dp
-      , checkDuplicates attrs
       , checkPredicates dp
       , checkSinglePattern dp
       , checkDuplicateArgs dp

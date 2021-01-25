@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module Table 
+module Utils.Table 
   ( getTableData
   ) where
 
@@ -50,22 +50,23 @@ values :: Row k v -> [v]
 values (Row m) = elems m
 
 
-dbPath = "examples/database/"
 dbSep  = ";"
 dbExt  = ".csv"
 
 -- read the database from the file as a matrix of strings
 -- read is as a single table row
-readDBString :: Text -> Text -> IO (Table Text Text)
+readDBString :: (MonadIO m, MonadFail m) => Text -> Text -> m (Table Text Text)
 readDBString dbFileName separator = do
     (firstLine:ls) <- fmap (lines . toText) (readFile $ toString dbFileName)
     let varNames = splitOn separator firstLine
     let t    = Relude.map (splitOn separator) ls
     return $ table varNames t
 
-getTableData :: Text -> IO [[Text]]
-getTableData p = do
-    tableData <- readDBString (dbPath <> p <> dbExt) dbSep
+getTableData 
+  :: (MonadIO m, MonadFail m)
+  => Text -> m [[Text]]
+getTableData path = do
+    tableData <- readDBString path dbSep
     let tableHeader = header tableData
     let tableRows   = rowsRaw tableData
     return (tableHeader : tableRows)

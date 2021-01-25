@@ -1,4 +1,4 @@
-name;latitude;longitude;speed;cargotype;cargoamount
+shipname;shiplatitude;shiplongitude;speed;cargotype;cargoamount
 alfa;270;290;40;carrot;10
 beta;180;280;30;garlic;5
 gamma;160;150;60;cheese;10

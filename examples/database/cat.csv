@@ -1,7 +1,7 @@
-name;gender;color;age;
-marks;male;white;10;
-maria;female;black;7;
-tisha;male;tabby;1;
-tika;female;tabby;15;
-benjamin;male;gray;7;
-frank;male;black;7;
+name;gender;color;age
+marks;male;white;10
+maria;female;black;7
+tisha;male;tabby;1
+tika;female;tabby;15
+benjamin;male;gray;7
+frank;male;black;7

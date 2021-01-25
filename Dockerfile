@@ -23,14 +23,12 @@ RUN make -j 8
 
 # Install sharemind API
 WORKDIR /root
-ADD docker/scripts/* /usr/bin/
-ADD docker/config/* /root/.config/sharemind/
+#ADD docker/config/* /root/.config/sharemind/
 RUN cp -r build-sdk/prefix/bin/* /usr/bin
 RUN cp -r build-sdk/prefix/lib/* /usr/lib
 RUN cp -r build-sdk/prefix/include/* /usr/include
 RUN cp -r build-sdk/prefix/share/* /usr/share
 RUN rm -rf build-sdk
-ADD SecreC/lp_essentials.sc /usr/lib/sharemind/stdlib
 
 # Install SWI-Prolog
 #ADD docker/install-swipl.sh install-swipl.sh
@@ -48,9 +46,15 @@ ADD stack.yaml.lock .
 RUN stack install --only-dependencies
 ADD src src
 ADD app app
+ADD table-gen table-gen
 ADD test test
 ADD README.md .
-RUN stack install
 CMD stack test
 ADD examples examples
 ADD SecreC SecreC
+ADD SecreC/lp_essentials.sc /usr/lib/sharemind/stdlib
+RUN chmod +x /usr/bin/*
+
+ADD docker/scripts /root/lpsec/docker/scripts
+RUN chmod +x /root/lpsec/docker/scripts/runsc
+RUN chmod +x /root/lpsec/docker/scripts/runlp

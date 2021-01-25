@@ -9,7 +9,7 @@ module Language.SecreC.SCProgram
   , Statement(..)
   , StructDecl(..)
   , FunctionDecl(..)
-  , varToExpr
+  , mainFun
   ) where
 
 import Relude
@@ -127,6 +127,6 @@ instance Pretty StructDecl where
       n  = pretty $ _sdName sd
       ms = pretty <$> map VarDecl (_sdMembers sd)
 
-varToExpr :: SCVar -> SCExpr
-varToExpr = undefined
+mainFun :: [Statement] -> FunctionDecl
+mainFun = FunctionDecl (SCTemplateDecl Nothing) Nothing "main" []
 
