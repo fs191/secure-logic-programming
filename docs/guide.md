@@ -200,14 +200,17 @@ Below is a list of all the supported aggregations
 
 # Nondeterminism
 
+TODO
+
 # Search strategies
+
+TODO
 
 # Command line arguments
 
 | Option                    | Description                                                                                                       |
 |---------------------------|-------------------------------------------------------------------------------------------------------------------|
 | -n,--iterations NUMBER    | Specifies the maximum recursion depth for predicates                                                              |
-| --db-create-tables        | ???                                                                                                               |
 | -v,--verbose              | Produces verbose output                                                                                           |
 | -t,--only-types           | Outputs a typed PrivaLog program instead of SecreC                                                                |
 | -o,--output FILE          | Specifies where to write the output program                                                                       |
