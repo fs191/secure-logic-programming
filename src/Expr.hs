@@ -33,6 +33,7 @@ module Expr
   , eNot
   , eInv
   , eCast
+  , eQuery
   , eSqrt, ePow
   , eAdd, eSub
   , eMul, eDiv, eFDiv
@@ -124,6 +125,7 @@ data Expr
   | ConstStr   {_annotation :: !Ann, _strVal :: !Text}
   | ConstBool  {_annotation :: !Ann, _boolVal :: !Bool}
   | Attribute  {_annotation :: !Ann, _attrName :: !Text}
+  | Query      {_annotation :: !Ann, _ord :: !Int, _msg :: !Expr}
   | Var  {_annotation :: !Ann, _varName :: !Text}
   | Not  {_annotation :: !Ann, _arg :: !Expr}
   | Neg  {_annotation :: !Ann, _arg :: !Expr}
@@ -156,6 +158,7 @@ data Expr
 makeLenses ''Expr
 makePrisms ''Expr
 
+--TODO we will need to keep the "query" predicate as a fixed part of Swipl program
 instance PrologSource Expr where
   prolog (Var _ x)           = pretty x
   prolog (ConstInt _ x)      = pretty x
@@ -169,6 +172,7 @@ instance PrologSource Expr where
   prolog (Not _ e)           = "(\\+" <> prolog e <> ")"
   prolog (Neg _ e)           = "(-" <> prolog e <> ")"
   prolog (Inv _ e)           = "(" <> prolog e <+> "^(-1))"
+  prolog (Query _ _ e)       = "query(" <> prolog e <> ")"
   prolog (Sqrt _ e)          = "sqrt(" <> prolog e <> ")"
   prolog (Div _ x y)         = "div(" <> prolog x <> ", " <> prolog y <> ")"
   prolog (Mod _ x y)         = "mod(" <> prolog x <> ", " <> prolog y <> ")"
@@ -325,6 +329,14 @@ eCast :: Expr -> PPType -> Expr
 eCast e t = Cast ann e
   where
     ann = e ^. annotation & annType .~ t
+
+-- | Creates a new query expression
+eQuery :: Expr -> Expr
+eQuery = Query e 0
+  where
+    e = empty & annBound .~ True
+              & annType  .~ PPBool
+              & domain   .~ Private
 
 -- | Creates a new square root expression
 eSqrt :: Expr -> Expr

@@ -26,7 +26,9 @@ preProcess dp =
     let dp' = flip evalState (0::Int) $
              dp1 & dpRules . traversed %~ simplifyRuleHead
                  & id %%~ U.transformBiM holeToVar
-    return $ dp' & dpRules %~ concatMap ruleNonDetSplit
+    let dp'' = flip evalState (0::Int) $
+             dp' & id %%~ U.transformBiM enumQuery
+    return $ dp'' & dpRules %~ concatMap ruleNonDetSplit
 
 -- | Rewrites constant terms to simpler terms
 simplify 
@@ -115,6 +117,14 @@ holeToVar (Hole e) =
     modify (+1)
     return . Var e $ "__HOLE__" <> show n
 holeToVar x = return x
+
+enumQuery :: Expr -> State Int Expr
+enumQuery (Query ann _ e) =
+  do
+    n <- get
+    modify (+1)
+    return $ Query ann n e
+enumQuery x = return x
 
 ruleNonDetSplit :: Rule -> [Rule]
 ruleNonDetSplit r = map (Rule rHead) newTails

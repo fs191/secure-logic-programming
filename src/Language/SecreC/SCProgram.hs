@@ -36,6 +36,8 @@ data TopStatement
   | Import Text
   -- SecreC domain statement
   | Domain SCDomain SCKind
+  -- Variable declaration
+  | GlobalVarDecl SCVar
   -- Empty line
   | Empty
 
@@ -44,6 +46,7 @@ instance Pretty TopStatement where
   pretty (Struct s)   = pretty s
   pretty (Import s)   = "import" <+> pretty s <> semi
   pretty (Domain d k) = "domain" <+> pretty d <+> pretty k <> semi
+  pretty (GlobalVarDecl x) = pretty (VarDecl x)
   pretty Empty = ""
 
 -- | Statements with a return type

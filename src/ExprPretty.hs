@@ -105,6 +105,11 @@ prettyEx (Aggr e f p x y) =
       , "(" <> p' <> ", " <> x' <> "," <> y' <> ") "
       , e'
       ]
+prettyEx (Query e i x) =
+  do
+    x' <- prettyEx x
+    e' <- prettyExAnn e
+    return $ "query_" <> pretty i <> "(" <> x' <> ")" <+> e'
 prettyEx (Sqrt e x) = 
   do
     x' <- prettyEx x

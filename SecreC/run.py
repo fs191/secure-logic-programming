@@ -143,7 +143,10 @@ def format(result):
 # python run.py market True X1=alice:private:string X2=garlic:public:string
 n = len(sys.argv)
 filename = sys.argv[1]
-if sys.argv[2] == '1':
+if n <= 2:
+    niceprint = True
+    k = 2
+elif sys.argv[2] == '1':
     niceprint = True
     k = 3
 elif sys.argv[2] == '0':
@@ -154,9 +157,12 @@ else:
     k = 2
 
 s = [runscript, outfilearg, controllercfg, filename + ".sb"]
+
+args = {}
 for i in range(k,n):
     [var,decl]   = sys.argv[i].split("=")
     [value,vdom,vtype] = decl.split(":")
+    args[var] = value
 
     if (vdom=="private"):
         vdom="pd_shared3p"
@@ -177,6 +183,15 @@ for i in range(k,n):
             xstr = map(lambda x : (x / 15) * 16 + x % 15, (ord(c) for c in value))
             s = s + ["--str=" + var, "--str=pd_shared3p", "--str=xor_uint8", "--size=" + str(len(xstr)), "--xstr=" + ("".join("{:02x}".format(c) for c in xstr))]
 
+    elif (vtype=="bool"):
+
+            #TODO use this code after updating sharemind-emulator
+            #s = s + ["--str=" + var, "--str=pd_shared3p", "--str=xor_uint8", "--size=" + str(len(value)), "--xstr=" + ("".join("{:02x}".format(int(c)) for c in value))]
+
+            #this is a workaround
+            xstr = map(lambda x : (x / 15) * 16 + x % 15, (int(c) for c in value))
+            s = s + ["--str=" + var, "--str=pd_shared3p", "--str=xor_uint8", "--size=" + str(len(xstr)), "--xstr=" + ("".join("{:02x}".format(c) for c in xstr))]
+
         else:
             s = s + ["--str=" + var, "--str=", "--str=" + vtype, "--size=" + str(len(value)), "--cstr=" + value]
 
@@ -186,6 +201,9 @@ for i in range(k,n):
 
     #TODO add float arguments, we can pass them as xstr componentwise
 
+#there is a special argument "responses" which requires a dummy input if not specified otherwise
+if not "responses" in args:
+    s = s + ["--str=responses", "--str=pd_shared3p", "--str=xor_uint8", "--size=1", "--xstr=00"]
 
 #print(s)
 #print(' '.join(s))

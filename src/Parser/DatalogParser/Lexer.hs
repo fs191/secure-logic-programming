@@ -63,7 +63,7 @@ identifier = asum
       if x `elem` keywords
         then fail . toString $ "reserved keyword " <> x <> " cannot be an identifier."
         else return x
-    keywords = ["sqrt", "is", "mod"]
+    keywords = ["sqrt", "is", "mod", "query"]
 
 attributeIdentifier :: Parser Text
 attributeIdentifier =

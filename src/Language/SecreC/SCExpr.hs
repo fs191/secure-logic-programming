@@ -126,6 +126,7 @@ data SCExpr
   | SCOrs  [SCExpr]
   | SCAnds [SCExpr]
   | SCTypeCast SCType SCExpr
+  | SCAt SCExpr Int
   | SCFunCall Text [SCExpr]
 
 instance Pretty SCExpr where
@@ -159,6 +160,7 @@ instance Pretty SCExpr where
   pretty (SCAnds xs)      = hsep . punctuate "&" $ pretty <$> xs
   pretty (SCOrs xs)       = hsep . punctuate "|" $ pretty <$> xs
   pretty (SCTypeCast t x) = parens (pretty t) <> pretty x
+  pretty (SCAt x i)       = pretty x <> "[" <> pretty i <> "]"
   pretty (SCFunCall f xs) = pretty f <> xs'
     where xs' = tupled $ pretty <$> xs
 

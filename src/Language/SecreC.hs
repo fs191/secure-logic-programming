@@ -59,6 +59,8 @@ nameArg :: (Semigroup a1, IsString a1, Show a2) => a2 -> a1
 nameArg  i = "arg" <> show i
 nameMM :: Text
 nameMM     = "m"
+nameResp :: Text
+nameResp   = "responses"
 
 -- private component of the filter
 nameBB :: Text
@@ -254,6 +256,8 @@ header =
   , Import "lp_essentials"
   , Empty
   , Empty
+  , GlobalVarDecl (variable SCShared3p (SCArray 1 SCBool) nameResp)
+  , Empty
   ]
 
 extPredDecl :: Expr -> StructDecl
@@ -414,6 +418,8 @@ concreteGoal dp = mainFun $
 
   -- get user inputs
   map (\(Var xtype x) -> let (xdom,xsctype) = scVarType xtype in VarInit (variable xdom xsctype x) (BI.argument (SCConstStr x))) xs <>
+
+  [VarAsgn nameResp (BI.argument (SCConstStr nameResp))] <>
 
   -- establish database connection
   [ VarInit (variable SCPublic SCText ds) strDataset
@@ -700,6 +706,9 @@ formulaToSC ds q j =
     formulaToSC_case q' = case q' of
         ConstBool _ b -> [addB (BI.reshape (SCConstBool b) [SCVarName nameMM])]
 
+        Cast _ e -> formulaToSC_case e
+        Query _ i _ -> [addB (SCAt (SCVarName nameResp) i)]
+
         Pred _ _ zs   -> --add database attributes to the set of declared variables
                             -- TODO it would be nice to have access to data types of extensional predicates here
                             let stmts = zipWith (\z i -> formulaToSC ds (Un ann z (Var (z ^. annotation) (nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
@@ -751,7 +760,7 @@ formulaToSC ds q j =
             let zss = chunksOf n zs in
             [ VarAsgn nameBB $ L.foldr1 BI.myCat $ map (SCAnd (SCVarName nameBB) . bexprToSC) bs
             , VarAsgn nameBP $ L.foldr1 BI.myCat $ map (const $ SCVarName nameBP) bs] <>
-            zipWith (\(Var annx x) zs -> VarInit (variable SCPublic (scColType annx) x) $ L.foldr1 BI.myCat $ map exprToSC zs) xs zss
+            zipWith (\(Var annx x) zs' -> VarInit (variable SCPublic (scColType annx) x) $ L.foldr1 BI.myCat $ map exprToSC zs') xs zss
 
         -- unification may be a comparison as well as initialization (for strings)
         Un _ e1 e2 ->  ex

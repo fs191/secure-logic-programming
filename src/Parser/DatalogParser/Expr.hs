@@ -97,6 +97,7 @@ aExpr5 = choice
     par = typable $ parens aExpr
     ops =
       [ Operator "sqrt" eSqrt
+      , Operator "query" eQuery
       , Operator "\\+"  eNot
       ]
     binOps =
