@@ -74,6 +74,7 @@ module Expr
   , toDNF
   , toCNF
   , groundTerm
+  , queryExprs
   , exprEq
   ) where
 
@@ -423,6 +424,9 @@ varExprs e = nub [v | v@(Var _ _) <- U.universe e]
 
 varNames :: Expr -> [Text]
 varNames e = nub [v | (Var _ v) <- U.universe e]
+
+queryExprs :: Expr -> [(Int,Text)]
+queryExprs e = nub [(i,s) | (Query _ i (ConstStr _ s)) <- U.universe e]
 
 -- | Turns all `And`s to a list, 
 -- starting from the root of the expression

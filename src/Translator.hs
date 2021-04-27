@@ -14,6 +14,7 @@ import Data.Text.Prettyprint.Doc
 
 import Parser.DatalogParser
 
+import Translator.EnumQueries
 import Translator.Adornment
 import Translator.PKTransform
 import Translator.PostProcessing
@@ -54,7 +55,11 @@ process =
       forM_ ex $ putTextLn . show . errorMsg src
       unless success exitFailure
     liftIO . when dbg $ putTextLn "Semantics check succeeded"
-    let adp = adornProgram dp
+
+    eqp <- enumerateQueries dp
+    printDebug "EnumQueries" eqp
+
+    let adp = adornProgram eqp
     printDebug "Adornment" adp
 
     pp <- preProcess adp

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8f474e7e98353193d87ef3bb905a0bfae58c44b454617b585d0abaac3c601d24
+-- hash: 5fe97aa71602eeee7d41ff8d86f5e81db82ca45af21cfe8b81d0b1527882bbaa
 
 name:           secure-logic-programming
 version:        0.1.0.0
@@ -50,6 +50,7 @@ library
       Translator.Adornment
       Translator.CoerceTypes
       Translator.Distribute
+      Translator.EnumQueries
       Translator.MagicSets
       Translator.PKTransform
       Translator.PostProcessing
@@ -60,6 +61,7 @@ library
       Translator.Solve
       Translator.Transform
       Translator.TypeInference
+      Utils.Interactive
       Utils.Table
       Utils.TableGen
   other-modules:
@@ -129,6 +131,38 @@ executable lpsec-gen-tables
       Paths_secure_logic_programming
   hs-source-dirs:
       table-gen
+  ghc-options: -Wall -XNoImplicitPrelude -XOverloadedStrings -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      HUnit
+    , base >=4.7 && <5
+    , containers
+    , hspec
+    , hspec-expectations
+    , lens
+    , listsafe
+    , megaparsec
+    , mtl
+    , optparse-applicative
+    , parser-combinators
+    , prettyprinter
+    , relude
+    , secure-logic-programming
+    , semigroups
+    , shelly
+    , simple-smt
+    , split
+    , text
+    , transformers
+    , union-find
+    , uniplate
+  default-language: Haskell2010
+
+executable lpsec-interactive
+  main-is: Main.hs
+  other-modules:
+      Paths_secure_logic_programming
+  hs-source-dirs:
+      interactive
   ghc-options: -Wall -XNoImplicitPrelude -XOverloadedStrings -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       HUnit

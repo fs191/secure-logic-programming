@@ -69,6 +69,15 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - secure-logic-programming
+  lpsec-interactive:
+    main: Main.hs
+    source-dirs: interactive
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - secure-logic-programming
 
 tests:
   test:
