@@ -34,6 +34,7 @@ module Expr
   , eInv
   , eCast
   , eQuery
+  , eQueryI
   , eSqrt, ePow
   , eAdd, eSub
   , eMul, eDiv, eFDiv
@@ -333,7 +334,10 @@ eCast e t = Cast ann e
 
 -- | Creates a new query expression
 eQuery :: Expr -> Expr
-eQuery = Query e 0
+eQuery = eQueryI 0
+
+eQueryI :: Int -> Expr -> Expr
+eQueryI i = Query e i
   where
     e = empty & annBound .~ True
               & annType  .~ PPBool
@@ -498,6 +502,7 @@ identifier :: Expr -> Maybe Text
 identifier (Var _ n)       = Just n
 identifier (ConstStr _ n)  = Just n
 identifier (Pred _ n _)    = Just n
+identifier (Query _ i _)   = Just $ show i
 identifier (Attribute _ n) = Just n
 identifier (ConstBool _ b) = Just $ show b
 identifier _ = Nothing
@@ -561,8 +566,9 @@ isComparison _        = False
 
 -- | Returns True if the expression is a predicate, built-in or otherwise
 isPredicative :: Expr -> Bool
-isPredicative Pred{} = True
-isPredicative Aggr{} = True
+isPredicative Pred{}  = True
+isPredicative Query{} = True
+isPredicative Aggr{}  = True
 isPredicative x
   | isComparison x = True
   | otherwise      = False

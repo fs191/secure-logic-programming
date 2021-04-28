@@ -113,6 +113,8 @@ inferConstants (ConstBool _ x) = constBool x
 inferConstants (Pred _ n xs) = predicate n xs 
 -- Square root should return a float
 inferConstants (Sqrt _ x) = eSqrt x
+-- A query is a private bool
+inferConstants (Query _ i x) = eQueryI i x
 inferConstants x = x
 
 -- | Infers domains for database clauses
@@ -175,6 +177,8 @@ inferBinRet :: Expr -> Expr -> Expr -> Expr
 -- TODO we also need to infer the boolean domain
 inferBinRet e@Choose{} (Expr.List _ xs) (Expr.List _ _) =
     e & annotation . annType %~ fromMaybe err2 . unifyTypes t
+      -- currently, choose is only created for a set of bounded choices
+      & annotation . annBound .~ True
       & annotation . domain  .~ d
     where
       ts = map (\x -> x ^. annotation . annType) xs

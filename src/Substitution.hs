@@ -190,6 +190,9 @@ unify' ((Not _ x, Not _ y):t) = unify' $ [x] `zip` [y] <> t
 unify' ((Neg _ x, Neg _ y):t) = unify' $ [x] `zip` [y] <> t
 unify' ((Inv _ x, Inv _ y):t) = unify' $ [x] `zip` [y] <> t
 unify' ((Sqrt _ x, Sqrt _ y):t) = unify' $ [x] `zip` [y] <> t
+unify' ((Query _ i _, Query _ j _):t)
+  | i == j    = unify' t
+  | otherwise = Nothing
 -- Swap
 unify' ((x, y@(Var{})):t) = unify' $ (y, x):t
 -- Delete / conflict

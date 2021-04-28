@@ -12,8 +12,6 @@ import qualified Data.Map as M
 import qualified Data.List as L
 import Data.Text.Prettyprint.Doc
 
-import Debug.Trace
-
 import Expr
 import Substitution
 
@@ -91,8 +89,9 @@ transformExprs ((Un _ l r):es) h =
   case unify l r of
     Nothing -> Nothing
     Just th ->
-      if isJust t
-        then t <> transformExprs es h
+      let t' = transformExprs es h in
+      if isJust t && isJust t'
+        then t <> t'
         else Nothing
       where
         t = uns (zipWith eUn (keys th) (elems th)) h
@@ -122,7 +121,7 @@ comparison (e:es) h
     if simplifyConst e == eTrue
       then transformExprs es h
       else Nothing
-  | otherwise = Just [e] <> transformExprs es h
+  | otherwise = (e:) <$> transformExprs es h
 
 uns :: [Expr] -> Head -> Maybe [Expr]
 uns (u@(Un a l@(Var _ x) r@(Var _ y)):es) h@(b, o)
@@ -163,7 +162,8 @@ substitute'' (e@(Is a l r):es) subst@(ann, m) (b, o) =
            | otherwise -> Is a l (replace m b r)
     _ -> Is a l (replace m b r))
   : substitute'' es subst (b, o)
-substitute'' (e@Pred {}:es) subst h = e : substitute'' es subst h
+substitute'' (e@Pred {}:es)  subst h = e : substitute'' es subst h
+substitute'' (e@Query {}:es) subst h = e : substitute'' es subst h
 substitute'' (e:es) subst h =
   simplifyConst (replace (snd subst) (fst h) e)
     : substitute'' es subst h
@@ -225,7 +225,7 @@ findError :: [Expr] -> Env -> Maybe [Expr]
 findError (e:es) m
   | e' == eTrue = findError es m'
   | e' == eFalse = Nothing
-  | otherwise = Just [e'] <> findError es m'
+  | otherwise = (e':) <$> findError es m'
   where
     (e', m') = simplifyExpr e m
 findError [] _ = Just []
@@ -305,6 +305,8 @@ simplifyConst = U.rewrite f
     f (Le _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x <= y
     f (Ge _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x >= y
     f (Eq _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x == y
+    f (Eq _ (ConstStr _ x) (ConstStr _ y)) = Just . constBool $ x == y
+    f (Eq _ (ConstBool _ x) (ConstBool _ y)) = Just . constBool $ x == y
     f (Eq _ (Var _ x) (Var _ y))
       | x == y    = Just $ constBool True
       | otherwise = Nothing

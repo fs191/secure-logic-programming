@@ -1,6 +1,6 @@
 module Parser.DatalogParser.Lexer
   ( lexeme, symbol, sc
-  , variable, identifier
+  , variable, identifier, str
   , attributeIdentifier
   , signedInteger
   , signedFloat
@@ -50,6 +50,13 @@ variable = toText <$> lexeme variable' <?> "variable"
         t <- many $ alphaNumChar <|> identifierSymbols
         return $ h:t
 
+str :: Parser Text
+str = asum
+  [ lexeme $ (try sQuote) *> str' <* sQuote
+  , lexeme $ (try dQuote) *> str' <* dQuote
+  ]
+  <?> "string"
+
 identifier :: Parser Text
 identifier = asum
   [ lexeme $ (try sQuote) *> identifier' <* sQuote
@@ -73,7 +80,7 @@ attributeIdentifier =
   <?> "attribute"
 
 sQuote :: Parser Text
-sQuote = symbol "'"
+sQuote = symbol "\'"
 
 dQuote :: Parser Text
 dQuote = symbol "\""
@@ -87,6 +94,12 @@ identifier' =
 
 identifierSymbols :: Parser Char
 identifierSymbols = oneOf ['_']
+
+str' :: Parser Text
+str' =
+  do
+    s <- toText <$> many (anySingleBut '\'')
+    return $ s
 
 signedInteger :: Parser Int
 signedInteger = lexeme $ C.signed sc C.decimal

@@ -245,6 +245,8 @@ mergeTwoMatchingRules r1 r2 =
 foldChoose :: Expr -> Expr
 foldChoose (Is ann x y) =
     Is ann x (foldChoose y)
+foldChoose (Un ann x y) =
+    Un ann x (foldChoose y)
 foldChoose (Choose ann (Expr.List _ xs) (Expr.List _ bs)) =
     let ys = map foldChoose xs in
     let xs' = concat $ zipWith (\b y -> case y of {(Choose _ (Expr.List _ xs0) (Expr.List _ bs0)) -> xs0              ; _ -> [y]}) bs ys in

@@ -835,8 +835,9 @@ bexprToSC e =
   case e of 
 
     ConstBool _ b -> BI.reshape (SCConstBool b) [SCVarName nameMM]
-    Var   _ x -> SCVarName x
-    Not  _ e0 -> SCNot $ bexprToSC e0
+    Var   _ x     -> SCVarName x
+    Query _ i _   -> SCAt (SCVarName nameResp) i
+    Not  _ e0     -> SCNot $ bexprToSC e0
 
     Lt   _ e1 e2 -> BI.bop (SCConstStr "<") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
     Le   _ e1 e2 -> BI.bop (SCConstStr "<=") ( exprToSC e1) ( exprToSC e2) (SCVarName nameBP)
@@ -852,7 +853,8 @@ bexprToSC e =
 
 
 mergeChoose :: [Expr] -> [Expr]
-mergeChoose qs =
+mergeChoose qs' =
+    let qs = map (\q -> case q of {Un ann x y@Choose{} -> Is ann x y ; _ -> q}) qs' in
     let (qs0',qs1) = L.partition (\case {Is _ _ Choose{} -> True; _ -> False }) qs in
     let qs0 = map (\(Is annx x ch) -> Is annx (eList [x]) ch) qs0' in
     if not $ null qs0 then

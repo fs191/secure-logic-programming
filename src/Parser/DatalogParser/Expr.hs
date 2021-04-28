@@ -208,7 +208,7 @@ varParse = withSrcPos $
 strParse :: Parser Expr
 strParse = withSrcPos $
   do
-    s <- identifier
+    s <- str <|> identifier
     typable . return $ constStr s
 
 rule :: Parser R.Rule
