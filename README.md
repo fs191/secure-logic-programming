@@ -67,13 +67,13 @@ The obtained `*.sc` programs can be run on [Sharemind](https://sharemind.cyber.e
 
 The compiled bytecode can now be run with Sharemind Emulator using the auxiliary Python script, found in the `SecreC` subdirectory of this project.
 
-    python run_emulator.py createdb_auction.sb
-    python run_emulator.py auction.sb
+    python run_sharemind.py --sb=createdb_auction.sb
+    python run_sharemind.py --sb=auction.sb
 
-The same code can as well be run on real Sharemind MPC. For this, a set of computing servers (miners) should be set up first. The instructions for this are provided as a part of Sharemind platform.
+The same code can as well be run on real Sharemind MPC by adding flag --real. For this, a set of computing servers (miners) should be set up first. The instructions for this are provided as a part of Sharemind platform.
 
-    python run.py createdb_auction.sb
-    python run.py auction.sb
+    python run_sharemind.py --real --sb=createdb_auction.sb
+    python run_sharemind.py --real --sb=auction.sb
 
 Non-privacy-preserving versions of the programs of `examples/ppdatalog` can be found in `examples/prolog`, and can be executed using `test_script.pl` as follows:
 

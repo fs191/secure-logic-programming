@@ -10,6 +10,7 @@ import Control.Lens
 import Control.Monad.Except
 import qualified Data.Generics.Uniplate.Data as U
 
+import Data.List as L
 import Data.Text.Prettyprint.Doc
 
 import Parser.DatalogParser
@@ -59,7 +60,7 @@ process =
     eqp <- enumerateQueries dp
     printDebug "EnumQueries" eqp
 
-    let adp = adornProgram eqp
+    let adp = adornProgram eqp & dpRules %~ L.nub
     printDebug "Adornment" adp
 
     pp <- preProcess adp
