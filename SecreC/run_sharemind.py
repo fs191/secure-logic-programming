@@ -152,7 +152,7 @@ kw_val  = 'val'
 def run():
 
     parser = argparse.ArgumentParser(description='Run SecreC script')
-    parser.add_argument('inputs', metavar='X', nargs='+',
+    parser.add_argument('inputs', metavar='X', nargs='*',
                         help='user input of the form \'VARIABLE=VALUE:DOMAIN:TYPE\'')
     parser.add_argument('--sb',   dest='sbfilename')
     parser.add_argument('--qr',   dest='qrfilename')

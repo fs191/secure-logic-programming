@@ -279,9 +279,10 @@ extPredGet dbc = function (SCTemplateDecl Nothing) returnType fname fargs fbody
     ni = SCVarName "ni"
     p = view predName dbc
     as = view predArgs dbc
+    argNames = map (\x -> case x of {(Attribute _ a) -> a ; _ -> error $ "Expected an attribute, but got " <> show x}) as
     n = length as
     is = [0..n-1]
-    colGetter i = VarAsgn (nameTableArg result i) (fun ds (SCConstStr p) (SCConstInt i) m mi ni) 
+    colGetter i c = VarAsgn (nameTableArg result i) (fun ds (SCConstStr p) (SCConstStr c) m mi ni) 
       where
         fun = if Just True == as ^? ix i . annotation . annType . to (==PPStr)
                 then BI.getDBStrColumn
@@ -292,7 +293,7 @@ extPredGet dbc = function (SCTemplateDecl Nothing) returnType fname fargs fbody
     fbody = [ VarDecl $ variable SCPublic (SCStruct (nameOutTableStruct p) (SCTemplateUse Nothing)) result
             , VarAsgn (nameTableBB result) (BI.trueColumn m)
             ]
-            <> map colGetter is
+            <> zipWith colGetter is argNames
             <> [Return (SCVarName result)]
 
 intPredInDecl :: Text -> [Int] -> StructDecl
@@ -521,12 +522,13 @@ ruleBodyToSC ann argTableType ds input p xs ys q =
 
   where
     inputTable = "table0"
-    result   = "result"
+    result     = "result"
+    btype      = scDomainFromAnn ann
 
     asgnInputArgs  = map (\(Var xtype x,i) -> VarInit (variable SCPublic (scColType xtype) x) (SCVarName $ nameTableArg inputTable i)) xs
     asgnOutputArgs = map (\(z,i) -> VarAsgn (nameTableArg result i) (exprToSC z)) ys
 
-    initFilter = [ VarInit (variable (scDomainFromAnn ann) (SCArray 1 SCBool) nameBB) (SCVarName (nameTableBB inputTable))
+    initFilter = [ VarInit (variable btype (SCArray 1 SCBool) nameBB) (SCVarName (nameTableBB inputTable))
                  , VarInit (variable SCPublic (SCArray 1 SCBool) nameBP) (BI.reshape (SCConstBool True) [SCVarName nameMM])
                  ]
 
@@ -541,7 +543,7 @@ ruleBodyToSC ann argTableType ds input p xs ys q =
                                    VarInit (variable SCPublic SCUInt64 (nameN k)) (SCDiv (SCVarName nameMM) (SCProd (map (SCVarName . nameM) js))) ) ks
     getTables    = map (\(tk,k) -> VarInit (variable SCPublic (SCStruct (nameOutTableStruct tk) (SCTemplateUse Nothing)) (nameTable k)) (SCFunCall (nameGetTableStruct tk) [SCVarName ds, SCVarName nameMM, SCVarName (nameM k), SCVarName (nameN k)])) ts
 
-    evalBody = concat $ zipWith (formulaToSC ds) qs [1..]
+    evalBody = concat $ zipWith (formulaToSC btype ds) qs [1..]
 
 
 ---------------------------------------------------------------------
@@ -692,8 +694,8 @@ prepareGoal ds _ goalPred j =
 
 --------------------------------------------------
 -- convert a formula to SecreC (transformation S^F)
-formulaToSC :: Text -> Expr -> Int -> [Statement]
-formulaToSC ds q j =
+formulaToSC :: SCDomain -> Text -> Expr -> Int -> [Statement]
+formulaToSC btype ds q j =
   [SCEmpty, Comment ("q" <> show j)] <> formulaToSC_case q
   where
     ann = q ^. annotation
@@ -711,7 +713,7 @@ formulaToSC ds q j =
 
         Pred _ _ zs   -> --add database attributes to the set of declared variables
                             -- TODO it would be nice to have access to data types of extensional predicates here
-                            let stmts = zipWith (\z i -> formulaToSC ds (Un ann z (Var (z ^. annotation) (nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
+                            let stmts = zipWith (\z i -> formulaToSC btype ds (Un ann z (Var (z ^. annotation) (nameTableArg (nameTable j) i))) (ind j i)) zs [0..] in
                             let (comps', asgns') = L.partition snd $ zipWith (\s z -> (s, z ^. annotation . annBound)) stmts zs in
                             let comps = concatMap (map (\(VarInit _ bexpr) -> bexpr) . fst) comps' in
                             let asgns = concatMap fst asgns' in
@@ -724,18 +726,18 @@ formulaToSC ds q j =
 
         Not _ e ->
             let b1 = nameB (ind j 1) in
-            let s1 = formulaToSC ds e (ind j 1) in
+            let s1 = formulaToSC btype ds e (ind j 1) in
             s1 <> [initBj $ SCNot (SCVarName b1), addB bj]
 
         Or _ e1 e2 ->
             let b1 = nameB (ind j 1) in
             let b2 = nameB (ind j 2) in
             -- store the current state of BB and BP
-            let bsave = [ VarInit (variable SCShared3p (SCArray 1 SCBool) (nameBBres j)) (SCVarName nameBB)
-                        , VarInit (variable SCPublic   (SCArray 1 SCBool) (nameBPres j)) (SCVarName nameBP)] in
+            let bsave = [ VarInit (variable btype    (SCArray 1 SCBool) (nameBBres j)) (SCVarName nameBB)
+                        , VarInit (variable SCPublic (SCArray 1 SCBool) (nameBPres j)) (SCVarName nameBP)] in
             -- compute the branches
-            let s1 = formulaToSC ds e1 (ind j 1) in
-            let s2 = formulaToSC ds e2 (ind j 2) in
+            let s1 = formulaToSC btype ds e1 (ind j 1) in
+            let s2 = formulaToSC btype ds e2 (ind j 2) in
             -- return to the saved state of BB and BP after exiting each branch
             let bload = [ VarAsgn nameBB (SCVarName (nameBBres j))
                         , VarAsgn nameBP (SCVarName (nameBPres j))] in
@@ -744,8 +746,8 @@ formulaToSC ds q j =
         And _ e1 e2 ->
             let b1 = nameB (ind j 1) in
             let b2 = nameB (ind j 2) in
-            let s1 = formulaToSC ds e1 (ind j 1) in
-            let s2 = formulaToSC ds e2 (ind j 2) in
+            let s1 = formulaToSC btype ds e1 (ind j 1) in
+            let s2 = formulaToSC btype ds e2 (ind j 2) in
             s1 <> s2 <> [initBj $ SCAnd (SCVarName b1) (SCVarName b2), addB bj]
 
         Lt{} -> [initBj $ exprToSC q', addB bj]

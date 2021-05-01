@@ -448,6 +448,11 @@ T[[1]] myCat(T[[1]] X, T[[1]] Y) {
 
 template <type T>
 T[[2]] myCat(T[[2]] X, T[[2]] Y) {
+    if (shape(X)[1] > shape(Y)[1]){
+        Y = cat(Y, reshape(0, shape(Y)[0], shape(X)[1] - shape(Y)[1]), 1);
+    } else if (shape(X)[1] < shape(Y)[1]){
+        X = cat(X, reshape(0, shape(X)[0], shape(Y)[1] - shape(X)[1]), 1);
+    }
     return cat(X, Y, 0);
 }
 
@@ -1170,6 +1175,27 @@ relColumn<D, T, T> getDBColumn(string ds, string tableName, K _colIndex, uint m,
     result.str = reshape((T) 0, m, 0);
     return result;
 }
+template<domain D, type T>
+relColumn<D, T, T> getDBColumn(string ds, string tableName, string colName, uint m, uint mi, uint ni){
+
+    uint [[1]] ms (mi); ms = 1;
+    uint [[1]] ns (mi); ns = ni;
+
+    D T [[1]] col = tdbReadColumn(ds, tableName, colName);
+    col = mySlice(col,0,min(size(col),mi));
+
+    //print("reportedNumRows:",mi);
+    //print("colSize:",        size(col));
+
+    col = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
+    //print("colSizeRep:", size(col));
+
+    public relColumn<D, T, T> result;
+    result.fv  = reshape(false, m);
+    result.val = col;
+    result.str = reshape((T) 0, m, 0);
+    return result;
+}
 
 template<domain D, type T, type S, type K>
 relColumn<D, T, S> getDBStrColumn(string ds, string tableName, K _colIndex, uint m, uint mi, uint ni){
@@ -1179,15 +1205,16 @@ relColumn<D, T, S> getDBStrColumn(string ds, string tableName, K _colIndex, uint
     uint [[1]] ms (mi); ms = 1;
     uint [[1]] ns (mi); ns = ni;
 
-    D T [[1]] col     = reshape(0,mi);
+    D T [[1]] col_val = reshape(0,mi);
     D S [[2]] col_str = reshape(0,mi,0);
+
     rv = tdbReadColumn(ds, tableName, colIndex);
     for (uint i = 0; i < mi; i++){
         //TODO we hope to find a better solution for public columns (need a public CRC32 function)
         D S [[1]] _temp = tdbVmapGetVlenValue(rv, "values", i);
         pd_shared3p xor_uint8 [[1]] temp = _temp;
 
-        col[i] = declassifyIfNeed(CRC32(temp));
+        col_val[i] = declassifyIfNeed(CRC32(temp));
         uint n = size(temp);
 
         D S [[2]] temp2 = reshape(0, shape(col_str)[0], max(shape(col_str)[1], n));
@@ -1196,17 +1223,51 @@ relColumn<D, T, S> getDBStrColumn(string ds, string tableName, K _colIndex, uint
         temp2 = mySetSlice(myReshape(temp3, 1, n), temp2, i, i+1, 0, n);
         col_str = temp2;
     }
-    col     = copyBlock(myReplicate(col, ms, ns), {mi * ni}, {m / (mi * ni)});
+    col_val = copyBlock(myReplicate(col_val, ms, ns), {mi * ni}, {m / (mi * ni)});
     col_str = copyBlock(myReplicate(col_str, ms, ns), {mi * ni}, {m / (mi * ni)});
 
     public relColumn<D, T, S> result;
     result.fv  = reshape(false, m);
-    result.val = col;
+    result.val = col_val;
     result.str = col_str;
     //print("finish:",mi);
     return result;
 }
 
+template<domain D, type T, type S>
+relColumn<D, T, S> getDBStrColumn(string ds, string tableName, string colName, uint m, uint mi, uint ni){
+
+    uint rv;
+    uint [[1]] ms (mi); ms = 1;
+    uint [[1]] ns (mi); ns = ni;
+
+    D T [[1]] col_val = tdbReadColumn(ds, tableName, colName + "_val");
+    D S [[2]] col_str = reshape(0,mi,0);
+    rv = tdbReadColumn(ds, tableName, colName);
+
+    for (uint i = 0; i < mi; i++){
+
+        D S [[1]] row = tdbVmapGetVlenValue(rv, "values", i);
+        uint n = size(row);
+
+        if (n > shape(col_str)[1]){
+            D S [[2]] temp = reshape(0, shape(col_str)[0], n);
+            col_str        = mySetSlice(col_str, temp, 0, shape(col_str)[0], 0, shape(col_str)[1]);
+        }
+        col_str = mySetSlice(myReshape(row, 1, n), col_str, i, i+1, 0, n);
+
+    }
+
+    col_val = copyBlock(myReplicate(col_val, ms, ns), {mi * ni}, {m / (mi * ni)});
+    col_str = copyBlock(myReplicate(col_str, ms, ns), {mi * ni}, {m / (mi * ni)});
+
+    public relColumn<D, T, S> result;
+    result.fv  = reshape(false, m);
+    result.val = col_val;
+    result.str = col_str;
+
+    return result;
+}
 // write public data to secret-shared database (create table step)
 // this is meant for testing only
 // colDataType:
@@ -1221,15 +1282,17 @@ void createTable(string ds, string tableName, T [[1]] _colDataType, T [[1]] _col
     uint [[1]] colDomain   = (uint)_colDomain;
     uint [[1]] ns = (uint)_ns;
 
-    pd_shared3p bool      private_bool;
-    pd_shared3p int32     private_int32;
-    pd_shared3p float32   private_float32;
-    pd_shared3p xor_uint8 private_string;
+    pd_shared3p bool       private_bool;
+    pd_shared3p int32      private_int32;
+    pd_shared3p float32    private_float32;
+    pd_shared3p xor_uint8  private_string;
+    pd_shared3p xor_uint32 private_xint32;
 
     bool    public_bool;
     int32   public_int32;
     float32 public_float32;
     uint8   public_string;
+    uint32  public_xint32;
 
     uint params;
 
@@ -1243,6 +1306,10 @@ void createTable(string ds, string tableName, T [[1]] _colDataType, T [[1]] _col
     uint n = size(ns);
     uint offset = 0;
     for (uint j = 0; j < n; j++){
+
+        string colName = substring(headers, offset, offset + ns[j]);
+        offset = offset + ns[j];
+
         if (colDataType[j] == 0){
             if (colDomain[j] == 0){
                 tdbVmapAddType(params, "types", public_bool);
@@ -1262,14 +1329,18 @@ void createTable(string ds, string tableName, T [[1]] _colDataType, T [[1]] _col
                 tdbVmapAddType(params, "types", private_float32);
             }
         }else{
+            //for string columns, we keep both the text and the CRC32 hash
             if (colDomain[j] == 0){
+                tdbVmapAddString(params, "names", colName + "_val");
+                tdbVmapAddType(params, "types", public_xint32);
                 tdbVmapAddVlenType(params, "types", public_string);
             }else{
+                tdbVmapAddString(params, "names", colName + "_val");
+                tdbVmapAddType(params, "types", private_xint32);
                 tdbVmapAddVlenType(params, "types", private_string);
             }
         }
-        tdbVmapAddString(params, "names", substring(headers, offset, offset + ns[j]));
-        offset = offset + ns[j];
+        tdbVmapAddString(params, "names", colName);
     }
     tdbTableCreate(ds, tableName, params);
     tdbVmapDelete(params);
@@ -1333,11 +1404,19 @@ void writePublicToTable(string ds, string tableName, T [[1]] _colDataType, T [[1
                 floatCnt++;
             } else {
                 if (colDomain[j] == 0){
-                  uint8 [[1]] temp = __bytes_from_string(substring(strData, offset, offset + ms[strCnt]));
-                  tdbVmapAddVlenValue(params, "values", temp);
+                  uint8 [[1]] temp_str = __bytes_from_string(substring(strData, offset, offset + ms[strCnt]));
+
+                  pd_shared3p xor_uint8 [[1]] temp_str_priv = temp_str;
+                  uint32 temp_val = declassify(CRC32(temp_str_priv));
+
+                  tdbVmapAddValue(params, "values", temp_val);
+                  tdbVmapAddVlenValue(params, "values", temp_str);
                 }else{
-                  pd_shared3p xor_uint8 [[1]] temp = __bytes_from_string(substring(strData, offset, offset + ms[strCnt]));
-                  tdbVmapAddVlenValue(params, "values", temp);
+                  pd_shared3p xor_uint8 [[1]] temp_str = __bytes_from_string(substring(strData, offset, offset + ms[strCnt]));
+                  pd_shared3p xor_uint32 temp_val = CRC32(temp_str);
+
+                  tdbVmapAddValue(params, "values", temp_val);
+                  tdbVmapAddVlenValue(params, "values", temp_str);
                 }
                 offset = offset + ms[strCnt];
                 strCnt++;
@@ -1584,6 +1663,23 @@ relColumn<D, T0, S0> myCat(relColumn<D, T0, S0> x, relColumn<public, T1, S1> y){
         z.str = x.str;
     } else {
         z.str = myCat(x.str, ystr);
+    }
+    return z;
+}
+
+template<type T0, type S0, type T1, type S1>
+relColumn<public, T0, S0> myCat(relColumn<public, T0, S0> x, relColumn<public, T1, S1> y){
+    T0 [[1]] yval = y.val;
+    S0 [[2]] ystr = y.str;
+    relColumn<public, T0, S0> z;
+    z.fv  = cat(x.fv,  y.fv);
+    z.val = cat(x.val, yval);
+    if (shape(x.str)[0] == 0){
+        z.str = ystr;
+    } else if (shape(y.str)[0] == 0) {
+        z.str = x.str;
+    } else {
+        z.str = cat(x.str, ystr);
     }
     return z;
 }
