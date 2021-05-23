@@ -7,6 +7,8 @@ module Utils.TableGen
   ) where
 
 import Relude
+import Data.List
+import Data.List.Split
 import qualified Data.Text as T
 import Control.Lens
 
@@ -45,6 +47,10 @@ csvImportCode dp = do
                                      <> concat (zipWith (tableGenerationCode ds) extPreds tableData) <>
                                      [BI.tdbCloseConnection $ SCVarName ds]]
 
+-- we need to split large datatables into chunks to make them compilable
+chunkLength :: Int
+chunkLength = 256
+
 tableGenerationCode :: Text -> Expr -> [[Text]] -> [Statement]
 tableGenerationCode ds dbc (tableHeader:tableRows) =
 
@@ -53,17 +59,18 @@ tableGenerationCode ds dbc (tableHeader:tableRows) =
                     (SCConstArr (map SCConstInt types)) 
                     (SCConstArr (map SCConstInt domains))
                     (SCConstStr headerStr) 
-                    (SCConstArr (map SCConstInt hlengths))
-  , BI.writePublicToTable (SCVarName ds) 
+                    (SCConstArr (map SCConstInt hlengths))]
+  ++ zipWith5 (\boolData intData floatData strData vlengths ->
+                 BI.writePublicToTable (SCVarName ds) 
                           (SCConstStr p) 
                           (SCConstArr (map SCConstInt types)) 
                           (SCConstArr (map SCConstInt domains))
                           (SCConstArr (map SCConstAny boolData))
                           (SCConstArr (map SCConstAny intData))
                           (SCConstArr (map SCConstAny floatData))
-                          (SCConstStr strData)
+                          (SCConstStr (mconcat strData))
                           (SCConstArr (map SCConstInt vlengths))
-  ]
+         ) boolDatas intDatas floatDatas strDatas vlengthss
 
   where
         p  = dbc ^. predName
@@ -90,13 +97,27 @@ tableGenerationCode ds dbc (tableHeader:tableRows) =
 
         tableData = concatMap (zip types) tableRows
 
-        boolData  = map snd $ filter (\x -> fst x == 0) tableData
-        intData   = map snd $ filter (\x -> fst x == 1) tableData
-        floatData = map snd $ filter (\x -> fst x == 2) tableData
-        strData'  = map snd $ filter (\x -> fst x == 3) tableData
+        boolData'  = map snd $ filter (\x -> fst x == 0) tableData
+        intData'   = map snd $ filter (\x -> fst x == 1) tableData
+        floatData' = map snd $ filter (\x -> fst x == 2) tableData
+        strData'   = map snd $ filter (\x -> fst x == 3) tableData
 
-        vlengths = map T.length strData'
-        strData  = mconcat strData'
+        vlengths' = map T.length strData'
+
+        boolDatas'  = chunksOf chunkLength boolData'
+        intDatas'   = chunksOf chunkLength intData'
+        floatDatas' = chunksOf chunkLength floatData'
+        strDatas'   = chunksOf chunkLength strData'
+        vlengthss'  = chunksOf chunkLength vlengths'
+
+        n = foldr max 0 [length boolDatas', length intDatas', length floatDatas', length strDatas'] 
+
+        boolDatas  = boolDatas'  ++ replicate (n - (length boolDatas'))  []
+        intDatas   = intDatas'   ++ replicate (n - (length intDatas'))   []
+        floatDatas = floatDatas' ++ replicate (n - (length floatDatas')) []
+        strDatas   = strDatas'   ++ replicate (n - (length strDatas'))   []
+        vlengthss  = vlengthss'  ++ replicate (n - (length vlengthss'))  []
+
 tableGenerationCode _ _ _ = error "Invalid arguments passed to tableGenerationCode"
 
 hdr :: [TopStatement]
