@@ -131,7 +131,9 @@ data SCExpr
 
 instance Pretty SCExpr where
   pretty (SCConstInt x)   = pretty x
-  pretty (SCConstFloat x) = pretty x
+  --TODO maybe, this is an issue of older scc that the float type has to be explicit
+  pretty (SCConstFloat x) = pretty x <> " :: float"
+
   pretty (SCConstStr x)   = dquotes $ pretty x
   pretty (SCConstBool True)  = "true"
   pretty (SCConstBool False) = "false"

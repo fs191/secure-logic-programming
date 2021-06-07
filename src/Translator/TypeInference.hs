@@ -109,6 +109,7 @@ inferConstants :: Expr -> Expr
 inferConstants (ConstStr _ x) = constStr x
 inferConstants (ConstInt _ x) = constInt x
 inferConstants (ConstBool _ x) = constBool x
+inferConstants (ConstFloat _ x) = constFloat x
 -- Ensure that the return type of all predicates is boolean
 inferConstants (Pred _ n xs) = predicate n xs 
 -- Square root should return a float
