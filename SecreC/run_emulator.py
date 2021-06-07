@@ -193,11 +193,11 @@ for i in range(k,n):
     elif (vtype=="bool"):
 
             #TODO use this code after updating sharemind-emulator
-            #s = s + ["--str=" + var, "--str=pd_shared3p", "--str=xor_uint8", "--size=" + str(len(value)), "--xstr=" + ("".join("{:02x}".format(int(c)) for c in value))]
+            #s = s + ["--str=" + var, "--str=pd_shared3p", "--str=bool", "--size=" + str(len(value)), "--xstr=" + ("".join("{:02x}".format(int(c)) for c in value))]
 
             #this is a workaround
             xstr = map(lambda x : (x / 15) * 16 + x % 15, (int(c) for c in value))
-            s = s + ["--str=" + var, "--str=pd_shared3p", "--str=xor_uint8", "--size=" + str(len(xstr)), "--xstr=" + ("".join("{:02x}".format(c) for c in xstr))]
+            s = s + ["--str=" + var, "--str=pd_shared3p", "--str=bool", "--size=" + str(len(xstr)), "--xstr=" + ("".join("{:02x}".format(c) for c in xstr))]
 
 
     #currently, anything else is integer
