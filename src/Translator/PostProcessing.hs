@@ -32,10 +32,12 @@ postProcess
   -> m DatalogProgram
 postProcess prog = 
   do
-    let prog' = removeFalseDP 
+    let prog' = removeFalseDP
               . foldChooseDP
               . simplifyDP
               . mergeRulesDP
+              . simplifyDP
+              . propagateConstInputs
               . filterGoalRules 
               $ filterGroundRules prog
     when (prog' ^. dpRules . to null) $ return DoesNotConverge $> ()
@@ -64,6 +66,25 @@ filterGoalRules dp = dp & dpRules .~ _rs
   where _g     = dp ^. dpGoal . _Pred . _2
         _rs    = dp ^.. dpRules . folded . filtered _fil
         _fil x = Just True == x ^? ruleHead . _Pred . _2 . to(==_g)
+
+-- | Propagate constant inputs (if any) into remaining rules
+propagateConstInputs :: DatalogProgram -> DatalogProgram
+propagateConstInputs dp = dp & dpRules %~ map (instantiateConstArgs goalArgs)
+  where goalArgs  = dp ^. dpGoal ^. predArgs
+
+
+-- | Propagates constant inputs into the rule head
+instantiateConstArgs :: [Expr] -> Rule -> Rule
+instantiateConstArgs goalArgs r = r & ruleTail %~ eAnd newConds
+    where
+       --f e = e & annotation %~ bind False
+       --g e = e & annotation %~ bind True
+       ruleArgs = args r
+       comps = zipWith eUn ruleArgs goalArgs
+       constArgs = filter (\(Un _ _ y) -> isTrueConstExpr y) comps
+       newConds  = if constArgs == [] then eTrue else L.foldr1 eAnd constArgs
+
+bind b ann = ann & annBound .~ b
 
 removeFalseDP :: DatalogProgram -> DatalogProgram
 removeFalseDP dp = dp & dpRules %~ removeFalseFacts

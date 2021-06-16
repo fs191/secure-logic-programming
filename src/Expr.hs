@@ -46,6 +46,7 @@ module Expr
   , eFalse
   , eAggr
   , isConstExpr
+  , isTrueConstExpr
   , varNames
   , annotation
   , vals
@@ -422,6 +423,10 @@ eFalse = constBool False
 -- | Is the expression constant (i.e. does not contain any variables)?
 isConstExpr :: Expr -> Bool
 isConstExpr e = L.null [x | x@(Var _ _) <- U.universe e]
+
+-- | Is the expression a true constant (i.e. does not contain neither variables not attributes)?
+isTrueConstExpr :: Expr -> Bool
+isTrueConstExpr e = L.null $ [x | x@(Var _ _) <- U.universe e] ++ [x | x@(Attribute _ _) <- U.universe e]
 
 varExprs :: Expr -> [Expr]
 varExprs e = nub [v | v@(Var _ _) <- U.universe e]

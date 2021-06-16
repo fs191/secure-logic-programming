@@ -61,7 +61,8 @@ m_lookup expr m =
 -- | Simplifies list of expressions
 -- | Note that bounded vars are united with free vars (and the other way around) on purpose
 simplify :: [Expr] -> Head -> [Expr]
-simplify es (b, o) =
+simplify es0 (b, o) =
+     let es = map simplifyConst es0 in
      let res = simplify' es (b `L.union` predFreeVars es, o `L.union` predBoundedVars es) in
      case res of
        Just x  -> x
@@ -294,22 +295,76 @@ simplifyConst = U.rewrite f
     f (Or _ _ (ConstBool _ True)) = Just $ constBool True
     f (Or _ (ConstBool _ False) x) = Just x
     f (Or _ x (ConstBool _ False)) = Just x
+
+    f (Mod _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x `mod` y
+
     f (Add _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x + y
     f (Sub _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x - y
     f (Mul _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x * y
-    f (Mod _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x `mod` y
+    f (Div _ (ConstInt _ x) (ConstInt _ y)) = Just . constFloat $ (fromIntegral x) / (fromIntegral y)
+    f (Pow _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x ^ y
+
+    f (Add _ (ConstInt _ x) (ConstFloat _ y)) = Just . constFloat $ (fromIntegral x) + y
+    f (Sub _ (ConstInt _ x) (ConstFloat _ y)) = Just . constFloat $ (fromIntegral x) - y
+    f (Mul _ (ConstInt _ x) (ConstFloat _ y)) = Just . constFloat $ (fromIntegral x) * y
+    f (Div _ (ConstInt _ x) (ConstFloat _ y)) = Just . constFloat $ (fromIntegral x) / y
+    f (Pow _ (ConstInt _ x) (ConstFloat _ y)) = Just . constFloat $ (fromIntegral x) ** y
+
+    f (Add _ (ConstFloat _ x) (ConstInt _ y)) = Just . constFloat $ x + (fromIntegral y)
+    f (Sub _ (ConstFloat _ x) (ConstInt _ y)) = Just . constFloat $ x - (fromIntegral y)
+    f (Mul _ (ConstFloat _ x) (ConstInt _ y)) = Just . constFloat $ x * (fromIntegral y)
+    f (Div _ (ConstFloat _ x) (ConstInt _ y)) = Just . constFloat $ x / (fromIntegral y)
+    f (Pow _ (ConstFloat _ x) (ConstInt _ y)) = Just . constFloat $ x ^ y
+
+    f (Add _ (ConstFloat _ x) (ConstFloat _ y)) = Just . constFloat $ x + y
+    f (Sub _ (ConstFloat _ x) (ConstFloat _ y)) = Just . constFloat $ x - y
+    f (Mul _ (ConstFloat _ x) (ConstFloat _ y)) = Just . constFloat $ x * y
+    f (Div _ (ConstFloat _ x) (ConstFloat _ y)) = Just . constFloat $ x / y
+    f (Div _ (ConstFloat _ x) (ConstFloat _ y)) = Just . constFloat $ x ** y
+
+    f (Sqrt _ (ConstInt _ x)) = Just . constFloat $ sqrt (fromIntegral x)
+    f (Sqrt _ (ConstFloat _ x)) = Just . constFloat $ sqrt x
+
     --f (Min _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x `min` y
     --f (Max _ (ConstInt _ x) (ConstInt _ y)) = Just . constInt $ x `max` y
+
     f (Lt _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x < y
     f (Gt _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x > y
     f (Le _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x <= y
     f (Ge _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x >= y
     f (Eq _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x == y
+    f (Neq _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x /= y
+
+    f (Lt _ (ConstInt _ x) (ConstFloat _ y)) = Just . constBool $ (fromIntegral x) < y
+    f (Gt _ (ConstInt _ x) (ConstFloat _ y)) = Just . constBool $ (fromIntegral x) > y
+    f (Le _ (ConstInt _ x) (ConstFloat _ y)) = Just . constBool $ (fromIntegral x) <= y
+    f (Ge _ (ConstInt _ x) (ConstFloat _ y)) = Just . constBool $ (fromIntegral x) >= y
+    f (Eq _ (ConstInt _ x) (ConstFloat _ y)) = Just . constBool $ (fromIntegral x) == y
+    f (Neq _ (ConstInt _ x) (ConstFloat _ y)) = Just . constBool $ (fromIntegral x) /= y
+
+    f (Lt _ (ConstFloat _ x) (ConstInt _ y)) = Just . constBool $ x < (fromIntegral y)
+    f (Gt _ (ConstFloat _ x) (ConstInt _ y)) = Just . constBool $ x > (fromIntegral y)
+    f (Le _ (ConstFloat _ x) (ConstInt _ y)) = Just . constBool $ x <= (fromIntegral y)
+    f (Ge _ (ConstFloat _ x) (ConstInt _ y)) = Just . constBool $ x >= (fromIntegral y)
+    f (Eq _ (ConstFloat _ x) (ConstInt _ y)) = Just . constBool $ x == (fromIntegral y)
+    f (Neq _ (ConstFloat _ x) (ConstInt _ y)) = Just . constBool $ x /= (fromIntegral y)
+
+    f (Lt _ (ConstFloat _ x) (ConstFloat _ y)) = Just . constBool $ x < y
+    f (Gt _ (ConstFloat _ x) (ConstFloat _ y)) = Just . constBool $ x > y
+    f (Le _ (ConstFloat _ x) (ConstFloat _ y)) = Just . constBool $ x <= y
+    f (Ge _ (ConstFloat _ x) (ConstFloat _ y)) = Just . constBool $ x >= y
+    f (Eq _ (ConstFloat _ x) (ConstFloat _ y)) = Just . constBool $ x == y
+    f (Neq _ (ConstFloat _ x) (ConstFloat _ y)) = Just . constBool $ x /= y
+
+
     f (Eq _ (ConstStr _ x) (ConstStr _ y)) = Just . constBool $ x == y
     f (Eq _ (ConstBool _ x) (ConstBool _ y)) = Just . constBool $ x == y
     f (Eq _ (Var _ x) (Var _ y))
       | x == y    = Just $ constBool True
       | otherwise = Nothing
-    f (Neq _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x /= y
+
+    f (Neq _ (ConstStr _ x) (ConstStr _ y)) = Just . constBool $ x /= y
+    f (Neq _ (ConstBool _ x) (ConstBool _ y)) = Just . constBool $ x /= y
+
     f (Is _ (ConstInt _ x) (ConstInt _ y)) = Just . constBool $ x == y
     f _ = Nothing
